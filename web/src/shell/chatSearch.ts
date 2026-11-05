@@ -54,8 +54,10 @@ export async function pagesUntil(
   return { messages: got.flat(), older, found: false }
 }
 
-/* Where prose is drawn in a row: what the backend searched, and nothing else. */
+/* Where prose is drawn in a row: what the backend searched, and nothing else.
+   A subagent's text is drawn inside the work, and is not searched. */
 const PROSE = '.md, .said__t'
+const WORK = '.acts'
 
 /* Each place `needle` is drawn in the prose under `root`, ignoring case, in order. */
 export function rangesIn(root: ParentNode, needle: string): Range[] {
@@ -63,7 +65,7 @@ export function rangesIn(root: ParentNode, needle: string): Range[] {
   if (!want) return []
   const found: Range[] = []
   for (const prose of Array.from(root.querySelectorAll(PROSE))) {
-    if (prose.parentElement?.closest(PROSE)) continue
+    if (prose.parentElement?.closest(PROSE) || prose.closest(WORK)) continue
     const walk = document.createTreeWalker(prose, NodeFilter.SHOW_TEXT)
     for (let node = walk.nextNode(); node; node = walk.nextNode()) {
       const text = (node.nodeValue ?? '').toLowerCase()

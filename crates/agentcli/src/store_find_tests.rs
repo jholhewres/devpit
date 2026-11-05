@@ -1,6 +1,6 @@
 use devpit_rpc::{Message, Part, Role};
 
-use super::{found, prompts};
+use super::{found, prompts, OPENING};
 
 fn said(id: &str, role: Role, parts: Vec<Part>) -> Message {
     Message {
@@ -66,5 +66,44 @@ fn the_prompts_are_the_persons_messages_where_they_sit() {
     assert_eq!(read.total, 3);
     assert_eq!(read.prompts[0].text, "first question");
     assert_eq!(read.prompts[1].at, 2);
-    assert_eq!(read.prompts[1].text.chars().count(), 140);
+    assert_eq!(read.prompts[1].text.chars().count(), OPENING);
+}
+
+#[test]
+fn only_what_the_window_draws_is_counted() {
+    let messages = vec![
+        said(
+            "m1",
+            Role::User,
+            vec![text("@/home/me/parser.png @/tmp/a.txt\nfix the parser")],
+        ),
+        said(
+            "m2",
+            Role::User,
+            vec![text("/review\n@/home/me/parser.rs\nthe parser again")],
+        ),
+        said(
+            "m3",
+            Role::Assistant,
+            vec![
+                Part::Text {
+                    text: "a subagent read the parser".to_owned(),
+                    parent: Some("call_1".to_owned()),
+                },
+                text("I will check the parser first."),
+            ],
+        ),
+    ];
+    assert_eq!(
+        found(&messages, "parser")
+            .iter()
+            .map(|hit| (hit.message_id.as_str(), hit.count))
+            .collect::<Vec<_>>(),
+        [("m1", 1), ("m2", 1), ("m3", 1)]
+    );
+    assert_eq!(prompts(&messages).prompts[0].text, "fix the parser");
+    assert_eq!(
+        prompts(&messages).prompts[1].text,
+        "/review the parser again"
+    );
 }

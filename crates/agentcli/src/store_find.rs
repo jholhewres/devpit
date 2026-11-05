@@ -1,13 +1,15 @@
 //! A whole conversation read for what it says: where a word is, and what the
 //! person asked. The window holds a page of it; these answer for all of it.
 
+use std::borrow::Cow;
+
 use devpit_rpc::{ConversationPrompts, FoundIn, Message, Part, Prompt, Role};
 
 /// The most of a prompt the rail shows.
 const OPENING: usize = 140;
 
 /// The messages whose prose holds `query`, ignoring case, and how many times
-/// each does. Tool output and thinking are left out: they are drawn folded.
+/// each does: the prose the window draws, not tool output or thinking.
 pub fn found(messages: &[Message], query: &str) -> Vec<FoundIn> {
     let needle = query.trim().to_lowercase();
     if needle.is_empty() {
@@ -35,7 +37,8 @@ pub fn prompts(messages: &[Message]) -> ConversationPrompts {
         .filter(|(_, message)| message.role == Role::User)
         .filter_map(|(at, message)| {
             let words = prose(message)
-                .flat_map(str::split_whitespace)
+                .map(|text| text.split_whitespace().collect::<Vec<_>>().join(" "))
+                .filter(|text| !text.is_empty())
                 .collect::<Vec<_>>()
                 .join(" ");
             (!words.is_empty()).then(|| Prompt {
@@ -51,11 +54,36 @@ pub fn prompts(messages: &[Message]) -> ConversationPrompts {
     }
 }
 
-fn prose(message: &Message) -> impl Iterator<Item = &str> {
-    message.parts.iter().filter_map(|part| match part {
-        Part::Text { text, .. } => Some(text.as_str()),
+/// The prose a message draws: its own text, not a subagent's (drawn in the
+/// folded work), and a person's words without the attachment line drawn as chips.
+fn prose(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
+    let person = message.role == Role::User;
+    message.parts.iter().filter_map(move |part| match part {
+        Part::Text { text, parent: None } if person => Some(typed(text)),
+        Part::Text { text, parent: None } => Some(Cow::Borrowed(text.as_str())),
         _ => None,
     })
+}
+
+/// A sent prompt without its `@path` line, as the window's `sentWith` splits
+/// it: the first line, or the second under a picked skill's.
+fn typed(text: &str) -> Cow<'_, str> {
+    let lines = text.split('\n').collect::<Vec<_>>();
+    if attached(lines[0]) {
+        return Cow::Owned(lines[1..].join("\n"));
+    }
+    let skilled = lines[0].starts_with('/') || lines[0].starts_with("Use the ");
+    if skilled && lines.get(1).is_some_and(|line| attached(line)) {
+        return Cow::Owned([&lines[..1], &lines[2..]].concat().join("\n"));
+    }
+    Cow::Borrowed(text)
+}
+
+fn attached(line: &str) -> bool {
+    line.starts_with('@')
+        && line
+            .split(' ')
+            .all(|token| token.len() > 1 && token.starts_with('@'))
 }
 
 #[cfg(test)]

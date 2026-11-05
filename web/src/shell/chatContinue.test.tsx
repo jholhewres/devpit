@@ -1,11 +1,14 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../gen/bindings'
 import { CONTINUE, continuable } from './chat'
 import { ChatThread } from './ChatThread'
+import { rangesIn } from './chatSearch'
 import { Markdown } from './MarkdownView'
+import { Turn } from './Turn'
+import { disclose } from './useDisclosed'
 
 vi.mock('./TurnApps', () => ({ TurnApps: () => null }))
 vi.mock('./TurnDelegations', () => ({ TurnDelegations: () => null }))
@@ -57,5 +60,28 @@ describe('a code block', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy code' }))
     expect(writeText).toHaveBeenCalledWith('make test\nmake fmt')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
+  })
+})
+
+describe('a match in a settled turn', () => {
+  it('is drawn once the search opens the fold that hid it', () => {
+    const narrated = {
+      id: 'm9',
+      turnId: 't9',
+      role: 'assistant',
+      createdAt: 2,
+      streaming: false,
+      ended: { at: 2, stopReason: 'end_turn', isError: false },
+      parts: [
+        { kind: 'text', text: 'I will check the parser first.', parent: null },
+        { kind: 'tool_call', id: 'c1', name: 'Read', input: '{}', state: 'ok', parent: null },
+        { kind: 'tool_result', call_id: 'c1', output: 'x', is_error: false, parent: null },
+        { kind: 'text', text: 'Done.', parent: null },
+      ],
+    } as unknown as Message
+    render(<Turn message={narrated} folder={null} />)
+    expect(rangesIn(document.body, 'parser')).toHaveLength(0)
+    act(() => disclose('m9:turn'))
+    expect(rangesIn(document.body, 'parser')).toHaveLength(1)
   })
 })

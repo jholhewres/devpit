@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 /*
  * Whether a fold is open, kept by its key outside the row that draws it: a
@@ -9,6 +9,16 @@ import { useCallback, useState } from 'react'
 /* Folds remembered at most; the oldest go first. */
 const MOST = 512
 const kept = new Map<string, boolean>()
+/* The folds drawn now, told when something outside them opens one. */
+const drawn = new Map<string, Set<(open: boolean) => void>>()
+
+/* Opens the fold `key`, drawn or not: a search that lands in it shows what it found. */
+export function disclose(key: string): void {
+  kept.delete(key)
+  kept.set(key, true)
+  if (kept.size > MOST) kept.delete(kept.keys().next().value!)
+  for (const tell of drawn.get(key) ?? []) tell(true)
+}
 
 export function useDisclosed(key: string | null, initial: boolean): [boolean, (open: boolean | ((was: boolean) => boolean)) => void] {
   const [open, setOpen] = useState(() => (key !== null ? (kept.get(key) ?? initial) : initial))
@@ -25,5 +35,15 @@ export function useDisclosed(key: string | null, initial: boolean): [boolean, (o
       }),
     [key],
   )
+  useEffect(() => {
+    if (key === null) return
+    const tells = drawn.get(key) ?? new Set<(open: boolean) => void>()
+    tells.add(setOpen)
+    drawn.set(key, tells)
+    return () => {
+      tells.delete(setOpen)
+      if (tells.size === 0) drawn.delete(key)
+    }
+  }, [key])
   return [open, set]
 }

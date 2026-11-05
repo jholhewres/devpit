@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { canPaint, counter, occurrences, paint, rangesIn, stepped, unpaint, type Occurrence } from './chatSearch'
 import { ask, commands } from './live'
+import { disclose } from './useDisclosed'
 import { abandoned, committed } from './typing'
 
 /*
@@ -42,6 +43,8 @@ export function ChatFind({
 
   const show = (one: Occurrence, needle: string): void => {
     now.current = { needle, one }
+    /* A settled turn folds its earlier prose, where the match may be. */
+    disclose(`${one.messageId}:turn`)
     void jump(one.messageId, (row) => {
       const scroll = box.current
       if (!scroll) return
