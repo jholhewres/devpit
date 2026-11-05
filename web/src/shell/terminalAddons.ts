@@ -73,6 +73,25 @@ export function drawOnTheGpu(
   }
 }
 
+/** Contexts the terminals hold at most: WebKitGTK's page limit is sixteen,
+ *  and the rest is left for the probe and anything else that draws. */
+export const MOST_CONTEXTS = 12
+
+interface Holder {
+  away: boolean
+  hide: () => void
+}
+
+/* Every terminal holding a context, the one shown longest ago first. */
+const holders = new Set<Holder>()
+
+function roomForOne(): void {
+  for (const one of holders) {
+    if (holders.size < MOST_CONTEXTS) return
+    if (one.away) one.hide()
+  }
+}
+
 /**
  * The GPU renderer only while the terminal is on screen.
  *
@@ -80,24 +99,44 @@ export function drawOnTheGpu(
  * sixteen — and every pane of every tab held one, hidden or not. Past the
  * limit the oldest lose theirs and fall back to drawing in the DOM, which is
  * the slow path, on the panes somebody is looking at. A pane that leaves the
- * screen gives its context back and takes one again when it returns.
+ * screen gives its context back, at once when one on screen needs it, and
+ * takes one again when it returns.
  */
-export function gpuWhileShown(terminal: Terminal, lost: () => void): { show: () => void; hide: () => void } {
+export function gpuWhileShown(
+  terminal: Terminal,
+  lost: () => void,
+  make: () => Addon = () => new WebglAddon(),
+): { show: () => void; hide: () => void; away: () => void } {
   let held: WebglAddon | null = null
+  const me: Holder = { away: false, hide: () => hide() }
   const show = (): void => {
-    if (held) return
+    me.away = false
+    if (held) {
+      holders.delete(me)
+      holders.add(me)
+      return
+    }
+    roomForOne()
     let made: WebglAddon | null = null
     const drawn = drawOnTheGpu(
       terminal,
-      () => (made = new WebglAddon()),
+      () => (made = make() as WebglAddon),
       () => {
         held = null
+        holders.delete(me)
         lost()
       },
     )
     held = drawn ? made : null
+    if (held) holders.add(me)
+  }
+  /* Off screen: kept for a quick look back, and the first given up when a
+     pane on screen needs a context. */
+  const away = (): void => {
+    me.away = true
   }
   const hide = (): void => {
+    holders.delete(me)
     if (!held) return
     /* The canvas before the addon goes: `dispose` takes it out of the page
        and leaves its context to the collector. Disposed first, so the
@@ -108,7 +147,7 @@ export function gpuWhileShown(terminal: Terminal, lost: () => void): { show: () 
     held = null
     loseContextOf(canvas?.getContext('webgl2') ?? null)
   }
-  return { show, hide }
+  return { show, hide, away }
 }
 
 /**

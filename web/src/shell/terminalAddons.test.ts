@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { drawOnTheGpu } from './terminalAddons'
+import { drawOnTheGpu, gpuWhileShown, MOST_CONTEXTS } from './terminalAddons'
 
 /* jsdom gives a canvas no context at all, which is the same answer a headless
    machine gives — so the context has to be stood in for to reach the path that
@@ -75,5 +75,39 @@ describe('the renderer a pane draws with', () => {
     expect(drawOnTheGpu(pane as never, made as never)).toBe(false)
     expect(made).not.toHaveBeenCalled()
     expect(pane.loadAddon).not.toHaveBeenCalled()
+  })
+})
+
+/* WebKitGTK takes contexts back past sixteen, from panes on screen too. A
+   pane off screen keeps its context for a quick look back, but gives it up
+   first when one on screen needs one. */
+describe('the GPU contexts the terminals hold', () => {
+  const pane = () => {
+    const addon = { dispose: vi.fn(), onContextLoss: vi.fn() }
+    const terminal = { loadAddon: vi.fn(), refresh: vi.fn(), rows: 24, element: null }
+    return { addon, gpu: gpuWhileShown(terminal as never, () => {}, () => addon as never) }
+  }
+
+  it('gives back the one off screen longest when another is needed past the ceiling', () => {
+    withAContext({})
+    const panes = Array.from({ length: MOST_CONTEXTS }, pane)
+    panes.forEach((one) => one.gpu.show())
+    panes[3]!.gpu.away()
+    panes[1]!.gpu.away()
+    const next = pane()
+    next.gpu.show()
+
+    expect(panes[1]!.addon.dispose).toHaveBeenCalledOnce()
+    expect(panes[3]!.addon.dispose).not.toHaveBeenCalled()
+    expect(next.addon.dispose).not.toHaveBeenCalled()
+    for (const one of [...panes, next]) one.gpu.hide()
+  })
+
+  it('takes nobody else\'s while all of them are on screen', () => {
+    withAContext({})
+    const panes = Array.from({ length: MOST_CONTEXTS + 1 }, pane)
+    panes.forEach((one) => one.gpu.show())
+    for (const one of panes) expect(one.addon.dispose).not.toHaveBeenCalled()
+    for (const one of panes) one.gpu.hide()
   })
 })
