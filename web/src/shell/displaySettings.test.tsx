@@ -24,7 +24,7 @@ describe('the display setting', () => {
   it('says what this start runs on and why', async () => {
     display = { ...display, running: 'x11', why: 'failedBefore' }
     render(<DisplaySettings />)
-    expect(await screen.findByText(/On X11 \(XWayland\)\. The last Wayland start never loaded its window/)).toBeTruthy()
+    expect(await screen.findByText(/On X11 \(XWayland\)\. A Wayland start of this version never loaded its window/)).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'Automatic' }).getAttribute('aria-checked')).toBe('true')
   })
 

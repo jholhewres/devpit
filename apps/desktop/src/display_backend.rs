@@ -107,6 +107,26 @@ pub(crate) fn started(root: &Path) {
     let _ = std::fs::remove_file(root.join(STARTING));
 }
 
+/// Before GTK: a start that tries Wayland is recorded until its page loads there.
+#[cfg(target_os = "linux")]
+pub(crate) fn before_gtk(root: &Path, version: &str, decision: &Decision) {
+    if decision
+        .gdk_backend
+        .is_some_and(|value| value.starts_with("wayland"))
+    {
+        starting(root, version);
+    }
+}
+
+/// The main page loaded. Only a page on Wayland clears the record: the X11 start
+/// a failure caused keeps it, so the version stays on X11 until a Settings choice.
+#[cfg(target_os = "linux")]
+pub(crate) fn after_load(root: &Path, wayland: bool) {
+    if wayland {
+        started(root);
+    }
+}
+
 static WHY: OnceLock<DisplayWhy> = OnceLock::new();
 static RUNNING: OnceLock<DisplayBackend> = OnceLock::new();
 
@@ -178,9 +198,9 @@ pub(crate) fn choose() {
     if let Some(value) = decision.gdk_backend {
         // Single-threaded still: nothing has been spawned before this.
         std::env::set_var("GDK_BACKEND", value);
-        if let (true, Some(root)) = (value.starts_with("wayland"), root.as_deref()) {
-            starting(root, version);
-        }
+    }
+    if let Some(root) = root.as_deref() {
+        before_gtk(root, version, &decision);
     }
     if matches!(
         decision.why,
@@ -200,7 +220,7 @@ pub(crate) fn page_loaded(wayland: bool) {
         DisplayBackend::X11
     });
     if let Ok(root) = Store::root() {
-        started(&root);
+        after_load(&root, wayland);
     }
 }
 

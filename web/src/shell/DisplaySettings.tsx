@@ -13,7 +13,7 @@ export const WHY: Record<DisplayWhy, string> = {
   inherited: 'GDK_BACKEND was set by whatever started devpit.',
   noWayland: 'This session has no Wayland compositor.',
   knownCrash: "This desktop's GTK settings crash devpit on Wayland, so it is on X11.",
-  failedBefore: 'The last Wayland start never loaded its window, so this one is on X11.',
+  failedBefore: 'A Wayland start of this version never loaded its window, so it stays on X11.',
   chosen: 'Chosen here.',
   default: 'Wayland where the desktop has it, X11 where it does not.',
 }
@@ -39,7 +39,7 @@ export function DisplaySettings(): React.JSX.Element | null {
     <PrefRow
       title="Display"
       said={`${display.running ? `On ${NAMED[display.running]}. ` : ''}${WHY[display.why]} A change applies at the next start.`}
-      more="DEVPIT_GDK_BACKEND=wayland or x11 overrides this for one start. A Wayland start that never loads its window makes the next start of the same version use X11."
+      more="DEVPIT_GDK_BACKEND=wayland or x11 overrides this for one start. A Wayland start that never loads its window keeps that version on X11 until a choice is made here."
     >
       <span className="voice__row" role="radiogroup" aria-label="Display">
         {CHOICES.map((one) => (

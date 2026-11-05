@@ -16,8 +16,9 @@ release notes are taken from here when a version is tagged.
   before.
 - **Native Wayland on Linux.** On a Wayland desktop the AppImage opens on
   Wayland instead of going through XWayland. It falls back to X11 when there
-  is no compositor, when the desktop's GTK settings are known to crash it, or
-  when the last Wayland start of the same version never loaded its window.
+  is no compositor, when the desktop's GTK settings are known to crash it, and
+  after a Wayland start that never loaded its window, for that version or
+  until Wayland is chosen again.
   Settings → General → Display chooses Wayland or X11 for the next start, and
   `DEVPIT_GDK_BACKEND` overrides both for one.
 

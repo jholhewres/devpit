@@ -1,5 +1,7 @@
 use super::*;
 
+use std::path::Path;
+
 /// The AppImage on a GNOME Wayland session, as its launcher leaves it.
 fn appimage_on_wayland() -> Found<'static> {
     Found {
@@ -138,4 +140,30 @@ fn gtk_crashes_on_wayland_only_where_it_reads_a_missing_xsettings_key() {
     // An old GNOME still has the key; a desktop without the schema is never read.
     assert!(!crashes_on_wayland((3, 24, 20), false, Some(true)));
     assert!(!crashes_on_wayland((3, 24, 20), false, None));
+}
+
+#[test]
+fn a_failed_wayland_start_keeps_the_version_on_x11_until_wayland_is_chosen_again() {
+    let root = tempfile::tempdir().unwrap();
+    let start = |root: &Path| {
+        let decision = decide(&Found {
+            failed_before: failed_before(root, "0.1.47"),
+            ..appimage_on_wayland()
+        });
+        before_gtk(root, "0.1.47", &decision);
+        decision
+    };
+    // A Wayland start that dies before its page loads.
+    assert_eq!(start(root.path()).why, DisplayWhy::Default);
+    // Every start after it is on X11, and its page loading on X11 keeps it so.
+    for _ in 0..3 {
+        let decision = start(root.path());
+        assert_eq!(decision.why, DisplayWhy::FailedBefore);
+        after_load(root.path(), false);
+    }
+    // A choice in Settings is a new try, and a page loaded on Wayland settles it.
+    started(root.path());
+    assert_eq!(start(root.path()).why, DisplayWhy::Default);
+    after_load(root.path(), true);
+    assert_eq!(start(root.path()).why, DisplayWhy::Default);
 }
