@@ -8,10 +8,9 @@ release notes are taken from here when a version is tagged.
 ### Fixes
 
 - **Sessions in a devpit terminal are tied to it again.** An agent devpit
-  starts in a pane (from the orchestrator, a handoff, a card or the launch
-  button) shows "Open its terminal here" in the session list, its questions
-  and permission requests reach "Waiting on you", and the orchestrator can
-  read its screen. 0.1.47 lost this for terminals in devpit's own keeper.
+  starts in a pane (from the orchestrator, a handoff or a card) shows "Open
+  its terminal here" in the session list, its questions and permission
+  requests reach "Waiting on you", and the orchestrator can read its screen. 0.1.47 lost this for terminals in devpit's own keeper.
   Sessions started on 0.1.47 are found again on Linux by the pane they were
   started in; on macOS they stay unlinked until they are started again.
   When the keeper dies, a terminal comes back with its agent only for
