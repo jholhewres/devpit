@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { RemoteDevice, RemotePairing, RemoteVia, RemoteView, Transcribing } from '../gen/bindings'
+import type { RemoteAsking, RemoteDevice, RemotePairing, RemoteVia, RemoteView, Transcribing } from '../gen/bindings'
 import { PrefSwitch } from './PrefSwitch'
 import { RemoteSettings } from './RemoteSettings'
 import { VoiceSettings } from './VoiceSettings'
@@ -28,7 +28,9 @@ const device = (over: Partial<RemoteDevice> = {}): RemoteDevice => ({
 })
 
 let via: RemoteVia = 'tailscale'
+let asking: RemoteAsking[] = []
 const chosen = vi.fn()
+const answered = vi.fn()
 
 const view = (): RemoteView => ({
   enabled: true,
@@ -39,6 +41,7 @@ const view = (): RemoteView => ({
   problem: null,
   devices: [device(), ...clients],
   mcp,
+  asking,
 })
 
 const pairing = (): RemotePairing => ({
@@ -58,6 +61,7 @@ vi.mock('./live', () => ({
     remoteRead: async () => view(),
     remoteAllow: async (id: string, typing: boolean, answering: boolean) => (allowed(id, typing, answering), view()),
     remoteForget: async (id: string) => (forgot(id), view()),
+    remoteAnswer: async (id: string, allow: boolean) => (answered(id, allow), (asking = []), view()),
     remoteVia: async (next: RemoteVia) => (chosen(next), (via = next), view()),
     remotePair: async (forMcp: boolean) => (paired(forMcp), { ...pairing(), url: forMcp ? `${pairing().url}&for=mcp` : pairing().url, qrSvg: forMcp ? '' : '<svg></svg>' }),
     remoteMcpSet: async (on: boolean) => (mcpSet(on), (mcp = on), view()),
@@ -118,6 +122,15 @@ describe('Remote in Settings', () => {
     expect(screen.getByRole('button', { name: 'answer' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(type)
     await waitFor(() => expect(allowed).toHaveBeenCalledWith('dev_1', true, true))
+  })
+
+  it('pairs a device that proved the code only once the person allows it here', async () => {
+    asking = [{ id: 'ask_1', name: 'Pixel' }]
+    render(<RemoteSettings />)
+    expect(await screen.findByText('Pixel asks to pair with this machine')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }))
+    await waitFor(() => expect(answered).toHaveBeenCalledWith('ask_1', true))
+    await waitFor(() => expect(screen.queryByText('Pixel asks to pair with this machine')).toBeNull())
   })
 
   it('shows watching as always on, with nothing to click', async () => {

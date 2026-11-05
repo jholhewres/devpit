@@ -219,6 +219,15 @@ fn pair(app: &tauri::AppHandle, stream: &mut TcpStream, request: &Request, root:
         reply(stream, "403 Forbidden", "application/json", br#"{"error":"that code is not the one on the machine's screen, or it ran out - open a new one"}"#);
         return;
     }
+    if !crate::remote_approval::allowed(app, &asked.name) {
+        reply(
+            stream,
+            "403 Forbidden",
+            "application/json",
+            br#"{"error":"the person at the machine did not allow this device"}"#,
+        );
+        return;
+    }
     let Some(token) = crate::remote_devices::fresh_token() else {
         reply(
             stream,

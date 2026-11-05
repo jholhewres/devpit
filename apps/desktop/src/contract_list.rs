@@ -95,6 +95,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         remote::remote_via,
         remote::remote_pair,
         remote::remote_pair_cancel,
+        remote::remote_answer,
         remote::remote_allow,
         remote::remote_forget,
         remote::remote_mcp_set,

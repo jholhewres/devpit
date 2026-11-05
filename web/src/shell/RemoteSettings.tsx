@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { RemoteActivity, RemoteDevice, RemotePairing, RemoteVia, RemoteView } from '../gen/bindings'
+import type { RemoteActivity, RemoteAsking, RemoteDevice, RemotePairing, RemoteVia, RemoteView } from '../gen/bindings'
 import { ask, commands } from './live'
 import { PrefSwitch } from './PrefSwitch'
 import { RemoteMcp } from './RemoteMcp'
@@ -90,6 +90,9 @@ export function RemoteSettings(): React.JSX.Element {
               </span>
             )}
             {pairing && <PairingCode pairing={pairing} relay={relay} onDone={() => (commands.remotePairCancel(), setPairing(null))} />}
+            {view.asking.map((one) => (
+              <AskingRow key={one.id} asking={one} onView={setView} />
+            ))}
             {devices.map((device) => (
               <DeviceRow key={device.id} device={device} onView={setView} />
             ))}
@@ -183,7 +186,7 @@ function PairingCode({ pairing, relay, onDone }: { pairing: RemotePairing; relay
             <code className="remote__big">{pairing.code}</code>
           </>
         )}
-        <span className="pref__d">Good once, for two minutes.</span>
+        <span className="pref__d">Good once, for ten minutes. You allow the device here before it pairs.</span>
         <button className="btn" onClick={onDone}>
           Done
         </button>
@@ -258,6 +261,23 @@ function LauncherRow({ address }: { address: string }): React.JSX.Element {
 
 /* One paired device and what it may do. Watching is not a choice, so it is
    drawn as a fact beside the two that are. */
+/* A device that proved the pairing code waits for a yes here: a code seen
+   over a shoulder does not pair one by itself. */
+function AskingRow({ asking, onView }: { asking: RemoteAsking; onView: (view: RemoteView) => void }): React.JSX.Element {
+  const answer = (allow: boolean): void => void ask(() => commands.remoteAnswer(asking.id, allow)).then((answer) => answer.data && onView(answer.data))
+  return (
+    <span className="remote__dev" role="alert">
+      <span className="remote__name">{asking.name} asks to pair with this machine</span>
+      <button className="btn" onClick={() => answer(true)}>
+        Allow
+      </button>
+      <button className="btn" onClick={() => answer(false)}>
+        Refuse
+      </button>
+    </span>
+  )
+}
+
 function DeviceRow({ device, onView }: { device: RemoteDevice; onView: (view: RemoteView) => void }): React.JSX.Element {
   const allow = (typing: boolean, answering: boolean): void =>
     void ask(() => commands.remoteAllow(device.id, typing, answering)).then((answer) => answer.data && onView(answer.data))

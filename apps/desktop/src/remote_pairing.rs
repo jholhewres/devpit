@@ -1,5 +1,5 @@
 //! The code that pairs a device: shown on this machine's screen, good once,
-//! for two minutes, and burned after a few wrong guesses.
+//! for ten minutes, and burned after a few wrong guesses.
 //!
 //! Presence is the point. Pairing gives a device the machine, so it needs
 //! someone at the machine to read the code off its screen.
@@ -7,7 +7,7 @@
 use std::sync::Mutex;
 
 /// How long a code is good for, in seconds.
-pub(crate) const GOOD_FOR: f64 = 120.0;
+pub(crate) const GOOD_FOR: f64 = 600.0;
 
 /// Wrong guesses before the code is burned.
 const GUESSES: u32 = 5;
@@ -121,7 +121,7 @@ pub(crate) fn withdraw() {
 
 #[cfg(test)]
 mod tests {
-    use super::{code_of, secret_taken, taken, Offered, GUESSES};
+    use super::{code_of, offer, secret_taken, taken, withdraw, Offered, GUESSES};
 
     const SECRET: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
 
@@ -154,6 +154,33 @@ mod tests {
             assert_eq!(secret_taken(&mut guessed, "nope", 10.0), None);
         }
         assert_eq!(secret_taken(&mut guessed, SECRET, 10.0), None);
+    }
+
+    /// The QR code's secret is good once, for ten minutes: used again, or
+    /// brought after its ten minutes, it is refused.
+    #[test]
+    fn a_pairing_secret_reused_or_expired_is_refused() {
+        let made = offer(1000.0, false).expect("offered");
+        let secret = made.secret.clone();
+        let mut held = Some(made.clone());
+        assert_eq!(
+            secret_taken(&mut held, &secret, 1000.0 + 599.0),
+            Some(false)
+        );
+        assert_eq!(
+            secret_taken(&mut held, &secret, 1000.0 + 599.0),
+            None,
+            "reused"
+        );
+
+        let mut held = Some(made);
+        assert_eq!(
+            secret_taken(&mut held, &secret, 1000.0 + 601.0),
+            None,
+            "expired"
+        );
+        assert!(held.is_none(), "an expired offer is put away");
+        withdraw();
     }
 
     #[test]

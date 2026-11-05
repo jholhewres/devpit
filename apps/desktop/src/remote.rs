@@ -111,6 +111,7 @@ fn view(root: &Path, store: &Store, problem: Option<String>) -> RemoteView {
             .collect(),
         mcp: crate::remote_mcp::allowed(store),
         problem,
+        asking: crate::remote_approval::asking(),
     }
 }
 
@@ -299,6 +300,22 @@ pub async fn remote_pair(mcp: bool) -> Result<RemotePairing, RpcError> {
 #[specta::specta]
 pub fn remote_pair_cancel() {
     crate::remote_pairing::withdraw();
+}
+
+/// `remote.answer` — the person allows, or refuses, a device waiting to pair.
+#[tauri::command]
+#[specta::specta]
+pub async fn remote_answer(id: String, allow: bool) -> Result<RemoteView, RpcError> {
+    crate::off_main::blocking(move || {
+        if !crate::remote_approval::answer(&id, allow) {
+            return Err(RpcError::new(
+                ErrorCode::NotFound,
+                "that device stopped waiting — pair it again",
+            ));
+        }
+        Ok(view(&Store::root()?, &Store::open_default()?, None))
+    })
+    .await
 }
 
 /// `remote.allow` — what a device may do besides watching. Its connections

@@ -1,9 +1,21 @@
 use devpit_rpc::RemoteIn;
 
-use super::{fragment_value, identify, identity, wait_after, LONGEST_WAIT};
+use super::{admit, fragment_value, identify, identity, wait_after, Who, LONGEST_WAIT};
 use crate::remote_devices::Devices;
 
 const SECRET: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+
+/// [`identify`], then [`admit`] with the person's answer `allowed`.
+fn through(
+    devices: &mut Devices,
+    peer: &[u8; 32],
+    first: impl FnOnce() -> Option<RemoteIn>,
+    take_secret: impl FnOnce(&str) -> Option<bool>,
+    now: f64,
+) -> Result<(crate::remote_devices::Device, bool), String> {
+    let who = identify(devices, peer, first, take_secret, now)?;
+    admit(devices, peer, who, true, now)
+}
 
 fn pairing(secret: &str) -> Option<RemoteIn> {
     Some(RemoteIn::Pair {
@@ -18,9 +30,9 @@ fn an_unknown_key_pairs_only_with_the_secret_on_offer() {
     let phone = [3u8; 32];
     let on_offer = |secret: &str| (secret == SECRET).then_some(false);
 
-    let wrong = identify(&mut devices, &phone, || pairing("guess"), on_offer, 1.0);
+    let wrong = through(&mut devices, &phone, || pairing("guess"), on_offer, 1.0);
     assert!(wrong.is_err());
-    let said_nothing = identify(&mut devices, &phone, || None, on_offer, 1.0);
+    let said_nothing = through(&mut devices, &phone, || None, on_offer, 1.0);
     assert!(said_nothing.is_err());
     let asked_first = identify(
         &mut devices,
@@ -36,7 +48,7 @@ fn an_unknown_key_pairs_only_with_the_secret_on_offer() {
     assert!(devices.devices.is_empty());
 
     let (device, fresh) =
-        identify(&mut devices, &phone, || pairing(SECRET), on_offer, 2.0).expect("paired");
+        through(&mut devices, &phone, || pairing(SECRET), on_offer, 2.0).expect("paired");
     assert!(fresh);
     assert_eq!(device.name, "Pixel");
     assert!(
@@ -55,7 +67,7 @@ fn a_paired_key_is_its_device_without_a_word_until_it_is_forgotten() {
         .id;
 
     let never = || -> Option<RemoteIn> { panic!("a known device is not asked for a secret") };
-    let (device, fresh) = identify(&mut devices, &phone, never, |_| None, 5.0).expect("known");
+    let (device, fresh) = through(&mut devices, &phone, never, |_| None, 5.0).expect("known");
     assert_eq!((device.id.as_str(), fresh), (id.as_str(), false));
     assert_eq!(
         devices.by_key(&phone).and_then(|one| one.last_seen),
@@ -65,8 +77,8 @@ fn a_paired_key_is_its_device_without_a_word_until_it_is_forgotten() {
     // Unpaired: the same key, at its next handshake, is a stranger again —
     // and the secret it paired with once does not bring it back.
     assert!(devices.forget(&id));
-    assert!(identify(&mut devices, &phone, || None, |_| None, 6.0).is_err());
-    assert!(identify(&mut devices, &phone, || pairing(SECRET), |_| None, 6.0).is_err());
+    assert!(through(&mut devices, &phone, || None, |_| None, 6.0).is_err());
+    assert!(through(&mut devices, &phone, || pairing(SECRET), |_| None, 6.0).is_err());
 }
 
 #[test]
@@ -75,9 +87,9 @@ fn a_key_paired_from_an_offer_for_an_mcp_client_is_one() {
     let laptop = [5u8; 32];
     let for_mcp = |secret: &str| (secret == SECRET).then_some(true);
     let (device, fresh) =
-        identify(&mut devices, &laptop, || pairing(SECRET), for_mcp, 1.0).expect("paired");
+        through(&mut devices, &laptop, || pairing(SECRET), for_mcp, 1.0).expect("paired");
     assert!(fresh && device.mcp);
-    let (again, fresh) = identify(&mut devices, &laptop, || None, |_| None, 2.0).expect("known");
+    let (again, fresh) = through(&mut devices, &laptop, || None, |_| None, 2.0).expect("known");
     assert!(
         !fresh && again.mcp,
         "known by its key as what it was paired as"
@@ -118,4 +130,37 @@ fn a_machines_name_goes_into_the_pairing_link_escaped() {
     assert_eq!(fragment_value("notebook"), "notebook");
     assert_eq!(fragment_value("Jo's Mac&co"), "Jo%27s%20Mac%26co");
     assert_eq!(fragment_value("café"), "caf%C3%A9");
+}
+
+/// A device that proved the secret is paired only once the person at the
+/// machine allows it; refused, it is not kept, and the secret is spent.
+#[test]
+fn a_device_with_the_secret_waits_for_the_person_and_a_no_pairs_nothing() {
+    let mut devices = Devices::default();
+    let phone = [6u8; 32];
+    let mut offered = Some(SECRET);
+    let mut take = |secret: &str| (offered.take() == Some(secret)).then_some(false);
+    let who = identify(&mut devices, &phone, || pairing(SECRET), &mut take, 1.0).expect("asks");
+    assert!(matches!(&who, Who::Asking { name, mcp: false } if name == "Pixel"));
+    assert!(admit(&mut devices, &phone, who, false, 1.0).is_err());
+    assert!(devices.devices.is_empty(), "refused, and kept anyway");
+    assert!(
+        identify(&mut devices, &phone, || pairing(SECRET), &mut take, 2.0).is_err(),
+        "the secret pairs once, allowed or not"
+    );
+
+    let take = |secret: &str| (secret == SECRET).then_some(false);
+    let who = identify(&mut devices, &phone, || pairing(SECRET), take, 3.0).expect("asks");
+    let (device, fresh) = admit(&mut devices, &phone, who, true, 3.0).expect("allowed");
+    assert!(fresh && device.key.is_some());
+}
+
+#[test]
+fn an_mcp_client_is_not_asked_about_its_own_offer() {
+    let mut devices = Devices::default();
+    let who = Who::Asking {
+        name: "laptop".to_owned(),
+        mcp: true,
+    };
+    assert!(admit(&mut devices, &[7u8; 32], who, false, 1.0).is_ok());
 }

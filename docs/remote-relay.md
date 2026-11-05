@@ -50,7 +50,7 @@ left, 4429 too many connections, 4504 the machine did not answer in time.
 - **Pairing** is the QR code Settings shows, or the link under it:
   `https://devpit.app/remote#relay=<id>&key=<machine key>&secret=<32 bytes>&name=<machine>`.
   It is a fragment, which browsers never send. The key is what the device
-  holds the machine to; the secret is one-time, good for two minutes, and
+  holds the machine to; the secret is one-time, good for ten minutes, and
   burned after five wrong tries, like the tailnet's code.
 
 ## The session
@@ -69,7 +69,11 @@ device → machine   s, se
 - The machine reads the device's static key from the third message. A key it
   paired is that device. A key it does not know must send, as its first
   sealed message, `{"t":"pair","secret":…,"name":…}` with the QR code's
-  secret, and is then paired by that key; anything else is refused.
+  secret. The machine then says `{"t":"approving"}` and asks the person on
+  its screen, in Settings → Remote; only their yes pairs that key, and a no
+  or two minutes of silence refuses it, the secret spent either way.
+  Anything else is refused. An MCP client is not asked about: its offer was
+  made for it on the machine, and is copied, never scanned.
 - XX gives both: each end proves its static key, and the session's keys come
   from ephemeral ones, so a key taken later opens nothing said before.
 
@@ -81,6 +85,15 @@ last — and a chunk. A message is held to a ceiling before it is kept: 256 KiB
 from a device, 8 MiB from the machine. A photo or a recording from the phone
 goes in pieces under it (`uploadPart`), each 96 KiB before base64.
 
+A terminal's bytes travel raw, not as base64 in JSON, between a machine
+whose `welcome` says `binary` and a viewer that gives the pane a `handle` in
+its `paneOpen`: flags `2` (more) and `3` (last) mark a raw message, which is
+the `/panes` frame `[u32 handle][u8 kind][bytes]`, little-endian — kind `0`
+the pane's output, `2` keys. On the tailnet the same frame is a WebSocket
+binary frame. A viewer that gives no handle, or a machine that never says
+`binary`, keeps `paneBytes` and `paneInput`; an end that reads only JSON
+never receives a raw message, and the relay carries both alike.
+
 Each frame's nonce is its place in the session, so a frame dropped, repeated,
 reordered or changed on the way does not open, and the session ends there.
 A session ends after 2^48 frames — far past any real one — and reconnecting
@@ -88,7 +101,8 @@ is a new handshake.
 
 ## Unpairing
 
-Forgetting a device in Settings ends its connections. Through the relay that
+Forgetting a device in Settings ends its connections at once: each one's
+loop sees it before its next read, which waits at most 8 ms. Through the relay that
 drops the session and its keys and closes the machine's side; the relay closes
 the device's side the moment it does (4408). The device's next handshake
 finishes at Noise level and is refused by the machine: its key is no longer

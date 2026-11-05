@@ -45,6 +45,7 @@ export function RemotePair({ onPaired }: { onPaired: (token: string) => void }):
       <button className="rm__btn" disabled={busy || code.trim().length < 8} onClick={() => void go()}>
         Pair
       </button>
+      {busy && <p className="rm__dim">Allow this device on the machine: devpit asks there before it pairs.</p>}
     </main>
   )
 }

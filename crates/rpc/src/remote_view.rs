@@ -167,6 +167,9 @@ pub enum RemoteOut {
         #[serde(default)]
         binary: bool,
     },
+    /// The device proved its pairing code and waits for the person at the
+    /// machine to allow it. An older viewer passes it by.
+    Approving,
     /// Said once, then the connection ends.
     Refused {
         why: String,
@@ -398,6 +401,16 @@ pub struct RemoteView {
     pub mcp: bool,
     /// Why it is not reachable, when it is on and is not.
     pub problem: Option<String>,
+    /// Devices that proved a pairing code and wait for the person to allow them.
+    pub asking: Vec<RemoteAsking>,
+}
+
+/// A device asking to be paired.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteAsking {
+    pub id: String,
+    pub name: String,
 }
 
 /// One thing a paired device did, from the Remote's own log.

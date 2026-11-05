@@ -387,6 +387,8 @@ export const commands = {
 	remotePair: (mcp: boolean) => typedError<RemotePairing, RpcError>(__TAURI_INVOKE("remote_pair", { mcp })),
 	/**  `remote.pair_cancel` — the pairing code is put away. */
 	remotePairCancel: () => __TAURI_INVOKE<void>("remote_pair_cancel"),
+	/**  `remote.answer` — the person allows, or refuses, a device waiting to pair. */
+	remoteAnswer: (id: string, allow: boolean) => typedError<RemoteView, RpcError>(__TAURI_INVOKE("remote_answer", { id, allow })),
 	/**
 	 *  `remote.allow` — what a device may do besides watching. Its connections
 	 *  end, and it connects again with what it has now.
@@ -4760,6 +4762,12 @@ export type RemoteActivity = {
 	what: string,
 };
 
+/**  A device asking to be paired. */
+export type RemoteAsking = {
+	id: string,
+	name: string,
+};
+
 /**  A device paired with this machine. */
 export type RemoteDevice = {
 	id: string,
@@ -4880,6 +4888,11 @@ export type RemoteOrchestrator = {
 export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean; 
 /**  The host reads and sends raw terminal bytes; absent from an older one. */
 binary?: boolean } | 
+/**
+ *  The device proved its pairing code and waits for the person at the
+ *  machine to allow it. An older viewer passes it by.
+ */
+{ t: "approving" } | 
 /**  Said once, then the connection ends. */
 { t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | { t: "agentHealth"; health: AgentHealth } | 
 /**  A session started from here, by the name to find it under. */
@@ -4990,6 +5003,8 @@ export type RemoteView = {
 	mcp: boolean,
 	/**  Why it is not reachable, when it is on and is not. */
 	problem: string | null,
+	/**  Devices that proved a pairing code and wait for the person to allow them. */
+	asking: RemoteAsking[],
 };
 
 /**  What removing a worktree would cost, when it refuses. */

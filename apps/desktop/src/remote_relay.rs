@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use devpit_remote::noise::{hex, unhex32, Keys};
 use devpit_remote::{Link, Received, Relay, RelayError};
-use devpit_rpc::{RemoteIn, RemoteRelay};
+use devpit_rpc::{RemoteIn, RemoteOut, RemoteRelay};
 use serde::{Deserialize, Serialize};
 use tungstenite::stream::MaybeTlsStream;
 
@@ -213,13 +213,31 @@ fn join(app: tauri::AppHandle, root: PathBuf, relay: Relay, keys: Keys, splice: 
     let mut wire = Relayed(Some(link));
     let now = crate::remote::now();
     let mut devices = Devices::read(&root);
-    let identified = identify(
+    let who = identify(
         &mut devices,
         &peer,
         || first(&mut wire),
         |secret| crate::remote_pairing::take_secret(secret, now),
         now,
     );
+    let who = match who {
+        Ok(who) => who,
+        Err(why) => {
+            refuse(&mut wire, &why);
+            return wire.end();
+        }
+    };
+    let allowed = match &who {
+        Who::Asking { name, mcp: false } => {
+            crate::remote_conn::send(&mut wire, &RemoteOut::Approving);
+            let yes = crate::remote_approval::allowed(&app, name);
+            // Read again: devices may have changed while the person decided.
+            devices = Devices::read(&root);
+            yes
+        }
+        _ => true,
+    };
+    let identified = admit(&mut devices, &peer, who, allowed, crate::remote::now());
     let device = match identified {
         Ok((device, fresh)) => {
             if devices.write(&root).is_err() && fresh {
@@ -252,21 +270,29 @@ fn join(app: tauri::AppHandle, root: PathBuf, relay: Relay, keys: Keys, splice: 
     crate::remote_conn::serve(app, wire, root, device);
 }
 
+/// Who a device is: one paired already, or one that proved the secret on
+/// offer and asks to be paired.
+#[derive(Debug)]
+pub(crate) enum Who {
+    Paired(Device),
+    Asking { name: String, mcp: bool },
+}
+
 /// Who the device whose handshake proved `peer` is: one paired already, or
-/// one pairing now with the secret its QR code carried as its first message
-/// — and whether it is new. `take_secret` says whether the secret is the one
-/// on offer, and then whether that offer was for an MCP client. Anything
-/// else is refused, saying why.
+/// one pairing now with the secret its QR code carried as its first message.
+/// `take_secret` says whether the secret is the one on offer, and then
+/// whether that offer was for an MCP client. Anything else is refused,
+/// saying why.
 pub(crate) fn identify(
     devices: &mut Devices,
     peer: &[u8; 32],
     first: impl FnOnce() -> Option<RemoteIn>,
     take_secret: impl FnOnce(&str) -> Option<bool>,
     now: f64,
-) -> Result<(Device, bool), String> {
+) -> Result<Who, String> {
     if let Some(device) = devices.by_key(peer).cloned() {
         devices.seen(&device.id, now);
-        return Ok((device, false));
+        return Ok(Who::Paired(device));
     }
     let Some(RemoteIn::Pair { secret, name }) = first() else {
         return Err("this device is not paired with this machine — pair it again".to_owned());
@@ -277,9 +303,30 @@ pub(crate) fn identify(
                 .to_owned(),
         );
     };
-    devices
-        .pair_key(&name, peer, mcp, now)
-        .map(|device| (device, true))
+    Ok(Who::Asking { name, mcp })
+}
+
+/// The device `who` is, and whether it is new: one asking is paired by its
+/// key only when the person `allowed` it. An MCP client's offer was made for
+/// it on this machine and is never scanned, so it is not asked about.
+pub(crate) fn admit(
+    devices: &mut Devices,
+    peer: &[u8; 32],
+    who: Who,
+    allowed: bool,
+    now: f64,
+) -> Result<(Device, bool), String> {
+    match who {
+        Who::Paired(device) => Ok((device, false)),
+        Who::Asking { name, mcp } => {
+            if !mcp && !allowed {
+                return Err("the person at the machine did not allow this device".to_owned());
+            }
+            devices
+                .pair_key(&name, peer, mcp, now)
+                .map(|device| (device, true))
+        }
+    }
 }
 
 /// A device's link through the relay.

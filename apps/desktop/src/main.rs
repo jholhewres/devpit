@@ -210,6 +210,7 @@ mod regrouping;
 mod reminder_time;
 mod reminders;
 mod remote;
+mod remote_approval;
 mod remote_conn;
 mod remote_devices;
 mod remote_host;

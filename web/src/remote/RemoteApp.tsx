@@ -46,6 +46,7 @@ export function RemoteApp(): React.JSX.Element {
   const [up, setUp] = useState(false)
   const [welcome, setWelcome] = useState<Welcome | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
+  const [approving, setApproving] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   const [projects, setProjects] = useState<readonly RemoteProject[]>([])
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -75,13 +76,18 @@ export function RemoteApp(): React.JSX.Element {
     const heard = (message: RemoteOut): void => {
       switch (message.t) {
         case 'welcome':
+          setApproving(false)
           setWelcome(message)
           setRefused(null)
           link.current?.send({ t: 'projects' })
           link.current?.send({ t: 'waiting' })
           link.current?.send({ t: 'drafts' })
           return
+        case 'approving':
+          setApproving(true)
+          return
         case 'refused':
+          setApproving(false)
           setRefused(message.why)
           // Through the relay, asking again would only be refused again.
           if (relay) link.current?.close()
@@ -184,6 +190,14 @@ export function RemoteApp(): React.JSX.Element {
   }
 
   if (!token && !relay) return RELAY_PAGE ? <RelayNothing /> : <RemotePair onPaired={(fresh) => (keepToken(fresh), setToken(fresh))} />
+
+  if (approving)
+    return (
+      <main className="rm rm--center">
+        <h1 className="rm__title">Allow it on the machine</h1>
+        <p className="rm__said">devpit asks the person at {relay?.name ?? 'the machine'} before this device pairs.</p>
+      </main>
+    )
 
   if (refused)
     return (
