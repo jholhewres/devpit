@@ -834,6 +834,13 @@ export const commands = {
 	agentSignedIn: (dir: string) => typedError<SignedIn, RpcError>(__TAURI_INVOKE("agent_signed_in", { dir })),
 	/**  `chat.paste` — keeps a pasted picture and answers with it as an attachment. */
 	chatPaste: (projectId: string, mediaType: string, data: string) => typedError<Attachment, RpcError>(__TAURI_INVOKE("chat_paste", { projectId, mediaType, data })),
+	/**  `chat.queue` — what waits in a conversation, as it was last kept. */
+	chatQueue: (projectId: string, conversationId: string) => typedError<ChatQueue, RpcError>(__TAURI_INVOKE("chat_queue", { projectId, conversationId })),
+	/**
+	 *  `chat.queue_keep` — keeps what waits in a conversation, whole, in place of
+	 *  what was kept before. Answers with what was kept.
+	 */
+	chatQueueKeep: (projectId: string, conversationId: string, queue: ChatQueue) => typedError<ChatQueue, RpcError>(__TAURI_INVOKE("chat_queue_keep", { projectId, conversationId, queue })),
 	/**  `chat.receipt` — records an answered question in the conversation. */
 	chatReceipt: (projectId: string, conversationId: string, tool: string, input: string, allowed: boolean) => typedError<Message, RpcError>(__TAURI_INVOKE("chat_receipt", { projectId, conversationId, tool, input, allowed })),
 	/**
@@ -2484,6 +2491,18 @@ export type Channels = {
 	 *  move on to the next channel while nobody does.
 	 */
 	escalates: ChannelEvent[],
+};
+
+/**
+ *  What waits to be said in a conversation once its turn is over, in order.
+ * 
+ *  Kept on disk beside the transcript, so closing the tab or reloading the
+ *  window does not lose what was typed while the agent worked.
+ */
+export type ChatQueue = {
+	items: QueuedMessage[],
+	/**  Held after a stop or a failed turn: nothing leaves until resumed. */
+	paused: boolean,
 };
 
 /**
@@ -4722,6 +4741,14 @@ export type Question = {
 	 */
 	input: string,
 	cwd: string,
+};
+
+/**  One message in a [`ChatQueue`], with what was attached when it was queued. */
+export type QueuedMessage = {
+	id: string,
+	prompt: string,
+	files: Attachment[],
+	skills: string[],
 };
 
 /**  Hours nothing is sent, but a reminder. */

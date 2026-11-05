@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn only_pictures_are_taken() {
+fn only_pictures_recordings_and_text_are_taken() {
     assert_eq!(extension_for("image/png"), Some("png"));
     assert_eq!(extension_for("image/jpeg"), Some("jpg"));
     assert_eq!(extension_for("text/html"), None);
@@ -9,6 +9,8 @@ fn only_pictures_are_taken() {
     assert_eq!(extension_for("audio/webm;codecs=opus"), Some("webm"));
     assert_eq!(extension_for("audio/mp4"), Some("m4a"));
     assert_eq!(extension_for("audio/x-anything"), None);
+    assert_eq!(extension_for("text/plain"), Some("txt"));
+    assert_eq!(extension_for("text/plain;charset=utf-8"), Some("txt"));
 }
 
 #[test]

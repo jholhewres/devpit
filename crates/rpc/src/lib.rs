@@ -80,8 +80,9 @@ pub use checkpoint::{
     validity, verdict, Checked, Fingerprint, Report, Validity, Verdict, WhatRan, Whose, WouldRun,
 };
 pub use conversation::{
-    Ask, Attachment, Conversation, ConversationAfter, ConversationFound, ConversationHead,
-    ConversationPrompts, FoundIn, OutsideSession, Prompt, TurnFrom,
+    Ask, Attachment, ChatQueue, Conversation, ConversationAfter, ConversationFound,
+    ConversationHead, ConversationPrompts, FoundIn, OutsideSession, Prompt, QueuedMessage,
+    TurnFrom,
 };
 pub use decisions::{Deciding, DecisionTried};
 pub use devflow::{

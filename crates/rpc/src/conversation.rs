@@ -170,3 +170,25 @@ pub struct Prompt {
     /// Its opening words, on one line.
     pub text: String,
 }
+
+/// What waits to be said in a conversation once its turn is over, in order.
+///
+/// Kept on disk beside the transcript, so closing the tab or reloading the
+/// window does not lose what was typed while the agent worked.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatQueue {
+    pub items: Vec<QueuedMessage>,
+    /// Held after a stop or a failed turn: nothing leaves until resumed.
+    pub paused: bool,
+}
+
+/// One message in a [`ChatQueue`], with what was attached when it was queued.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct QueuedMessage {
+    pub id: String,
+    pub prompt: String,
+    pub files: Vec<Attachment>,
+    pub skills: Vec<String>,
+}

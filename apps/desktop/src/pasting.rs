@@ -1,4 +1,5 @@
-//! A picture pasted into the composer, kept where the agent can read it.
+//! A picture pasted into the composer, or text too long to type, kept where
+//! the agent can read it.
 //!
 //! Written into the devpit workspace and never into the project: a paste is
 //! not a file anybody asked to commit, and a repository that grows a folder of
@@ -13,7 +14,8 @@ use devpit_rpc::{Attachment, ErrorCode, RpcError};
 pub(crate) const MOST_BYTES: usize = 8 * 1024 * 1024;
 
 /// The extension a pasted type is saved under, or nothing for a type this
-/// does not take — pictures, and the voice messages the composer records.
+/// does not take — pictures, the voice messages the composer records, and a
+/// paste of text too long to sit in the composer.
 /// A recording's type comes with its codec (`audio/webm;codecs=opus`).
 pub(crate) fn extension_for(media_type: &str) -> Option<&'static str> {
     match media_type.split(';').next().unwrap_or_default().trim() {
@@ -25,6 +27,7 @@ pub(crate) fn extension_for(media_type: &str) -> Option<&'static str> {
         "audio/ogg" => Some("ogg"),
         "audio/mp4" => Some("m4a"),
         "audio/wav" => Some("wav"),
+        "text/plain" => Some("txt"),
         _ => None,
     }
 }
@@ -36,7 +39,7 @@ pub(crate) fn decoded(data: &str) -> Result<Vec<u8>, RpcError> {
         return Err(RpcError::new(
             ErrorCode::Invalid,
             format!(
-                "that picture is past the {} MB a paste takes",
+                "that paste is past the {} MB a paste takes",
                 MOST_BYTES / 1_048_576
             ),
         ));
@@ -70,7 +73,7 @@ pub(crate) fn chat_paste_now(
     let ext = extension_for(&media_type).ok_or_else(|| {
         RpcError::new(
             ErrorCode::Invalid,
-            "only pictures and recordings can be pasted",
+            "only pictures, recordings and text can be pasted",
         )
     })?;
     let bytes = decoded(&data)?;
