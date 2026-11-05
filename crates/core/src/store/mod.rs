@@ -71,7 +71,7 @@ pub use card_edges::CardEdges;
 pub use card_links::{BackgroundLink, CardLinks, ChatLink, RunLink, SessionHeld};
 pub use cards::{AttachmentRow, CommentRow, NoticeRow};
 pub use evidence::{Evidence, EvidenceError, Ran, MOST_EVIDENCE};
-pub use layouts::{CardTabLayout, PaneLayoutWrite};
+pub use layouts::{PaneLayoutWrite, TabLayout};
 pub use plans::{NewCard, PlanRow, MOST_PLAN};
 pub use runs::RunRow;
 pub use seen_sessions::{SeenSessionRow, SessionSeen};

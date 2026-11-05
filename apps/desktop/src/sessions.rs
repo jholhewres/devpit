@@ -368,3 +368,18 @@ pub(crate) fn holding(project_id: &str, leaf_id: &str) -> Result<SessionLayout, 
         "that pane is not in this project",
     ))
 }
+
+/// The project whose layouts hold this leaf, whichever it is.
+pub(crate) fn project_holding(store: &Store, leaf_id: &str) -> Option<String> {
+    if !crate::adopting::plain(leaf_id) {
+        return None;
+    }
+    let layouts = store.layouts_naming(leaf_id).ok()?;
+    layouts
+        .into_iter()
+        .find(|layout| {
+            decode(&layout.project_id, &layout.tree, &layout.focused_id)
+                .is_ok_and(|decoded| decoded.tree.contains_leaf(leaf_id))
+        })
+        .map(|layout| layout.project_id)
+}

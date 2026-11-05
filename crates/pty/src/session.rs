@@ -116,6 +116,23 @@ fn environ_has(_pid: u32, _entry: &[u8]) -> bool {
     false
 }
 
+/// The value `name` had when `pid` started, or `None` where nothing here can
+/// read another process's environment.
+#[cfg(target_os = "linux")]
+pub fn environ_of(pid: u32, name: &str) -> Option<String> {
+    let environ = std::fs::read(format!("/proc/{pid}/environ")).ok()?;
+    let prefix = format!("{name}=");
+    environ
+        .split(|byte| *byte == 0)
+        .find_map(|one| one.strip_prefix(prefix.as_bytes()))
+        .and_then(|value| String::from_utf8(value.to_vec()).ok())
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn environ_of(_pid: u32, _name: &str) -> Option<String> {
+    None
+}
+
 /// Asks every member to end, waits up to `grace`, then insists.
 pub fn stop_members(members: &[u32], grace: Duration) -> Stopped {
     if members.is_empty() {

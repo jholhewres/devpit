@@ -53,7 +53,7 @@ pub(crate) fn read(
     projects: &[Project],
     worktrees: &Path,
     windows: &HashMap<String, String>,
-    in_ptyd: impl Fn(&str) -> Option<devpit_rpc::LivePane>,
+    in_ptyd: impl Fn(Option<&str>, Option<i32>) -> Option<devpit_rpc::LivePane>,
     screen: impl Fn(&str) -> Option<String>,
 ) -> Vec<LiveSession> {
     let Ok(entries) = std::fs::read_dir(sessions) else {
@@ -85,6 +85,7 @@ pub(crate) fn read(
             let found = terminal_in(
                 listed.tmux.as_deref(),
                 listed.session_id.as_deref(),
+                listed.pid,
                 windows,
                 &in_ptyd,
             );
@@ -187,41 +188,62 @@ pub(crate) fn pane_target(listed: &str, windows: &HashMap<String, String>) -> Op
 fn terminal_listed(
     listed: &Listed,
     windows: &HashMap<String, String>,
-    in_ptyd: impl Fn(&str) -> Option<devpit_rpc::LivePane>,
+    in_ptyd: impl Fn(Option<&str>, Option<i32>) -> Option<devpit_rpc::LivePane>,
 ) -> Option<(String, Option<devpit_rpc::LivePane>)> {
     terminal_in(
         listed.tmux.as_deref(),
         listed.session_id.as_deref(),
+        listed.pid,
         windows,
         in_ptyd,
     )
 }
 
-/// [`terminal_listed`], from the listing's `tmux` and `sessionId`.
+/// [`terminal_listed`], from the listing's `tmux`, `sessionId` and `pid`.
 pub(crate) fn terminal_in(
     tmux: Option<&str>,
     session_id: Option<&str>,
+    pid: Option<i32>,
     windows: &HashMap<String, String>,
-    in_ptyd: impl Fn(&str) -> Option<devpit_rpc::LivePane>,
+    in_ptyd: impl Fn(Option<&str>, Option<i32>) -> Option<devpit_rpc::LivePane>,
 ) -> Option<(String, Option<devpit_rpc::LivePane>)> {
     if let Some(target) = tmux.and_then(|tmux| pane_target(tmux, windows)) {
         let pane = pane_of(&target);
         return Some((target, pane));
     }
-    let pane = in_ptyd(session_id?)?;
+    let pane = in_ptyd(session_id, pid)?;
     Some((crate::ptyd_link::target(&pane.pane_id), Some(pane)))
 }
 
-/// The ptyd pane a session's hooks said it started in, while that pane is
-/// still in its project's layout.
-pub(crate) fn ptyd_pane_of(session_id: &str) -> Option<devpit_rpc::LivePane> {
+/// The ptyd pane a session is in, while that pane is still in its project's
+/// layout.
+pub(crate) fn ptyd_pane_of(
+    session_id: Option<&str>,
+    pid: Option<i32>,
+) -> Option<devpit_rpc::LivePane> {
     let store = crate::projects::store().ok()?;
-    let (project_id, pane_id) = store.place_of_session(session_id).ok()??;
+    let (project_id, pane_id) = place_of(&store, session_id, pid)?;
     let target = crate::pane_io::target_of(&project_id, &pane_id).ok()?;
     crate::ptyd_link::is_ptyd(&target).then_some(devpit_rpc::LivePane {
         project_id,
         pane_id,
     })
+}
+
+/// The project and leaf of a session: where its hooks said it started, else
+/// the `DEVPIT_PANE` its process was started with, the name those hooks report.
+/// The second finds one typed before devpit kept the launch, or by hand.
+pub(crate) fn place_of(
+    store: &devpit_core::Store,
+    session_id: Option<&str>,
+    pid: Option<i32>,
+) -> Option<(String, String)> {
+    if let Some(place) = session_id.and_then(|id| store.place_of_session(id).ok().flatten()) {
+        return Some(place);
+    }
+    let leaf = devpit_pty::environ_of(u32::try_from(pid?).ok()?, devpit_tmux::PANE_ENV)?;
+    let project = crate::sessions::project_holding(store, &leaf)?;
+    Some((project, leaf))
 }
 
 /// The project and pane a devpit terminal's target names:

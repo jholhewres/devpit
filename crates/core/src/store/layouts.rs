@@ -107,7 +107,7 @@ impl Store {
 }
 
 /// A tab a card named, and the tree in it.
-pub struct CardTabLayout {
+pub struct TabLayout {
     pub project_id: String,
     pub tab_id: String,
     pub tree: String,
@@ -119,13 +119,30 @@ impl Store {
     ///
     /// `_` is a wildcard to LIKE, so the prefix is escaped: `tabXcardY` is not
     /// a card's tab.
-    pub fn card_tab_layouts(&self) -> Result<Vec<CardTabLayout>, StoreError> {
+    pub fn card_tab_layouts(&self) -> Result<Vec<TabLayout>, StoreError> {
         let mut statement = self.conn.prepare(
             "SELECT project_id, tab_id, tree, focused_id FROM pane_layout \
              WHERE tab_id LIKE 'tab\\_card\\_%' ESCAPE '\\'",
         )?;
         let rows = statement.query_map([], |row| {
-            Ok(CardTabLayout {
+            Ok(TabLayout {
+                project_id: row.get(0)?,
+                tab_id: row.get(1)?,
+                tree: row.get(2)?,
+                focused_id: row.get(3)?,
+            })
+        })?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    /// Every layout whose stored tree mentions `text`, across projects: the
+    /// few a leaf can be in, for the caller to decode and check.
+    pub fn layouts_naming(&self, text: &str) -> Result<Vec<TabLayout>, StoreError> {
+        let mut statement = self.conn.prepare(
+            "SELECT project_id, tab_id, tree, focused_id FROM pane_layout WHERE instr(tree, ?1) > 0",
+        )?;
+        let rows = statement.query_map([text], |row| {
+            Ok(TabLayout {
                 project_id: row.get(0)?,
                 tab_id: row.get(1)?,
                 tree: row.get(2)?,

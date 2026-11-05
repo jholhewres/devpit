@@ -130,3 +130,21 @@ fn a_shell_is_found_by_the_name_in_its_environment_and_a_daemon_it_started_is_no
     assert_eq!(found, Some(vec![shell.id()]));
     assert_eq!(nobody, Some(vec![]));
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_process_says_the_value_it_was_started_with_and_nothing_for_a_name_it_lacks() {
+    let mut child = std::process::Command::new("sleep")
+        .arg("30")
+        .env("DEVPIT_TEST_PANE", "leaf_started_in")
+        .env("DEVPIT_TEST_PANE_TOO", "leaf_not_this_one")
+        .spawn()
+        .expect("spawn");
+    let said = environ_of(child.id(), "DEVPIT_TEST_PANE");
+    let lacking = environ_of(child.id(), "DEVPIT_TEST_NOT_SET");
+    let _ = child.kill();
+    let _ = child.wait();
+
+    assert_eq!(said.as_deref(), Some("leaf_started_in"));
+    assert_eq!(lacking, None);
+}

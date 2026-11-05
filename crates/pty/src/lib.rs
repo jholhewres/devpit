@@ -47,7 +47,7 @@ pub use osc::{Scanner, Span, Told, MOST_CARRIED};
 pub use reader::{after_read, AfterRead};
 pub use ring::RingBuffer;
 pub use session::{
-    members as session_members, started_under, started_with, stop_members, AGENT_GRACE,
+    environ_of, members as session_members, started_under, started_with, stop_members, AGENT_GRACE,
 };
 pub use stopping::{stop, stop_group, Stopped, GRACE};
 

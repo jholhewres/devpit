@@ -4,7 +4,7 @@ use std::path::Path;
 use devpit_rpc::Project;
 use serde_json::json;
 
-use super::{card_of, pane_of, pane_target, read, remote_of, start_of};
+use super::{card_of, pane_of, pane_target, place_of, read, remote_of, start_of};
 
 /// tmux's answer to which window each pane is in.
 fn windows(panes: &[(&str, &str)]) -> HashMap<String, String> {
@@ -50,7 +50,7 @@ fn a_live_session_is_placed_on_its_project_and_card() {
         &[project("prj_1", &app, None)],
         &worktrees,
         &HashMap::new(),
-        |_| None,
+        |_, _| None,
         |_| None,
     );
     let names: Vec<_> = found
@@ -90,7 +90,7 @@ fn a_dead_session_and_the_orchestrators_own_are_left_out() {
         &[project("orch", &orch, Some("claude"))],
         dir.path(),
         &HashMap::new(),
-        |_| None,
+        |_, _| None,
         |_| None,
     );
     assert!(
@@ -168,7 +168,7 @@ fn a_session_in_a_devpit_terminal_says_the_question_it_is_stopped_on() {
         &[],
         dir.path(),
         &HashMap::new(),
-        |_| None,
+        |_, _| None,
         |target| (target == "devpit_prj_1:leaf_1").then(|| screen.to_owned()),
     );
     let waiting = found[0].waiting.as_ref().expect("waiting on a question");
@@ -254,7 +254,7 @@ fn a_listing_says_whether_remote_control_is_on() {
         &[],
         dir.path(),
         &HashMap::new(),
-        |_| None,
+        |_, _| None,
         |_| None,
     );
     let remote: Vec<_> = found
@@ -282,8 +282,8 @@ fn a_session_in_a_ptyd_pane_is_found_by_its_session_id() {
         "cwd": dir.path().display().to_string(), "sessionId": "sess-ptyd" });
     std::fs::write(sessions.join("31.json"), body.to_string()).expect("listing");
 
-    let in_ptyd = |session: &str| {
-        (session == "sess-ptyd").then(|| devpit_rpc::LivePane {
+    let in_ptyd = |session: Option<&str>, _pid: Option<i32>| {
+        (session == Some("sess-ptyd")).then(|| devpit_rpc::LivePane {
             project_id: "prj_1".into(),
             pane_id: "leaf_p".into(),
         })
@@ -314,11 +314,65 @@ fn a_session_in_a_ptyd_pane_is_found_by_its_session_id() {
         &[],
         dir.path(),
         &HashMap::new(),
-        |_| None,
+        |_, _| None,
         |_| None,
     );
     assert!(
         !unknown[0].in_devpit,
         "no hook named it: in no devpit terminal"
     );
+}
+
+/// A session devpit typed into a ptyd pane before it kept the launch: no hook
+/// tied it to the pane, and the `DEVPIT_PANE` its process was started with
+/// still says which one it is, while a layout holds that leaf.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_session_its_hooks_never_placed_is_found_by_the_pane_its_process_started_in() {
+    use devpit_rpc::{LayoutNode, SplitDirection};
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = devpit_core::Store::open(&dir.path().join("state.db")).expect("store");
+    let root = dir.path().join("project");
+    std::fs::create_dir_all(&root).expect("root");
+    let project = store.add_project(&root, None).expect("project");
+    let tree = LayoutNode::leaf("leaf_first", "s:leaf_first")
+        .split_leaf(
+            "leaf_first",
+            SplitDirection::Horizontal,
+            LayoutNode::leaf("leaf_unplaced", "s:leaf_unplaced"),
+        )
+        .expect("split");
+    store
+        .set_pane_layout(
+            &project,
+            "tab_one",
+            &serde_json::to_string(&tree).expect("json"),
+            "leaf_first",
+        )
+        .expect("layout");
+    let started = |leaf: Option<&str>| {
+        let mut sleep = std::process::Command::new("sleep");
+        sleep.arg("30").env_remove(devpit_tmux::PANE_ENV);
+        if let Some(leaf) = leaf {
+            sleep.env(devpit_tmux::PANE_ENV, leaf);
+        }
+        sleep.spawn().expect("spawn")
+    };
+    let mut in_pane = started(Some("leaf_unplaced"));
+    let mut in_no_layout = started(Some("leaf_gone"));
+    let mut outside = started(None);
+    let pid = |child: &std::process::Child| i32::try_from(child.id()).ok();
+
+    let found = place_of(&store, Some("sess-unplaced"), pid(&in_pane));
+    let gone = place_of(&store, Some("sess-gone"), pid(&in_no_layout));
+    let nowhere = place_of(&store, Some("sess-outside"), pid(&outside));
+    for child in [&mut in_pane, &mut in_no_layout, &mut outside] {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+
+    assert_eq!(found, Some((project, "leaf_unplaced".to_owned())));
+    assert_eq!(gone, None);
+    assert_eq!(nowhere, None);
 }
