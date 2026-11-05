@@ -38,6 +38,8 @@ pub const LOCAL: &[(&str, &str)] = &[
     (key::AUTO_UPDATE, "how this install updates itself"),
     (key::WORKTREE_BASE, "a path on this machine"),
     (key::TERMINAL_BACKEND, "a daemon running on this machine"),
+    (key::SESSION_NEXT_CARD, "sessions this machine starts"),
+    (key::SESSION_HANDOFF_PERCENT, "sessions this machine starts"),
     (key::OPEN_IN_APPS, "the apps installed here"),
     (key::WORKTREES_HIDDEN, "this machine's worktrees"),
     (
