@@ -8,13 +8,14 @@ use devpit_rpc::RpcError;
 ///
 /// Asked of tmux rather than sent through the pty: the client draws on the
 /// alternate screen, where a wheel is arrow keys and the shell echoes them.
+/// Answers whether tmux took it; a ptyd pane's history is the window's own.
 #[tauri::command]
 #[specta::specta]
 pub async fn session_scroll(
     project_id: String,
     pane_id: String,
     lines: i32,
-) -> Result<(), RpcError> {
+) -> Result<bool, RpcError> {
     crate::off_main::blocking(move || session_scroll_now(project_id, pane_id, lines)).await
 }
 
@@ -23,7 +24,7 @@ pub(crate) fn session_scroll_now(
     project_id: String,
     pane_id: String,
     lines: i32,
-) -> Result<(), RpcError> {
+) -> Result<bool, RpcError> {
     let target = crate::pane_io::target_of(&project_id, &pane_id)?;
     crate::pane_io::scroll(&target, lines)
 }

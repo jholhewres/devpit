@@ -185,10 +185,13 @@ pub(crate) fn cwd(target: &str) -> Option<PathBuf> {
 
 /// Scrolls a pane's history. Nothing for a ptyd pane: no tmux client draws
 /// it, so xterm holds the history and its own wheel scrolls it.
-pub(crate) fn scroll(target: &str, lines: i32) -> Result<(), RpcError> {
+pub(crate) fn scroll(target: &str, lines: i32) -> Result<bool, RpcError> {
     match holder(target) {
-        Holder::Tmux { .. } => tmux()?.scroll(target, lines).map_err(internal),
-        Holder::Ptyd(_) => Ok(()),
+        Holder::Tmux { .. } => tmux()?
+            .scroll(target, lines)
+            .map(|()| true)
+            .map_err(internal),
+        Holder::Ptyd(_) => Ok(false),
     }
 }
 

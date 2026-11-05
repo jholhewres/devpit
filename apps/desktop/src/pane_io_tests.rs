@@ -17,6 +17,11 @@ fn a_target_says_whether_tmux_or_the_daemon_holds_the_pane() {
 }
 
 #[test]
+fn a_ptyd_pane_leaves_the_wheel_to_the_window_that_holds_its_history() {
+    assert!(!scroll(&crate::ptyd_link::target("leaf_a"), -3).unwrap());
+}
+
+#[test]
 fn a_tmux_leaf_is_reached_by_its_names_and_a_ptyd_leaf_by_its_target() {
     let tree = LayoutNode::leaf("leaf_a", "an-older-spelling")
         .split_leaf(

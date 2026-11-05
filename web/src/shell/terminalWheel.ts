@@ -40,6 +40,9 @@ export function wheelToTmux(terminal: Terminal, box: HTMLElement, projectId: str
   let pixels = 0
   let timer: ReturnType<typeof setTimeout> | undefined
   let inHistory = false
+  /* A view that does not know the pane's target (a session's terminal over the
+     orchestrator's chat) learns from the first flick whether tmux holds it. */
+  let tmuxHolds = true
 
   const flush = (): void => {
     timer = undefined
@@ -48,10 +51,16 @@ export function wheelToTmux(terminal: Terminal, box: HTMLElement, projectId: str
     if (lines === 0) return
     pixels -= lines * row
     if (lines < 0) inHistory = true
-    void ask(() => commands.sessionScroll(projectId, paneId, lines))
+    void ask(() => commands.sessionScroll(projectId, paneId, lines)).then((answer) => {
+      if (answer.data !== false) return
+      tmuxHolds = false
+      inHistory = false
+      terminal.scrollLines(lines)
+    })
   }
 
   terminal.attachCustomWheelEventHandler((event) => {
+    if (!tmuxHolds) return true
     /* Sideways travel is not scrolling a terminal. */
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return false
     const row = box.clientHeight / Math.max(terminal.rows, 1) || 16

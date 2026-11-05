@@ -1653,8 +1653,9 @@ export const commands = {
 	 * 
 	 *  Asked of tmux rather than sent through the pty: the client draws on the
 	 *  alternate screen, where a wheel is arrow keys and the shell echoes them.
+	 *  Answers whether tmux took it; a ptyd pane's history is the window's own.
 	 */
-	sessionScroll: (projectId: string, paneId: string, lines: number) => typedError<null, RpcError>(__TAURI_INVOKE("session_scroll", { projectId, paneId, lines })),
+	sessionScroll: (projectId: string, paneId: string, lines: number) => typedError<boolean, RpcError>(__TAURI_INVOKE("session_scroll", { projectId, paneId, lines })),
 	/**  `session.redraw` — this leaf's screen drawn again, whole. */
 	sessionRedraw: (projectId: string, paneId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("session_redraw", { projectId, paneId })),
 	/**

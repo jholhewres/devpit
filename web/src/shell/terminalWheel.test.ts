@@ -50,6 +50,25 @@ describe('the wheel over a tmux terminal', () => {
   })
 })
 
+describe('the wheel over a terminal whose holder is not known', () => {
+  it('hands the wheel back to xterm once tmux says it does not hold the pane', async () => {
+    vi.useFakeTimers()
+    scrolled.mockReturnValue(false)
+    let handler: (event: WheelEvent) => boolean = () => true
+    const lines = vi.fn()
+    const terminal = { rows: 10, attachCustomWheelEventHandler: (one: typeof handler) => (handler = one), scrollLines: lines }
+    wheelFor(undefined, terminal as never, { clientHeight: 200 } as HTMLElement, 'p1', 'leaf')
+    const spin = (deltaY: number): boolean => handler({ deltaX: 0, deltaY, deltaMode: 0, preventDefault: () => {} } as unknown as WheelEvent)
+    spin(-60)
+    vi.advanceTimersByTime(50)
+    await vi.runAllTimersAsync()
+    expect(lines).toHaveBeenCalledWith(-3)
+    expect(spin(-60)).toBe(true)
+    vi.advanceTimersByTime(50)
+    expect(scrolled).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('the wheel over a devpit-ptyd terminal', () => {
   it('is left to xterm, which holds the history, and typing goes straight through', () => {
     let taken = false
