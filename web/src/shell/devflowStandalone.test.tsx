@@ -123,14 +123,25 @@ describe('the devflow plugin button', () => {
 })
 
 describe('the devflow binary button', () => {
-  it('installs after a yes, then shows the version, doctor and Update', async () => {
+  it('installs after a yes, then shows the version and doctor, with nothing newer to offer', async () => {
     render(<DevflowBinaryRow />)
     fireEvent.click(await screen.findByRole('button', { name: 'Install devflow…' }))
     expect(screen.getByText(/checksums\.txt/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     expect(await screen.findByText(/devflow 0\.2\.1 at \/h\/\.local\/bin\/devflow/)).toBeTruthy()
     expect(screen.getByLabelText('devflow doctor').textContent).toBe('ok  devflow is on PATH')
-    expect(screen.getByRole('button', { name: 'Update to 0.2.1…' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Update/ })).toBeNull()
+  })
+
+  it('offers no download of an older devflow over a newer one', async () => {
+    binary = { ...binary, version: '0.3.0' }
+    render(<DevflowBinaryRow />)
+    expect(await screen.findByText(/devflow 0\.3\.0 at/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Update/ })).toBeNull()
+    cleanup()
+    binary = { ...binary, version: '0.2.0' }
+    render(<DevflowBinaryRow />)
+    expect(await screen.findByRole('button', { name: 'Update to 0.2.1…' })).toBeTruthy()
   })
 
   it('says why when there is no network, and stays not installed', async () => {

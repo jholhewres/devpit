@@ -120,6 +120,18 @@ export function DevflowPluginRow({ projectId, devpitOn, onDeactivate }: { projec
   )
 }
 
+/* Whether `version` is older than `known`, by its numbers: a newer devflow
+   is never offered the download that would replace it with an older one. */
+function behind(version: string, known: string): boolean {
+  const parts = (one: string): number[] => one.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0)
+  const [have, want] = [parts(version), parts(known)]
+  for (let at = 0; at < Math.max(have.length, want.length); at += 1) {
+    const diff = (have[at] ?? 0) - (want[at] ?? 0)
+    if (diff !== 0) return diff < 0
+  }
+  return false
+}
+
 export function DevflowBinaryRow(): React.JSX.Element | null {
   const [binary, setBinary] = useState<DevflowBinary | null>(null)
   const [sure, setSure] = useState(false)
@@ -145,6 +157,7 @@ export function DevflowBinaryRow(): React.JSX.Element | null {
     })
   }
   const installed = binary.version !== null
+  const offered = binary.version === null || behind(binary.version, binary.known)
   return (
     <div className="pref pref--stack">
       <div className="pref__body">
@@ -167,9 +180,11 @@ export function DevflowBinaryRow(): React.JSX.Element | null {
               </button>
             </>
           ) : (
-            <button className="btn" onClick={() => setSure(true)}>
-              {installed ? `Update to ${binary.known}…` : 'Install devflow…'}
-            </button>
+            offered && (
+              <button className="btn" onClick={() => setSure(true)}>
+                {installed ? `Update to ${binary.known}…` : 'Install devflow…'}
+              </button>
+            )
           )}
         </div>
         {binary.doctor.length > 0 && (
