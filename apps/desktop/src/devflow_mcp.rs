@@ -216,13 +216,11 @@ pub(crate) fn set_in(
         (false, Some(text)) if added_in(tool, text) => without(tool, text)?,
         (false, _) => return Ok(()),
     };
-    if let Some(parent) = file.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
-    }
-    let fresh = file.with_extension("devpit-writing");
-    std::fs::write(&fresh, after)
-        .and_then(|()| std::fs::rename(&fresh, &file))
-        .map_err(|err| format!("{} could not be written: {err}", file.display()))
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
+    devpit_agentcli::config_edit::write_text(&file, before.as_deref(), &after, &now.to_string())
+        .map(|_| ())
 }
 
 fn home() -> Result<PathBuf, RpcError> {

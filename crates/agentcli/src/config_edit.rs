@@ -95,7 +95,23 @@ pub fn plan(loaded: &Loaded, change: impl FnOnce(&mut Map<String, Value>)) -> Pl
 /// Writes a planned change, refusing a file changed since it was read.
 /// Answers the backup, when there was a file to keep.
 pub fn write(loaded: &Loaded, planned: &Planned, now: &str) -> Result<Option<PathBuf>, String> {
-    let target = std::fs::canonicalize(&loaded.path).unwrap_or_else(|_| loaded.path.clone());
+    write_text(
+        &loaded.path,
+        loaded.original.as_deref(),
+        &planned.after,
+        now,
+    )
+}
+
+/// Puts `after` in `path`, a file of any format last read as `before` (`None`:
+/// no file), with everything [`write`] promises but the JSON.
+pub fn write_text(
+    path: &Path,
+    before: Option<&str>,
+    after: &str,
+    now: &str,
+) -> Result<Option<PathBuf>, String> {
+    let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let current = match std::fs::read_to_string(&target) {
         Ok(text) => Some(text),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
@@ -106,7 +122,7 @@ pub fn write(loaded: &Loaded, planned: &Planned, now: &str) -> Result<Option<Pat
             ))
         }
     };
-    if current != loaded.original {
+    if current.as_deref() != before {
         return Err(format!(
             "{} changed since it was read; nothing was written — look again",
             target.display()
@@ -124,7 +140,7 @@ pub fn write(loaded: &Loaded, planned: &Planned, now: &str) -> Result<Option<Pat
                     .unwrap_or("settings")
             );
             let backup = dir.join(name);
-            std::fs::write(&backup, text)
+            written_privately(&backup, text)
                 .map_err(|err| format!("the backup could not be written: {err}"))?;
             Some(backup)
         }
@@ -137,11 +153,9 @@ pub fn write(loaded: &Loaded, planned: &Planned, now: &str) -> Result<Option<Pat
             .and_then(|name| name.to_str())
             .unwrap_or("settings")
     ));
-    std::fs::write(&temporary, &planned.after).map_err(|err| err.to_string())?;
+    written_privately(&temporary, after).map_err(|err| err.to_string())?;
     if let Ok(meta) = std::fs::metadata(&target) {
         let _ = std::fs::set_permissions(&temporary, meta.permissions());
-    } else {
-        restrict(&temporary);
     }
     std::fs::rename(&temporary, &target).map_err(|err| {
         let _ = std::fs::remove_file(&temporary);
@@ -150,15 +164,26 @@ pub fn write(loaded: &Loaded, planned: &Planned, now: &str) -> Result<Option<Pat
     Ok(backup)
 }
 
-/// A new file is the person's alone.
+/// A new file, the person's alone from its first byte: these files hold
+/// tokens. One left at `path` by an earlier try is replaced, never followed.
 #[cfg(unix)]
-fn restrict(path: &Path) {
-    use std::os::unix::fs::PermissionsExt;
-    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+fn written_privately(path: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
+    use std::os::unix::fs::OpenOptionsExt as _;
+
+    let _ = std::fs::remove_file(path);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)?
+        .write_all(text.as_bytes())
 }
 
 #[cfg(not(unix))]
-fn restrict(_path: &Path) {}
+fn written_privately(path: &Path, text: &str) -> std::io::Result<()> {
+    std::fs::write(path, text)
+}
 
 /// A unified diff of two texts, three lines of context around each change.
 pub fn diff(before: &str, after: &str, name: &str) -> String {

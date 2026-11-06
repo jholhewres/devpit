@@ -138,3 +138,60 @@ fn devflow_is_added_to_a_tool_and_removed_with_its_state_read_back() {
     assert!(added(&state, "codex"));
     set_in(home.path(), &none, Tool::Gemini, false, CMD).expect("removed twice is nothing");
 }
+
+/// These files hold the tools' tokens, and most are the person's alone: a
+/// write keeps a file's permissions, its backup is no wider, and a new file
+/// is theirs alone.
+#[cfg(unix)]
+#[test]
+fn a_write_never_lets_anyone_else_read_a_tools_file() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mode = |path: &Path| std::fs::metadata(path).expect("meta").permissions().mode() & 0o777;
+    let home = tempfile::tempdir().expect("home");
+    let none = |_: &str| None;
+    let file = Tool::Codex.file(home.path(), none);
+    let dir = file.parent().expect("dir");
+    std::fs::create_dir_all(dir).expect("mkdir");
+    std::fs::write(&file, "TOKEN = \"secret\"\n").expect("theirs");
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+
+    set_in(home.path(), &none, Tool::Codex, true, CMD).expect("added");
+    assert_eq!(mode(&file), 0o600);
+    let backup = std::fs::read_dir(dir)
+        .expect("dir")
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| path.to_string_lossy().contains("devpit-backup"))
+        .expect("a backup");
+    assert_eq!(mode(&backup), 0o600);
+    assert_eq!(
+        std::fs::read_to_string(&backup).expect("backup"),
+        "TOKEN = \"secret\"\n"
+    );
+
+    set_in(home.path(), &none, Tool::Cursor, true, CMD).expect("added");
+    assert_eq!(mode(&Tool::Cursor.file(home.path(), none)), 0o600);
+}
+
+/// A dotfiles link stays a link, and what it points at gets the change.
+#[cfg(unix)]
+#[test]
+fn a_tools_file_linked_from_elsewhere_stays_a_link() {
+    let home = tempfile::tempdir().expect("home");
+    let none = |_: &str| None;
+    let real = home.path().join("dotfiles-settings.json");
+    std::fs::write(&real, "{}").expect("real");
+    let file = Tool::Gemini.file(home.path(), none);
+    std::fs::create_dir_all(file.parent().expect("dir")).expect("mkdir");
+    std::os::unix::fs::symlink(&real, &file).expect("link");
+
+    set_in(home.path(), &none, Tool::Gemini, true, CMD).expect("added");
+
+    let meta = std::fs::symlink_metadata(&file).expect("meta");
+    assert!(meta.file_type().is_symlink(), "the link was replaced");
+    assert!(added_in(
+        Tool::Gemini,
+        &std::fs::read_to_string(&real).expect("real")
+    ));
+}
