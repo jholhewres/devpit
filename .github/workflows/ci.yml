@@ -66,7 +66,7 @@ jobs:
   # tests are the bar, and CI does not invent commands nobody can run by hand.
   # The frontend is left to the Linux job, which already builds it once.
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
 

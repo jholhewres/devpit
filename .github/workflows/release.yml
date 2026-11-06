@@ -74,7 +74,7 @@ jobs:
           # Two targets on one leg, because the download is one file and the
           # updater resolves by target key: an Intel Mac looks itself up under
           # `darwin-x86_64` and has no way to know it is the same artifact.
-          - os: macos-14
+          - os: macos-15
             target: |
               darwin-aarch64
               darwin-x86_64
