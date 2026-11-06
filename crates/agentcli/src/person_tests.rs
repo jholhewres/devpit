@@ -276,6 +276,19 @@ fn anything_beside_the_request_refuses_the_stop() {
     assert!(!stop("fix-login"), "no stop word");
     assert!(!stop("✅"), "a yes names nothing to stop");
     assert!(!stop("pare review-x"), "another session");
+    assert!(!stop("stop fix-login ❌"), "a symbol is not nothing");
+    assert!(!stop("stop fix-login？"));
+    assert!(!stop("~~stop fix-login~~"));
+    assert!(!stop("(stop fix-login)"));
+    assert!(!stop("* pare fix-login"));
+    assert!(!stop("✅ fix-login ❌"));
+}
+
+/// The message is compared whole, so a name the words would split still works.
+#[test]
+fn a_name_with_a_space_or_a_symbol_can_be_asked_for() {
+    assert!(asks_to_stop("stop fix login", "fix login"));
+    assert!(asks_to_stop("pare api/v2", "api/v2"));
 }
 
 /// Part of a name is an ordinary word, and may mean something else entirely.

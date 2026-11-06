@@ -267,18 +267,12 @@ const STOP: [&str; 21] = [
 pub fn asks_to_stop(said: &str, session: &str) -> bool {
     let said = said.trim().to_lowercase();
     let session = session.to_lowercase();
-    if said.contains('?') {
-        return false;
-    }
     if let Some(beside) = marked(&said) {
         return beside == [session];
     }
-    let words: Vec<&str> = said
-        .split(|c: char| !c.is_alphanumeric() && !"-'._".contains(c))
-        .map(|word| word.trim_matches('.'))
-        .filter(|word| !word.is_empty())
-        .collect();
-    matches!(words.as_slice(), [verb, name] if STOP.contains(verb) && *name == session)
+    said.trim_end_matches(HANGING)
+        .split_once(char::is_whitespace)
+        .is_some_and(|(verb, name)| STOP.contains(&verb) && name.trim() == session)
 }
 
 /// Whether `said` is a yes mark or a send word alone, which names no session:
