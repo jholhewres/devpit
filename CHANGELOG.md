@@ -19,10 +19,10 @@ release notes are taken from here when a version is tagged.
   when your last message names it with a word like "stop", or when
   another session already works on the same card.
 - **Smaller fixes.** An X11 program started in a devpit terminal opens
-  its window. "Open in browser" works on macOS and Windows without
-  Chromium. A browser tab hears about tabs opened in the window. The
-  Devflow screen no longer offers to replace a newer devflow with an
-  older one.
+  its window, once devpit's terminal keeper has restarted. "Open in
+  browser" works on macOS and Windows without Chromium. A browser tab
+  hears about tabs opened in the window. The Devflow screen no longer
+  offers to replace a newer devflow with an older one.
 
 ### New
 
