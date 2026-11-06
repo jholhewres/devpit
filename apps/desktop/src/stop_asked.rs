@@ -5,8 +5,14 @@
 use devpit_agentcli::person::{From, Said};
 use devpit_rpc::LiveSession;
 
-/// Whether stopping `name` (only `pid`, when given) goes ahead.
-pub(crate) fn allowed(said: Option<&Said>, name: &str, swapped: bool) -> Result<(), String> {
+/// Whether stopping `name` goes ahead. `others`: the other running sessions,
+/// which a part of a name may also mean.
+pub(crate) fn allowed(
+    said: Option<&Said>,
+    name: &str,
+    others: &[&str],
+    swapped: bool,
+) -> Result<(), String> {
     if swapped {
         return Ok(());
     }
@@ -15,7 +21,7 @@ pub(crate) fn allowed(said: Option<&Said>, name: &str, swapped: bool) -> Result<
             "not stopped: the person last wrote from {}, where a stop goes only by its button",
             said.from.label()
         )),
-        Some(said) if devpit_agentcli::person::asks_to_stop(&said.text, name) => Ok(()),
+        Some(said) if devpit_agentcli::person::asks_to_stop(&said.text, name, others) => Ok(()),
         Some(said) => Err(format!(
             "not stopped: the person's last message («{}») does not ask for {name} to stop. Ask them, naming the session.",
             crate::draft_sending::short(&said.text)

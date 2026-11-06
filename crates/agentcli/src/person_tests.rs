@@ -245,23 +245,42 @@ fn a_yes_mark_from_another_session_or_a_tool_is_not_the_person() {
 }
 
 #[test]
-fn a_stop_is_asked_by_naming_the_session_beside_a_stop_word() {
+fn a_stop_is_a_request_to_stop_that_session() {
     let session = "devpit-0149-z90e";
-    assert!(asks_to_stop("pare a devpit-0149-z90e", session));
-    assert!(asks_to_stop("Stop z90e, it is done.", session));
-    assert!(asks_to_stop("pode encerrar a devpit-0149-z90e", session));
-    assert!(asks_to_stop("✅ fecha devpit-0149-z90e", session));
-    assert!(
-        !asks_to_stop("não pare a devpit-0149-z90e", session),
-        "turned around"
-    );
-    assert!(
-        !asks_to_stop("como vai a devpit-0149-z90e?", session),
-        "no stop word"
-    );
-    assert!(
-        !asks_to_stop("pare a review-devpit", session),
-        "another session"
-    );
-    assert!(!asks_to_stop("✅", session), "a yes names nothing to stop");
+    let stop = |said: &str| asks_to_stop(said, session, &["review-devpit"]);
+    assert!(stop("pare a devpit-0149-z90e"));
+    assert!(stop("Stop z90e, it is done."));
+    assert!(stop("pode encerrar a devpit-0149-z90e"));
+    assert!(stop("✅ fecha devpit-0149-z90e"));
+    assert!(stop(
+        "a review acabou. pare a sessão devpit-0149-z90e agora"
+    ));
+    assert!(!stop("não pare a devpit-0149-z90e"), "turned around");
+    assert!(!stop("como vai a devpit-0149-z90e?"), "no stop word");
+    assert!(!stop("pare a review-devpit"), "another session");
+    assert!(!stop("✅"), "a yes names nothing to stop");
+}
+
+/// A stop loses work, so anything short of asking for it is refused: the
+/// refusal only sends the orchestrator back to ask.
+#[test]
+fn a_message_that_keeps_or_asks_about_a_session_does_not_stop_it() {
+    let stop = |said: &str| asks_to_stop(said, "fix-login", &["review-x"]);
+    assert!(!stop("pare a review-x e deixa a fix-login rodando"));
+    assert!(!stop("stop review-x, keep fix-login running"));
+    assert!(!stop("why did fix-login stop?"));
+    assert!(!stop("a fix-login vai parar sozinha?"));
+    assert!(!stop("close the login dialog first"));
+    assert!(!stop("before you stop fix-login, show me its log"));
+    assert!(!stop("antes de parar a fix-login, me mostra o log"));
+    assert!(!stop("stop fix-login and review-x"));
+}
+
+/// Part of a name means that session only while no other running session
+/// has the same part.
+#[test]
+fn a_part_of_a_name_shared_with_another_session_stops_neither() {
+    assert!(asks_to_stop("stop devpit", "devpit-a", &["other"]));
+    assert!(!asks_to_stop("stop devpit", "devpit-a", &["devpit-b"]));
+    assert!(asks_to_stop("stop devpit-a", "devpit-a", &["devpit-b"]));
 }

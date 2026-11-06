@@ -35,18 +35,26 @@ fn live(name: &str, pid: i32, card: Option<&str>) -> devpit_rpc::LiveSession {
 #[test]
 fn a_stop_nobody_asked_for_is_refused() {
     let name = "fix-login";
-    assert!(allowed(Some(&said("pare a fix-login", From::Composer)), name, false).is_ok());
+    assert!(allowed(
+        Some(&said("pare a fix-login", From::Composer)),
+        name,
+        &[],
+        false
+    )
+    .is_ok());
     let refused = allowed(
         Some(&said("como está a fix-login?", From::Composer)),
         name,
+        &[],
         false,
     );
     assert!(refused.is_err_and(|why| why.contains("fix-login")));
-    assert!(allowed(None, name, false).is_err(), "nothing said");
+    assert!(allowed(None, name, &[], false).is_err(), "nothing said");
     assert!(
         allowed(
             Some(&said("pare a fix-login", From::Channel("telegram"))),
             name,
+            &[],
             false
         )
         .is_err(),
@@ -56,8 +64,8 @@ fn a_stop_nobody_asked_for_is_refused() {
 
 #[test]
 fn a_session_relieved_on_its_card_is_stopped_without_a_word() {
-    assert!(allowed(Some(&said("ok", From::Composer)), "fix-login", true).is_ok());
-    assert!(allowed(None, "fix-login", true).is_ok());
+    assert!(allowed(Some(&said("ok", From::Composer)), "fix-login", &[], true).is_ok());
+    assert!(allowed(None, "fix-login", &[], true).is_ok());
 }
 
 #[test]
