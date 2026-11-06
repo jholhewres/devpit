@@ -260,59 +260,25 @@ const STOP: [&str; 21] = [
     "derruba",
 ];
 
-/// Words that may come before the stop verb in a request.
-const STOP_LEAD: [&str; 13] = [
-    "ok", "okay", "sim", "yes", "pode", "por", "favor", "please", "agora", "now", "então", "entao",
-    "then",
-];
-
-/// Words that may come between the stop verb and the session's name.
-const STOP_FILLER: [&str; 12] = [
-    "a", "o", "as", "os", "the", "essa", "esta", "this", "that", "sessão", "sessao", "session",
-];
-
-/// Words that may come after the session's name.
-const STOP_TRAIL: [&str; 7] = ["agora", "now", "please", "por", "favor", "já", "ja"];
-
-/// Whether what the person said is a request to stop `session`, which a stop
-/// loses the work of: one clause that is the verb and then the name, and no
-/// question or negation. `others` are the other running sessions: a part of a
-/// name counts only when none of them has it. In doubt it is no, and the
-/// refusal sends the orchestrator back to ask.
-pub fn asks_to_stop(said: &str, session: &str, others: &[&str]) -> bool {
+/// Whether what the person said is a request to stop `session`, which loses
+/// its work: the whole message is a stop verb or a yes mark, and the session's
+/// full name. Nothing is read into a sentence, and a part of a name is an
+/// ordinary word. Anything else is no, and the refusal says what to send.
+pub fn asks_to_stop(said: &str, session: &str) -> bool {
     let said = said.trim().to_lowercase();
-    if said.contains('?') || words_of(&said).iter().any(|word| NOT.contains(word)) {
+    let session = session.to_lowercase();
+    if said.contains('?') {
         return false;
     }
-    said.split([',', ';', '!', '\n'])
-        .flat_map(|part| part.split(". "))
-        .any(|clause| stops(&words_of(clause), session, others))
-}
-
-/// `text`'s words, keeping what a session's name may hold.
-fn words_of(text: &str) -> Vec<&str> {
-    text.split(|c: char| !c.is_alphanumeric() && !"-'._".contains(c))
+    if let Some(beside) = marked(&said) {
+        return beside == [session];
+    }
+    let words: Vec<&str> = said
+        .split(|c: char| !c.is_alphanumeric() && !"-'._".contains(c))
         .map(|word| word.trim_matches('.'))
         .filter(|word| !word.is_empty())
-        .collect()
-}
-
-/// Whether `clause` is the stop verb, then `session`, and nothing else.
-fn stops(clause: &[&str], session: &str, others: &[&str]) -> bool {
-    let mut rest = clause
-        .iter()
-        .skip_while(|word| STOP_LEAD.contains(word))
-        .copied();
-    if !rest.next().is_some_and(|verb| STOP.contains(&verb)) {
-        return false;
-    }
-    let mut rest = rest.skip_while(|word| STOP_FILLER.contains(word));
-    let Some(name) = rest.next() else {
-        return false;
-    };
-    let means = name == session.to_lowercase()
-        || (names(&[name], session) && !others.iter().any(|other| names(&[name], other)));
-    means && rest.all(|word| STOP_TRAIL.contains(&word))
+        .collect();
+    matches!(words.as_slice(), [verb, name] if STOP.contains(verb) && *name == session)
 }
 
 /// Whether `said` is a yes mark or a send word alone, which names no session:

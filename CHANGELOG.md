@@ -15,9 +15,10 @@ release notes are taken from here when a version is tagged.
 - **The orchestrator's preferences hold from the next message.** Editing
   `context/preferences.md` by hand takes effect from your next message,
   without reopening the orchestrator.
-- **The orchestrator stops a session only when you ask.** It stops one
-  when your last message names it with a word like "stop", or when
-  another session already works on the same card.
+- **The orchestrator stops a session only when you ask.** Your last
+  message has to be only that request, with the session's full name:
+  `stop fix-login` or `✅ fix-login`. It can also stop a session when
+  another one already works on the same card.
 - **Smaller fixes.** An X11 program started in a devpit terminal opens
   its window, once devpit's terminal keeper has restarted. "Open in
   browser" works on macOS and Windows without Chromium. A browser tab
