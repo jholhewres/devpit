@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fake = vi.hoisted(() => {
-  const terms: { disposed: boolean; cleared: number; written: unknown[]; scrolled: ((top: number) => void) | null }[] = []
+  const terms: { disposed: boolean; cleared: number; written: unknown[]; scrolled: ((top: number) => void) | null; write: (data: unknown, done?: () => void) => void }[] = []
   const pages: { left: number; bytes: Uint8Array }[] = []
   let asked = 0
   const attaches: { paneId: string; detached: boolean; on: { output: (b: Uint8Array, r: boolean) => void } }[] = []
@@ -43,7 +43,7 @@ const fake = vi.hoisted(() => {
       this.disposed = true
     }
   }
-  return { terms, attaches, Terminal, pages, asked: () => asked, ask: () => (asked += 1) }
+  return { terms, attaches, Terminal, pages, asked: () => asked, ask: () => (asked += 1), replaying: { current: (() => false) as () => boolean } }
 })
 
 vi.mock('@xterm/xterm', () => ({ Terminal: fake.Terminal }))
@@ -56,7 +56,12 @@ vi.mock('./live', () => ({
 }))
 vi.mock('./terminal', () => ({ contrastFor: () => 1, darkNow: () => true, options: () => ({}), palette: () => ({}) }))
 vi.mock('./terminalPathLinks', () => ({ linkPaths: () => ({ dispose() {} }) }))
-vi.mock('./terminalFollow', () => ({ followAfterClear: () => ({ dispose() {} }) }))
+vi.mock('./terminalFollow', () => ({
+  followAfterClear: (_terminal: unknown, replaying: () => boolean) => {
+    fake.replaying.current = replaying
+    return { dispose() {} }
+  },
+}))
 vi.mock('./terminalWheel', () => ({ wheelFor: () => ({ dispose() {}, typed() {} }) }))
 vi.mock('./terminalIme', () => ({ guardComposition: () => () => {} }))
 vi.mock('./terminalPaste', () => ({ picturesAsPaths: () => () => {} }))
@@ -205,6 +210,27 @@ describe('a terminal off screen', () => {
     await act(async () => term.scrolled?.(0))
     await settle()
     expect(fake.asked()).toBe(1)
+  })
+
+  it('counts the bytes it writes again around a page as a replay, so their clears do not move the reader', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
+    await settle()
+    const term = fake.terms[0]
+    act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
+    fake.pages.push({ left: 0, bytes: Uint8Array.from([65]) })
+    expect(fake.replaying.current()).toBe(false)
+    const seen: boolean[] = []
+    const write = term.write.bind(term)
+    term.write = (data: unknown, done?: () => void) => {
+      seen.push(fake.replaying.current())
+      write(data, done)
+    }
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every(Boolean)).toBe(true)
+    expect(fake.replaying.current()).toBe(false)
   })
 
   it('asks no further page once one drew no rows above, so the view is not pulled to the top again', async () => {

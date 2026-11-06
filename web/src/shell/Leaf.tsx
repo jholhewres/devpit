@@ -130,7 +130,7 @@ export function Leaf({
     terminal.loadAddon(fit)
     terminal.open(box)
     const linked = linkPaths(terminal, openingRef)
-    const follows = followAfterClear(terminal)
+    const follows = followAfterClear(terminal, () => paging)
     // After `open`, which is when there is a canvas to take a context from.
     measureWideCharacters(terminal)
     /* tmux sends only what changes, so a screen that was emptied under it —

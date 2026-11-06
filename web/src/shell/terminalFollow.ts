@@ -15,10 +15,12 @@ export interface Follower {
   scrollToBottom: () => void
 }
 
-export function followAfterClear(terminal: Follower): { dispose: () => void } {
+/** `replaying`: held bytes are being written again, old clears among them, and
+ *  whoever writes them puts the view back: those clears say nothing new. */
+export function followAfterClear(terminal: Follower, replaying: () => boolean): { dispose: () => void } {
   let cleared = false
   const csi = terminal.parser.registerCsiHandler({ final: 'J' }, (params) => {
-    if (params[0] === 3 && terminal.buffer.active.type === 'normal') cleared = true
+    if (params[0] === 3 && terminal.buffer.active.type === 'normal' && !replaying()) cleared = true
     return false
   })
   /* Once the redraw has rows above the screen: scrolling nowhere would leave
