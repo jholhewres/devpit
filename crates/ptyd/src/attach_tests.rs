@@ -148,6 +148,27 @@ fn typing_reaches_the_pane_its_output_reaches_the_terminal_and_is_acked() {
     assert!(matches_running(&at, 21), "leaving does not end the pane");
 }
 
+/// Beside a desktop window the attach client leaves the acking to it: the
+/// pane is held for the window, however much is read and acked here.
+#[test]
+fn beside_a_window_the_attach_client_leaves_the_acking_to_it() {
+    let (_dir, at, daemon) = daemon();
+    shell_at(&at, 23);
+    let mut window = socket::connect(&at).expect("connect");
+    frame::write(&mut window, &Frame::new(23, Kind::Attach, Vec::new())).expect("attach");
+    let mut one = attached(&at, 23);
+    one.keys.write_all(b"yes mirrored\n").expect("type");
+    one.screen.wait_for("mirrored\r\nmirrored");
+    std::thread::sleep(Duration::from_secs(1));
+    let pane = daemon.pane(23).expect("pane");
+    let held = pane.unacked();
+    pane.kill();
+    assert!(
+        held > crate::pane::MOST_UNACKED,
+        "the attach client acked what the window owed: {held} held"
+    );
+}
+
 #[test]
 fn the_pane_ending_ends_the_attach_with_its_code() {
     let (_dir, at, _daemon) = daemon();
