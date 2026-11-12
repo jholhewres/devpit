@@ -259,6 +259,7 @@ fn a_stop_is_a_message_that_is_only_the_request() {
     assert!(stop("✅ fix-login"));
     assert!(stop("fix-login ✅"));
     assert!(stop("✅ fix-login."));
+    assert!(stop("fix-login. ✅"));
 }
 
 #[test]
