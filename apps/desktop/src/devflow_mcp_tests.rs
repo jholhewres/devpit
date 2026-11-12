@@ -101,6 +101,18 @@ fn a_json_file_without_servers_gets_them_last_in_its_own_indentation() {
     );
 }
 
+/// Notepad saves a byte-order mark: the file it wrote reads as added, and
+/// Remove finds what Add put there.
+#[test]
+fn a_json_file_with_a_byte_order_mark_reads_as_added_and_can_be_removed() {
+    let theirs = "\u{feff}{\"theme\": \"dark\"}";
+    let added = with(Tool::Cursor, Some(theirs), CMD).expect("added");
+    assert!(added_in(Tool::Cursor, &added), "{added}");
+    let removed = without(Tool::Cursor, &added).expect("removed");
+    assert!(!added_in(Tool::Cursor, &removed), "{removed}");
+    assert!(removed.starts_with('\u{feff}'), "{removed}");
+}
+
 #[test]
 fn opencode_gets_it_as_a_local_server() {
     let added = with(Tool::Opencode, Some(r#"{"model":"m"}"#), CMD).expect("added");
@@ -170,6 +182,10 @@ fn taking_codex_out_keeps_every_comment_that_is_not_its_own() {
     let crlf = theirs.replace('\n', "\r\n");
     let added = with(Tool::Codex, Some(&crlf), CMD).expect("added");
     assert!(!added.replace("\r\n", "").contains('\n'), "{added:?}");
+    assert_eq!(
+        without(Tool::Codex, &crlf).expect("removed"),
+        removed.replace('\n', "\r\n")
+    );
 }
 
 #[test]
