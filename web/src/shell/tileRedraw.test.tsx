@@ -13,7 +13,13 @@ import { nearness } from './due'
  * the tiles drawn.
  */
 
-afterEach(cleanup)
+/* Set by a test, for the read after the first: card b, renamed somewhere else. */
+let renamed = false
+
+afterEach(() => {
+  cleanup()
+  renamed = false
+})
 
 const handlers: Record<string, (payload: unknown) => void> = {}
 
@@ -49,7 +55,7 @@ const card = (id: string, position: number, over: Partial<Card> = {}): Card => (
 const board = (): Board => ({
   projectId: 'p1',
   columns: [{ id: 'col_1', name: 'Todo', position: 0, step: null, onPass: null, autonomy: 'manual', role: null, roleChosen: false }],
-  cards: [card('a', 0), card('b', 1), card('c', 2, { runs: [run] })],
+  cards: [card('a', 0), card('b', 1, renamed ? { title: 'Card b, renamed' } : {}), card('c', 2, { runs: [run] })],
   steps: [],
 })
 
@@ -68,7 +74,7 @@ vi.mock('./window', () => ({
   },
 }))
 vi.mock('./useShell', () => ({
-  useShell: () => ({ project: { id: 'p1' }, wantedCard: null, openCard: vi.fn(), show: vi.fn() }),
+  useShell: () => ({ project: { id: 'p1' }, active: { kind: 'board' }, wantedCard: null, openCard: vi.fn(), show: vi.fn() }),
 }))
 
 const drawn = vi.mocked(nearness)
@@ -95,6 +101,20 @@ describe('a tile on the board', () => {
     act(() => handlers['run:progress']!(['run_c', 'compiling 3 of 9']))
 
     expect(screen.getByText('compiling 3 of 9')).toBeTruthy()
+    expect(drawn).toHaveBeenCalledTimes(1)
+  })
+
+  /* Every read answers new objects for every card, and an agent's turn is
+     many reads: each one drew the whole board again. */
+  it('is drawn again on a reload only when its own card changed', async () => {
+    render(<BoardPane />)
+    await screen.findByText('Card c')
+    drawn.mockClear()
+
+    renamed = true
+    act(() => handlers['board:changed']!('p1'))
+
+    expect(await screen.findByText('Card b, renamed')).toBeTruthy()
     expect(drawn).toHaveBeenCalledTimes(1)
   })
 })

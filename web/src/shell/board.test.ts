@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Board, Card, Column, Run } from '../gen/bindings'
-import { endOf, landed, lanes, moveQuestion, placed, playable, tiedToOthers } from './board'
+import { endOf, kept, landed, lanes, moveQuestion, placed, playable, tiedToOthers } from './board'
 
 const column = (id: string, position: number): Column => ({ id, name: id, position, step: null, onPass: null, autonomy: 'manual', role: null, roleChosen: false })
 const card = (id: string, columnId: string, position: number): Card =>
@@ -119,5 +119,44 @@ describe('a move other tiles hear about', () => {
     expect(tiedToOthers(planned, 'blocker')).toBe(true)
     expect(tiedToOthers(planned, 'after')).toBe(false)
     expect(tiedToOthers(board, 'c1')).toBe(false)
+  })
+})
+
+describe('a board read again', () => {
+  /* A read answers new objects for everything, changed or not. */
+  const reread = (one: Board): Board => JSON.parse(JSON.stringify(one)) as Board
+  const running: Board = {
+    ...board,
+    cards: board.cards.map((one) =>
+      one.id === 'c3' ? { ...one, runs: [{ id: 'r', stepId: 's', stepName: 'tests', state: 'running', output: null, exitCode: null, costUsd: null, durationMs: null, startedAt: 0 }] } : one,
+    ),
+  }
+
+  it('is the board shown when nothing on it changed', () => {
+    expect(kept(running, reread(running))).toBe(running)
+  })
+
+  it("keeps the unchanged cards' objects and takes the one whose run changed", () => {
+    const read = reread(running)
+    read.cards[2]!.runs[0]!.state = 'ok'
+    const next = kept(running, read)
+    expect(next.cards[0]).toBe(running.cards[0])
+    expect(next.cards[1]).toBe(running.cards[1])
+    expect(next.cards[2]).toBe(read.cards[2])
+    expect(next.columns).toBe(running.columns)
+  })
+
+  /* The last one: every card before it is still in its place. */
+  it('drops a card that left, and keeps the rest as they were', () => {
+    const read = reread(running)
+    read.cards = read.cards.filter((one) => one.id !== 'c3')
+    const next = kept(running, read)
+    expect(next.cards.map((one) => one.id)).toEqual(['c2', 'c1'])
+    expect(next.cards[0]).toBe(running.cards[0])
+  })
+
+  it("is the board read when it is another project's", () => {
+    const other = { ...reread(running), projectId: 'q' }
+    expect(kept(running, other)).toBe(other)
   })
 })

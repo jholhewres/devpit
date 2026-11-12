@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import type { Board, CardHappening, CardSession, ColumnDeleted, Played, Step } from '../gen/bindings'
 import { noteCards } from './beat'
-import { endOf, landed, lanes, moveQuestion, tiedToOthers, type Lane } from './board'
+import { alike, endOf, kept, landed, lanes, moveQuestion, tiedToOthers, type Lane } from './board'
 import { shifted } from './laneOrder'
 import { ask, commands } from './live'
 import { onCarried } from './window'
@@ -80,7 +80,9 @@ export function useBoard(projectId: string | null, inFront = true): UseBoard {
       return ask(() => commands.boardGet(projectId)).then((asked) => {
         if (mine !== asking.current || projectId !== current.current) return
         if (saysError) setError(asked.error)
-        if (asked.data) setBoard(asked.data)
+        const fresh = asked.data
+        /* Unchanged cards keep their objects, so their tiles stay as drawn. */
+        if (fresh) setBoard((was) => kept(was, fresh))
         /* A read that failed after a refusal leaves the card where it was. */
         else if (orElse) setBoard(orElse)
       })
@@ -173,7 +175,7 @@ export function useBoard(projectId: string | null, inFront = true): UseBoard {
         if (!onBoard.current.has(happening.cardId)) return
         setBoard((was) => withActivity(was, happening))
         setSessions((was) =>
-          same(was[happening.cardId], happening.sessions) ? was : { ...was, [happening.cardId]: happening.sessions },
+          alike(was[happening.cardId], happening.sessions) ? was : { ...was, [happening.cardId]: happening.sessions },
         )
       }),
     [],
@@ -391,16 +393,14 @@ export function useBoard(projectId: string | null, inFront = true): UseBoard {
   }
 }
 
-/* The same answer twice is not a change: every project's cards arrive here,
-   and a new board object for each re-drew every tile of this one. */
-const same = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a) === JSON.stringify(b)
-
 /** The board with one card's activity replaced — the same board when the card
  *  is not on it or its activity did not change. */
 export function withActivity(board: Board | null, happening: CardHappening): Board | null {
   if (!board) return board
   const card = board.cards.find((one) => one.id === happening.cardId)
-  if (!card || same(card.activity, happening.activity)) return board
+  /* The same answer twice is not a change: every project's cards arrive here,
+     and a new board object for each re-drew every tile of this one. */
+  if (!card || alike(card.activity, happening.activity)) return board
   return {
     ...board,
     cards: board.cards.map((one) => (one.id === happening.cardId ? { ...one, activity: happening.activity } : one)),
