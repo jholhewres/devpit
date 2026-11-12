@@ -222,6 +222,29 @@ fn unacknowledged_output_stops_the_reading_and_an_ack_resumes_it() {
     pane.kill();
 }
 
+/// The pane keeps one count of unacked output, which any watcher's ack takes
+/// from: a window that stopped reading does not hold one that acks.
+#[test]
+fn a_client_that_never_acks_does_not_hold_the_output_from_one_that_does() {
+    let pane = Pane::spawn(11, &asked("yes 0123456789abcdef"), |_| {}).expect("spawn");
+    let (stuck, _never_read) = crate::client::Client::queued();
+    pane.attach(&stuck);
+    let (acking, queue) = crate::client::Client::queued();
+    pane.attach(&acking);
+    let mut seen = 0usize;
+    let started = Instant::now();
+    while seen < 4 * MOST_UNACKED && started.elapsed() < Duration::from_secs(20) {
+        if let Ok(one) = queue.recv_timeout(Duration::from_millis(100)) {
+            if one.kind() == Some(Kind::Output) {
+                seen += one.bytes.len();
+                pane.ack(one.bytes.len());
+            }
+        }
+    }
+    pane.kill();
+    assert!(seen >= 4 * MOST_UNACKED, "held after {seen} bytes");
+}
+
 /// 500 MB through a client that acknowledges what it reads: memory is held
 /// to the window, and Ctrl+C stops the flood well within a second.
 #[test]
