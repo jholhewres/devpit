@@ -17,12 +17,34 @@ fn asked(method: &str, path: &str, headers: &[(&str, &str)]) -> Request {
     Request {
         method: method.to_owned(),
         path: path.to_owned(),
+        query: String::new(),
         headers: headers
             .iter()
             .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
             .collect::<HashMap<_, _>>(),
         body: Vec::new(),
     }
+}
+
+/// What the door says of `request` asked with `query`, `codes` aside.
+fn at_door_with(request: &Request, query: &str, codes: &Codes) -> Door {
+    let place = place();
+    let mut request = request.clone();
+    request.query = query.to_owned();
+    door(
+        &request,
+        &Keys {
+            place: &place,
+            token: TOKEN,
+            codes,
+            session: SESSION,
+            ticket: "ticket",
+        },
+    )
+}
+
+fn at_door(request: &Request, query: &str) -> Door {
+    at_door_with(request, query, &Codes::new())
 }
 
 fn signed_in(path: &str) -> Request {
@@ -37,29 +59,14 @@ fn signed_in(path: &str) -> Request {
 #[test]
 fn without_the_cookie_or_with_a_wrong_one_the_door_says_401() {
     let bare = asked("POST", "/rpc/project_list", &[("host", "127.0.0.1:41234")]);
-    assert_eq!(
-        door(&bare, "", &place(), TOKEN, SESSION),
-        Door::Unauthorized
-    );
+    assert_eq!(at_door(&bare, ""), Door::Unauthorized);
     let wrong = asked(
         "POST",
         "/rpc/project_list",
         &[("host", "127.0.0.1:41234"), ("cookie", "devpit_local=nope")],
     );
-    assert_eq!(
-        door(&wrong, "", &place(), TOKEN, SESSION),
-        Door::Unauthorized
-    );
-    assert_eq!(
-        door(
-            &signed_in("/rpc/project_list"),
-            "",
-            &place(),
-            TOKEN,
-            SESSION
-        ),
-        Door::In
-    );
+    assert_eq!(at_door(&wrong, ""), Door::Unauthorized);
+    assert_eq!(at_door(&signed_in("/rpc/project_list"), ""), Door::In);
     let planted = format!("{COOKIE}=attacker; {COOKIE}={SESSION}");
     let shadowed = asked(
         "POST",
@@ -67,7 +74,7 @@ fn without_the_cookie_or_with_a_wrong_one_the_door_says_401() {
         &[("host", "127.0.0.1:41234"), ("cookie", planted.as_str())],
     );
     assert_eq!(
-        door(&shadowed, "", &place(), TOKEN, SESSION),
+        at_door(&shadowed, ""),
         Door::In,
         "a cookie planted first under the same name does not sign the browser out"
     );
@@ -80,7 +87,7 @@ fn without_the_cookie_or_with_a_wrong_one_the_door_says_401() {
         ],
     );
     assert_eq!(
-        door(&token_as_cookie, "", &place(), TOKEN, SESSION),
+        at_door(&token_as_cookie, ""),
         Door::Unauthorized,
         "the cookie is this run's session, never the token in the home"
     );
@@ -115,11 +122,7 @@ fn a_foreign_host_or_origin_is_refused_whatever_it_carries() {
             headers.push(("origin", origin));
         }
         let request = asked("POST", "/rpc/project_list", &headers);
-        assert_eq!(
-            door(&request, "", &place(), TOKEN, SESSION),
-            Door::Foreign,
-            "{host} {origin:?}"
-        );
+        assert_eq!(at_door(&request, ""), Door::Foreign, "{host} {origin:?}");
     }
     let named = asked(
         "GET",
@@ -130,7 +133,7 @@ fn a_foreign_host_or_origin_is_refused_whatever_it_carries() {
             ("cookie", cookie.as_str()),
         ],
     );
-    assert_eq!(door(&named, "", &place(), TOKEN, SESSION), Door::In);
+    assert_eq!(at_door(&named, ""), Door::In);
 }
 
 /// The token is traded only under this install's own random name, so the
@@ -140,29 +143,17 @@ fn the_token_is_traded_for_the_cookie_once_and_only_when_it_is_right() {
     for host in ["127.0.0.1:41234", "localhost:41234"] {
         let elsewhere = asked("GET", "/auth", &[("host", host)]);
         assert_eq!(
-            door(&elsewhere, &format!("t={TOKEN}"), &place(), TOKEN, SESSION),
+            at_door(&elsewhere, &format!("t={TOKEN}")),
             Door::Unauthorized,
             "{host}"
         );
     }
     let host = format!("{NAME}:41234");
     let auth = asked("GET", "/auth", &[("host", host.as_str())]);
-    assert_eq!(
-        door(&auth, &format!("t={TOKEN}"), &place(), TOKEN, SESSION),
-        Door::Admit
-    );
-    assert_eq!(
-        door(&auth, "t=wrong", &place(), TOKEN, SESSION),
-        Door::Unauthorized
-    );
-    assert_eq!(
-        door(&auth, "", &place(), TOKEN, SESSION),
-        Door::Unauthorized
-    );
-    assert_eq!(
-        door(&auth, "x=1", &place(), TOKEN, SESSION),
-        Door::Unauthorized
-    );
+    assert_eq!(at_door(&auth, &format!("t={TOKEN}")), Door::Admit);
+    assert_eq!(at_door(&auth, "t=wrong"), Door::Unauthorized);
+    assert_eq!(at_door(&auth, ""), Door::Unauthorized);
+    assert_eq!(at_door(&auth, "x=1"), Door::Unauthorized);
 }
 
 #[test]
@@ -235,12 +226,31 @@ fn the_server_binds_loopback_alone_and_keeps_its_port() {
     );
 }
 
+/// "Open in browser" puts the link on Chromium's command line, which any
+/// user of the machine can read: it carries a one-time code, never the token.
 #[test]
-fn the_sign_in_link_goes_to_loopback() {
+fn the_sign_in_link_goes_to_loopback_with_a_code() {
     assert_eq!(
-        sign_in_url(&place(), "t0k"),
-        format!("http://{NAME}:41234/auth?t=t0k")
+        sign_in_url(&place(), "c0de"),
+        format!("http://{NAME}:41234/auth?c=c0de")
     );
+}
+
+#[test]
+fn a_sign_in_code_admits_once_and_only_within_its_minute() {
+    let host = format!("{NAME}:41234");
+    let auth = asked("GET", "/auth", &[("host", host.as_str())]);
+    let codes = Codes::new();
+    let code = codes.issue(Instant::now()).expect("code");
+    let with = |code: &str| at_door_with(&auth, &format!("c={code}"), &codes);
+    assert_eq!(with(&code), Door::Admit);
+    assert_eq!(with(&code), Door::Unauthorized, "a code is good once");
+    let long_ago = Instant::now()
+        .checked_sub(CODE_LIFE + Duration::from_secs(1))
+        .expect("an uptime past a minute");
+    let stale = codes.issue(long_ago).expect("stale");
+    assert_eq!(with(&stale), Door::Unauthorized, "a code is good a minute");
+    assert_eq!(with(TOKEN), Door::Unauthorized, "the token is no code");
 }
 
 #[test]
@@ -265,21 +275,87 @@ fn each_desktop_opens_a_link_with_its_own_opener() {
     assert_eq!(link_opener("linux"), ("xdg-open", &[][..]));
 }
 
-/// A pasted picture or a saved file is a call of megabytes: it is read whole,
-/// and only one past the ceiling is refused.
+fn keys<'a>(place: &'a Place, codes: &'a Codes) -> Keys<'a> {
+    Keys {
+        place,
+        token: TOKEN,
+        codes,
+        session: SESSION,
+        ticket: "ticket",
+    }
+}
+
+/// A pasted picture or a saved file is a call of megabytes: it is read whole
+/// past the door, one past the ceiling is refused, and a caller the door
+/// turns away has no body read at all, however long it says it is.
 #[test]
-fn a_call_of_megabytes_is_read_and_one_past_the_ceiling_is_not() {
-    let call = |length: usize| {
-        let body = "x".repeat(length);
+fn only_a_call_past_the_door_has_its_body_read() {
+    let (place, codes) = (place(), Codes::new());
+    let call = |cookie: &str, length: usize, body: usize| {
         format!(
-            "POST /rpc/file_write HTTP/1.1\r\nhost: 127.0.0.1:41234\r\ncontent-length: {length}\r\n\r\n{body}"
+            "POST /rpc/file_write HTTP/1.1\r\nhost: 127.0.0.1:41234\r\ncookie: {cookie}\r\n\
+             content-length: {length}\r\n\r\n{}",
+            "x".repeat(body)
         )
     };
-    let big = call(2 * 1024 * 1024);
-    let (request, _) = read_with_query(&mut big.as_bytes()).expect("read");
-    assert_eq!(request.body.len(), 2 * 1024 * 1024);
-    let over = call(MOST_BODY + 1);
-    assert!(read_with_query(&mut over.as_bytes()).is_none());
+    let read = |raw: String| admitted(&mut raw.as_bytes(), &keys(&place, &codes), |_| {});
+    let stranger = read(call("devpit_local=nope", MOST_BODY, 0)).expect("a head");
+    assert_eq!((stranger.0, stranger.1.body.len()), (Door::Unauthorized, 0));
+    let ours = format!("{COOKIE}={SESSION}");
+    let big = read(call(&ours, 2 * 1024 * 1024, 2 * 1024 * 1024)).expect("a call");
+    assert_eq!((big.0, big.1.body.len()), (Door::In, 2 * 1024 * 1024));
+    assert!(read(call(&ours, MOST_BODY + 1, MOST_BODY + 1)).is_none());
+}
+
+/// The query is the request line's, however few bytes the first read held.
+#[test]
+fn the_query_is_read_from_the_whole_request_line() {
+    let (place, codes) = (place(), Codes::new());
+    let raw = format!("GET /auth?x=1&t={TOKEN} HTTP/1.1\r\nhost: {NAME}:41234\r\n\r\n");
+    let mut reader = BufReader::with_capacity(8, raw.as_bytes());
+    let (entry, _) = admitted(&mut reader, &keys(&place, &codes), |_| {}).expect("read");
+    assert_eq!(entry, Door::Admit);
+}
+
+/// A head sent a byte at a time is dropped at its deadline: a read timeout
+/// alone starts over with every byte.
+#[test]
+fn a_head_that_trickles_in_is_dropped_at_its_deadline() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let at = listener.local_addr().expect("addr");
+    let sender = std::thread::spawn(move || {
+        let mut client = TcpStream::connect(at).expect("connect");
+        let _ = client.write_all(b"GET / HTTP/1.1\r\n");
+        for _ in 0..60 {
+            if client.write_all(b"x").is_err() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    });
+    let (stream, _) = listener.accept().expect("accept");
+    let started = Instant::now();
+    let read = read_head(BufReader::new(Deadline::new(
+        stream,
+        Duration::from_millis(300),
+    )));
+    assert!(read.is_none());
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "{:?}",
+        started.elapsed()
+    );
+    let _ = sender.join();
+}
+
+#[test]
+fn connections_past_the_most_wait_for_one_to_close() {
+    let open = Arc::new(AtomicUsize::new(0));
+    let first = open_one(&open, 2).expect("first");
+    let _second = open_one(&open, 2).expect("second");
+    assert!(open_one(&open, 2).is_none());
+    drop(first);
+    assert!(open_one(&open, 2).is_some());
 }
 
 #[test]

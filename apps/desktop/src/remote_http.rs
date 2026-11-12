@@ -4,6 +4,8 @@
 
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write};
+use std::net::TcpStream;
+use std::time::{Duration, Instant};
 
 const MOST_LINE: usize = 8 * 1024;
 const MOST_HEADERS: usize = 64;
@@ -15,6 +17,8 @@ pub(crate) struct Request {
     pub method: String,
     /// Without the query.
     pub path: String,
+    /// After the `?`, read from the whole request line.
+    pub query: String,
     /// Names lowercased.
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
@@ -30,15 +34,22 @@ pub(crate) fn read(reader: impl BufRead) -> Option<Request> {
     read_up_to(reader, MOST_BODY)
 }
 
-/// [`read`], with a body up to `most_body` bytes, kept as it arrives rather
-/// than allocated from what `content-length` claims.
+/// [`read`], with a body up to `most_body` bytes.
 pub(crate) fn read_up_to(mut reader: impl BufRead, most_body: usize) -> Option<Request> {
+    let mut request = read_head(&mut reader)?;
+    read_body(&mut reader, &mut request, most_body)?;
+    Some(request)
+}
+
+/// The request line and headers, the body left unread.
+pub(crate) fn read_head(mut reader: impl BufRead) -> Option<Request> {
     let mut first = String::new();
     line(&mut reader, &mut first)?;
     let mut words = first.split_whitespace();
     let method = words.next()?.to_owned();
     let target = words.next()?;
-    let path = target.split('?').next().unwrap_or("/").to_owned();
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    let (path, query) = (path.to_owned(), query.to_owned());
     let mut headers = HashMap::new();
     loop {
         if headers.len() > MOST_HEADERS {
@@ -53,11 +64,27 @@ pub(crate) fn read_up_to(mut reader: impl BufRead, most_body: usize) -> Option<R
         let (name, value) = header.split_once(':')?;
         headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_owned());
     }
-    let length: usize = match headers.get("content-length") {
+    Some(Request {
+        method,
+        path,
+        query,
+        headers,
+        body: Vec::new(),
+    })
+}
+
+/// The body `content-length` gives, up to `most` bytes, kept as it arrives
+/// rather than allocated from what the header claims.
+pub(crate) fn read_body(
+    mut reader: impl BufRead,
+    request: &mut Request,
+    most: usize,
+) -> Option<()> {
+    let length: usize = match request.header("content-length") {
         Some(length) => length.parse().ok()?,
         None => 0,
     };
-    if length > most_body {
+    if length > most {
         return None;
     }
     let mut body = Vec::new();
@@ -67,12 +94,40 @@ pub(crate) fn read_up_to(mut reader: impl BufRead, most_body: usize) -> Option<R
     if body.len() != length {
         return None;
     }
-    Some(Request {
-        method,
-        path,
-        headers,
-        body,
-    })
+    request.body = body;
+    Some(())
+}
+
+/// A socket read that gives up at `until`: a read timeout alone starts over
+/// with every byte, so a head sent a byte at a time would hold a thread for good.
+pub(crate) struct Deadline {
+    stream: TcpStream,
+    until: Instant,
+}
+
+impl Deadline {
+    pub(crate) fn new(stream: TcpStream, within: Duration) -> Deadline {
+        Deadline {
+            stream,
+            until: Instant::now() + within,
+        }
+    }
+
+    /// Moves the deadline to `within` from now.
+    pub(crate) fn renew(&mut self, within: Duration) {
+        self.until = Instant::now() + within;
+    }
+}
+
+impl Read for Deadline {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let left = self.until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(std::io::ErrorKind::TimedOut.into());
+        }
+        self.stream.set_read_timeout(Some(left))?;
+        self.stream.read(buf)
+    }
 }
 
 fn line(reader: &mut impl BufRead, into: &mut String) -> Option<()> {
