@@ -1,6 +1,8 @@
 use devpit_rpc::RemoteIn;
 
-use super::{admit, fragment_value, identify, identity, wait_after, Who, LONGEST_WAIT};
+use super::{
+    admit, allowed_for, fragment_value, identify, identity, wait_after, Who, LONGEST_WAIT,
+};
 use crate::remote_devices::Devices;
 
 const SECRET: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
@@ -141,8 +143,13 @@ fn a_device_with_the_secret_waits_for_the_person_and_a_no_pairs_nothing() {
     let mut offered = Some(SECRET);
     let mut take = |secret: &str| (offered.take() == Some(secret)).then_some(false);
     let who = identify(&mut devices, &phone, || pairing(SECRET), &mut take, 1.0).expect("asks");
-    assert!(matches!(&who, Who::Asking { name, mcp: false } if name == "Pixel"));
-    assert!(admit(&mut devices, &phone, who, false, 1.0).is_err());
+    let mut asked_about = None;
+    let allowed = allowed_for(&who, |name| {
+        asked_about = Some(name.to_owned());
+        false
+    });
+    assert_eq!(asked_about.as_deref(), Some("Pixel"));
+    assert!(admit(&mut devices, &phone, who, allowed, 1.0).is_err());
     assert!(devices.devices.is_empty(), "refused, and kept anyway");
     assert!(
         identify(&mut devices, &phone, || pairing(SECRET), &mut take, 2.0).is_err(),
@@ -162,5 +169,6 @@ fn an_mcp_client_is_not_asked_about_its_own_offer() {
         name: "laptop".to_owned(),
         mcp: true,
     };
-    assert!(admit(&mut devices, &[7u8; 32], who, false, 1.0).is_ok());
+    let allowed = allowed_for(&who, |_| panic!("an MCP client was asked about"));
+    assert!(admit(&mut devices, &[7u8; 32], who, allowed, 1.0).is_ok());
 }
