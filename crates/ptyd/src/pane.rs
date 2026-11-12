@@ -370,10 +370,6 @@ impl Pane {
         self.state.lock().ok()?.cwd.clone()
     }
 
-    pub fn program(&self) -> Option<String> {
-        self.state.lock().ok()?.program.clone()
-    }
-
     fn read(
         &self,
         mut reader: Box<dyn Read + Send>,
