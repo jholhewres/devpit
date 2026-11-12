@@ -269,20 +269,20 @@ describe('a terminal off screen', () => {
   })
 
   /* A page redrawn in place (a progress bar) draws no rows, yet older rows
-     still sit before it. */
-  it('keeps asking for older pages after one that drew no rows while nothing cleared', async () => {
+     still sit before it. The view stays at the top, where a wheel moves
+     nothing and no scroll would ask again: the next page is asked at once. */
+  it('asks the next page at once after one that drew no rows while nothing cleared', async () => {
     render(<Leaf paneId="leaf_1" projectId="prj_1" />)
     onScreen(true)
     await settle()
     const term = fake.terms[0]
     act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
-    fake.pages.push({ left: 5, bytes: Uint8Array.from([65]) }, { left: 4, bytes: Uint8Array.from([67]) })
+    fake.pages.push({ left: 5, bytes: Uint8Array.from([65]) }, { left: 0, bytes: Uint8Array.from([67]) })
     const before = fake.asked()
     await act(async () => term.scrolled?.(0))
     await settle()
-    await act(async () => term.scrolled?.(0))
-    await settle()
     expect(fake.asked() - before).toBe(2)
+    expect(term.written.slice(-4)).toEqual([Uint8Array.from([67]), Uint8Array.from([65]), Uint8Array.from([66]), new Uint8Array()])
     fake.pages.length = 0
   })
 
