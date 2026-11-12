@@ -19,43 +19,77 @@ const FRESH: Duration = Duration::from_millis(2500);
 /// How often the window is told what changed while it is on screen.
 const EVERY: Duration = Duration::from_secs(2);
 
-type Kept = Option<(Instant, Arc<Vec<Snapped>>)>;
+/// A listing, when it was made, and the hook sequence read just before tmux
+/// was asked: a hook heard after it is newer than anything the listing says.
+pub(crate) struct Listing {
+    at: Instant,
+    pub seq: u64,
+    pub rows: Arc<Vec<Snapped>>,
+}
 
-static KEPT: Mutex<Kept> = Mutex::new(None);
-/// One listing at a time: callers that missed together take the same one.
-static LISTING: Mutex<()> = Mutex::new(());
+/// The listing every caller shares, one made at a time.
+pub(crate) struct Shared {
+    kept: Mutex<Option<Arc<Listing>>>,
+    listing: Mutex<()>,
+}
+
+impl Shared {
+    pub(crate) const fn new() -> Shared {
+        Shared {
+            kept: Mutex::new(None),
+            listing: Mutex::new(()),
+        }
+    }
+
+    /// The kept listing while it is at most [`FRESH`] old, else `list`'s.
+    pub(crate) fn fresh(&self, list: impl FnOnce() -> Vec<Snapped>) -> Arc<Listing> {
+        let kept = || {
+            self.kept
+                .lock()
+                .ok()?
+                .clone()
+                .filter(|kept| kept.at.elapsed() < FRESH)
+        };
+        if let Some(kept) = kept() {
+            return kept;
+        }
+        let _listing = self.listing.lock();
+        if let Some(kept) = kept() {
+            return kept;
+        }
+        self.keep(list)
+    }
+
+    /// A new listing, kept for everyone.
+    pub(crate) fn refresh(&self, list: impl FnOnce() -> Vec<Snapped>) -> Arc<Listing> {
+        let _listing = self.listing.lock();
+        self.keep(list)
+    }
+
+    fn keep(&self, list: impl FnOnce() -> Vec<Snapped>) -> Arc<Listing> {
+        let seq = crate::card_activity::next_seq();
+        let listing = Arc::new(Listing {
+            seq,
+            rows: Arc::new(list()),
+            at: Instant::now(),
+        });
+        if let Ok(mut held) = self.kept.lock() {
+            *held = Some(listing.clone());
+        }
+        listing
+    }
+}
+
+static SHARED: Shared = Shared::new();
 
 /// The panes of every session, from a listing at most [`FRESH`] old.
 pub(crate) fn rows() -> Arc<Vec<Snapped>> {
-    let kept = || {
-        KEPT.lock()
-            .ok()?
-            .as_ref()
-            .filter(|(at, _)| at.elapsed() < FRESH)
-            .map(|(_, rows)| rows.clone())
-    };
-    if let Some(rows) = kept() {
-        return rows;
-    }
-    let _listing = LISTING.lock();
-    if let Some(rows) = kept() {
-        return rows;
-    }
-    keep()
+    listing().rows.clone()
 }
 
-/// A new listing, kept for everyone.
-fn refresh() -> Arc<Vec<Snapped>> {
-    let _listing = LISTING.lock();
-    keep()
-}
-
-fn keep() -> Arc<Vec<Snapped>> {
-    let rows = Arc::new(listed());
-    if let Ok(mut held) = KEPT.lock() {
-        *held = Some((Instant::now(), rows.clone()));
-    }
-    rows
+/// [`rows`], with the sequence it is newer than.
+pub(crate) fn listing() -> Arc<Listing> {
+    SHARED.fresh(listed)
 }
 
 fn listed() -> Vec<Snapped> {
@@ -124,6 +158,28 @@ pub(crate) fn projects(rows: &[Snapped]) -> HashSet<String> {
         .collect()
 }
 
+/// Every project's panes, named by one `name` for all of them: naming reads
+/// the process table, once a tick rather than once a project.
+pub(crate) fn named_by_project(
+    rows: &[Snapped],
+    name: impl FnOnce(Vec<Running>) -> Vec<devpit_rpc::PaneRunning>,
+) -> HashMap<String, Vec<devpit_rpc::PaneRunning>> {
+    let mut now: HashMap<String, Vec<devpit_rpc::PaneRunning>> = HashMap::new();
+    let mut owners = Vec::new();
+    let mut panes = Vec::new();
+    for project in projects(rows) {
+        for pane in in_project(rows, &project) {
+            owners.push(project.clone());
+            panes.push(pane);
+        }
+        now.insert(project, Vec::new());
+    }
+    for (project, pane) in owners.into_iter().zip(name(panes)) {
+        now.entry(project).or_default().push(pane);
+    }
+    now
+}
+
 /// Whether a project's panes changed since they were last told.
 #[derive(Default)]
 pub(crate) struct Told {
@@ -172,13 +228,9 @@ pub(crate) fn watch(app: tauri::AppHandle) {
             if !shown {
                 continue;
             }
-            let seq = crate::card_activity::next_seq();
-            let rows = refresh();
-            let mut now: HashMap<String, Vec<devpit_rpc::PaneRunning>> = HashMap::new();
-            for project in projects(&rows) {
-                let panes = crate::shell_launch::named_panes(in_project(&rows, &project));
-                now.insert(project, panes);
-            }
+            let Listing { seq, rows, .. } = &*SHARED.refresh(listed);
+            let (seq, rows) = (*seq, rows.clone());
+            let mut now = named_by_project(&rows, crate::shell_launch::named_panes);
             #[cfg(unix)]
             for project in crate::ptyd_watch::projects() {
                 let panes = crate::ptyd_watch::running_in(&project);

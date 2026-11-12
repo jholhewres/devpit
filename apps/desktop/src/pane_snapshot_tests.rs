@@ -94,3 +94,42 @@ fn with_no_tmux_socket_nothing_is_listed_or_asked() {
     std::fs::write(&socket, b"").expect("socket");
     assert_eq!(listed_at(Some(&socket), rows).len(), rows().len());
 }
+
+/// A listing kept for others is older than a hook heard after it was made:
+/// its sequence is the one read before tmux was asked, not when it is reused.
+#[test]
+fn a_kept_listing_is_older_than_a_hook_heard_after_it_was_made() {
+    let shared = Shared::new();
+    let made = shared.fresh(rows);
+    let hook = crate::card_activity::next_seq();
+    let reused = shared.fresh(|| panic!("listed again while fresh"));
+    assert_eq!(reused.seq, made.seq);
+    assert!(reused.seq < hook);
+}
+
+#[test]
+fn every_projects_panes_are_named_together_and_handed_back_to_their_project() {
+    let named = named_by_project(&rows(), |panes| {
+        panes
+            .into_iter()
+            .map(|one| devpit_rpc::PaneRunning {
+                pane_id: one.leaf_id,
+                busy: false,
+                label: String::new(),
+                agent: None,
+                command: one.command,
+            })
+            .collect()
+    });
+    let leaves = |project: &str| -> Vec<String> {
+        let mut leaves: Vec<String> = named[project]
+            .iter()
+            .map(|one| one.pane_id.clone())
+            .collect();
+        leaves.sort();
+        leaves
+    };
+    assert_eq!(named.len(), 2);
+    assert_eq!(leaves("p1"), ["leaf_a", "leaf_b"]);
+    assert_eq!(leaves("p10"), ["leaf_c"]);
+}
