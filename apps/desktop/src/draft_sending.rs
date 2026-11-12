@@ -6,8 +6,8 @@
 //! wherever the person spoke to the orchestrator — the composer or the Claude
 //! app — and never from another session, a tool or the agent's own account.
 //! One message lets one draft go: a second ask on the same words is refused.
-//! From a channel's chat a word lets nothing go: the draft waits for the
-//! person's press on its button there.
+//! Words that do not let it go leave it waiting for the person's click, and
+//! from a channel's chat a word lets nothing go: there it is their press.
 
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
@@ -46,6 +46,26 @@ pub(crate) fn lets_go(said: &Said, name: &str, waiting: usize) -> bool {
     !matches!(said.from, From::Channel(_)) && authorises(&said.text, name, waiting)
 }
 
+/// What the orchestrator is told when what the person said does not let the
+/// draft for `name` go: nothing is sent, and it waits for their click.
+pub(crate) fn waits(said: &Said, name: &str) -> Value {
+    let why = match said.from {
+        From::Channel(_) => format!(
+            "the person last wrote from {}, where a draft goes only by its button",
+            said.from.label()
+        ),
+        _ => format!(
+            "the person's last message («{}») does not ask for it by itself",
+            short(&said.text)
+        ),
+    };
+    json!({
+        "done": false,
+        "asked": format!("send the draft to {name}"),
+        "note": format!("Not sent yet: {why}. It waits beside the session and above this chat's composer, where one click of the person's sends it. Tell them so; do not ask them to type it again."),
+    })
+}
+
 /// Sends the draft for `name` when the person's last word in the log of the
 /// orchestrator of `project`, standing in `root`, asks for it.
 pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Result<Value, String> {
@@ -68,16 +88,7 @@ pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Res
         .filter(|(whose, _, _)| whose == profile)
         .count();
     if !lets_go(&said, name, waiting) {
-        return Err(match said.from {
-            From::Channel(_) => format!(
-                "not sent: the person last wrote from {}, where a draft goes only by its button. It waits beside the session for their click.",
-                said.from.label()
-            ),
-            _ => format!(
-                "not sent: the person's last message («{}») does not ask for the draft to {name} to go. It waits beside the session for their click, or for them to reply ✅, beside the session's name when more than one draft waits.",
-                short(&said.text)
-            ),
-        });
+        return Ok(waits(&said, name));
     }
     let mut held = spent()
         .lock()

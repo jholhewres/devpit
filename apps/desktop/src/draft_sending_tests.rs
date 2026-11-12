@@ -1,6 +1,6 @@
 use devpit_agentcli::person::{From, Said};
 
-use super::{key_of, lets_go, spend};
+use super::{key_of, lets_go, spend, waits};
 
 fn said(id: &str, text: &str) -> Said {
     Said {
@@ -63,4 +63,18 @@ fn a_yes_mark_alone_is_spent_whole_and_counts_nowhere_on_a_channel() {
         ..go
     };
     assert!(!lets_go(&on_telegram, "noiseless-mvp", 1));
+}
+
+/// Words that do not let the draft go are not a refusal to rewrite: the
+/// draft waits beside the session for the person's one click.
+#[test]
+fn a_draft_the_words_do_not_cover_waits_for_the_click() {
+    let words = said("u1", "decida por mim e prossiga");
+    assert!(!lets_go(&words, "noiseless-mvp", 1));
+    let answer = waits(&words, "noiseless-mvp");
+    assert_eq!(answer["done"], false);
+    assert_eq!(answer["asked"], "send the draft to noiseless-mvp");
+    assert!(answer["note"]
+        .as_str()
+        .is_some_and(|note| note.contains("one click")));
 }
