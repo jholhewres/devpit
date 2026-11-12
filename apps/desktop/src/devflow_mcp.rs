@@ -78,19 +78,31 @@ impl Tool {
     }
 }
 
-/// Codex's table for devflow, and its subtables (`.env`).
-const CODEX_TABLE: &str = "[mcp_servers.devflow]";
+/// Codex's `config.toml`, read as TOML: an entry however it is spelled.
+fn codex_doc(text: &str) -> Result<toml_edit::DocumentMut, String> {
+    text.parse().map_err(|_| {
+        "Codex's config.toml is not valid TOML devpit can change; it is left as it was".to_owned()
+    })
+}
 
-fn codex_header(line: &str) -> Option<bool> {
-    let line = line.trim();
-    line.starts_with('[')
-        .then(|| line == CODEX_TABLE || line.starts_with("[mcp_servers.devflow."))
+/// Line ends as the file had them: toml_edit writes what it adds with `\n`.
+fn codex_text(doc: &toml_edit::DocumentMut, was: &str) -> String {
+    let text = doc.to_string();
+    if was.contains("\r\n") {
+        text.replace("\r\n", "\n").replace('\n', "\r\n")
+    } else {
+        text
+    }
 }
 
 /// Whether `text`, the tool's file, has devflow in it.
 pub(crate) fn added_in(tool: Tool, text: &str) -> bool {
     match tool {
-        Tool::Codex => text.lines().any(|line| line.trim() == CODEX_TABLE),
+        Tool::Codex => codex_doc(text).ok().is_some_and(|doc| {
+            doc.get("mcp_servers")
+                .and_then(|all| all.get(NAME))
+                .is_some()
+        }),
         _ => serde_json::from_str::<Value>(text)
             .ok()
             .is_some_and(|value| value[tool.servers()].get(NAME).is_some()),
@@ -100,63 +112,61 @@ pub(crate) fn added_in(tool: Tool, text: &str) -> bool {
 /// `text` (none: no file yet) with devflow added, run as `command mcp`.
 pub(crate) fn with(tool: Tool, text: Option<&str>, command: &str) -> Result<String, String> {
     if tool == Tool::Codex {
-        let mut kept = without(tool, text.unwrap_or_default())?;
-        if !kept.is_empty() && !kept.ends_with("\n\n") {
-            kept.push_str(if kept.ends_with('\n') { "\n" } else { "\n\n" });
+        let text = text.unwrap_or_default();
+        let mut doc = codex_doc(text)?;
+        let beside_others = !text.trim().is_empty();
+        let servers = doc
+            .entry("mcp_servers")
+            .or_insert_with(|| {
+                let mut all = toml_edit::Table::new();
+                all.set_implicit(true);
+                toml_edit::Item::Table(all)
+            })
+            .as_table_like_mut()
+            .ok_or("Codex's `mcp_servers` is not a table; it is left as it was")?;
+        let args = toml_edit::value(toml_edit::Array::from_iter(["mcp"]));
+        match servers
+            .get_mut(NAME)
+            .and_then(toml_edit::Item::as_table_like_mut)
+        {
+            Some(ours) => {
+                ours.insert("command", toml_edit::value(command));
+                ours.insert("args", args);
+            }
+            None => {
+                let mut ours = toml_edit::Table::new();
+                if beside_others {
+                    ours.decor_mut().set_prefix("\n");
+                }
+                ours.insert("command", toml_edit::value(command));
+                ours.insert("args", args);
+                servers.insert(NAME, toml_edit::Item::Table(ours));
+            }
         }
-        let quoted = command.replace('\\', "\\\\").replace('"', "\\\"");
-        kept.push_str(&format!(
-            "{CODEX_TABLE}\ncommand = \"{quoted}\"\nargs = [\"mcp\"]\n"
-        ));
-        return Ok(kept);
+        return Ok(codex_text(&doc, text));
     }
-    let mut value = match text.filter(|one| !one.trim().is_empty()) {
-        Some(one) => parsed(tool, one)?,
-        None => json!({}),
-    };
-    let servers = value
-        .as_object_mut()
-        .ok_or_else(|| not_ours(tool))?
-        .entry(tool.servers())
-        .or_insert_with(|| json!({}));
-    servers
-        .as_object_mut()
-        .ok_or_else(|| not_ours(tool))?
-        .insert(NAME.to_owned(), tool.entry(command));
-    pretty(&value)
+    match text.filter(|one| !one.trim().is_empty()) {
+        Some(one) => {
+            devpit_agentcli::json_in_place::put(one, tool.servers(), NAME, &tool.entry(command))
+                .map_err(|_| not_ours(tool))
+        }
+        None => pretty(&json!({ tool.servers(): { NAME: tool.entry(command) } })),
+    }
 }
 
 /// `text` without devflow.
 pub(crate) fn without(tool: Tool, text: &str) -> Result<String, String> {
     if tool == Tool::Codex {
-        let mut dropping = false;
-        let kept: Vec<&str> = text
-            .lines()
-            .filter(|line| {
-                if let Some(ours) = codex_header(line) {
-                    dropping = ours;
-                }
-                !dropping
-            })
-            .collect();
-        let mut kept = kept.join("\n").trim_end().to_owned();
-        if !kept.is_empty() {
-            kept.push('\n');
+        let mut doc = codex_doc(text)?;
+        if let Some(servers) = doc
+            .get_mut("mcp_servers")
+            .and_then(toml_edit::Item::as_table_like_mut)
+        {
+            servers.remove(NAME);
         }
-        return Ok(kept);
+        return Ok(codex_text(&doc, text));
     }
-    let mut value = parsed(tool, text)?;
-    if let Some(servers) = value.get_mut(tool.servers()).and_then(Value::as_object_mut) {
-        servers.remove(NAME);
-    }
-    pretty(&value)
-}
-
-fn parsed(tool: Tool, text: &str) -> Result<Value, String> {
-    serde_json::from_str::<Value>(text)
-        .ok()
-        .filter(Value::is_object)
-        .ok_or_else(|| not_ours(tool))
+    devpit_agentcli::json_in_place::take(text, tool.servers(), NAME).map_err(|_| not_ours(tool))
 }
 
 fn not_ours(tool: Tool) -> String {
@@ -216,11 +226,7 @@ pub(crate) fn set_in(
         (false, Some(text)) if added_in(tool, text) => without(tool, text)?,
         (false, _) => return Ok(()),
     };
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs());
-    devpit_agentcli::config_edit::write_text(&file, before.as_deref(), &after, &now.to_string())
-        .map(|_| ())
+    devpit_agentcli::config_edit::write_text(&file, before.as_deref(), &after).map(|_| ())
 }
 
 fn home() -> Result<PathBuf, RpcError> {

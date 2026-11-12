@@ -36,7 +36,7 @@ fn a_change_is_shown_backed_up_and_written_whole() {
     assert!(planned.diff.contains("+  \"hooks\": {"), "{}", planned.diff);
     assert!(planned.diff.contains(" \"theme\": \"dark\""));
 
-    let backup = write(&loaded, &planned, "20261002-101500")
+    let backup = write(&loaded, &planned)
         .expect("written")
         .expect("a backup");
     assert_eq!(
@@ -61,7 +61,7 @@ fn a_file_changed_since_it_was_read_is_not_written() {
     let loaded = read(&path).expect("read");
     let planned = plan(&loaded, |map| put_ours(map, &["hooks"], "devpit", json!(1)));
     std::fs::write(&path, "{\"mine\": true}").expect("edited meanwhile");
-    assert!(write(&loaded, &planned, "x").is_err());
+    assert!(write(&loaded, &planned).is_err());
     assert_eq!(
         std::fs::read_to_string(&path).expect("read"),
         "{\"mine\": true}"
@@ -95,7 +95,7 @@ fn a_symlinked_file_is_written_through_its_link() {
     std::os::unix::fs::symlink(&real, &link).expect("link");
     let loaded = read(&link).expect("read");
     let planned = plan(&loaded, |map| put_ours(map, &[], "devpit", json!(true)));
-    write(&loaded, &planned, "t").expect("written");
+    write(&loaded, &planned).expect("written");
     assert!(std::fs::symlink_metadata(&link)
         .expect("meta")
         .file_type()
