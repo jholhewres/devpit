@@ -57,6 +57,7 @@ fn the_plugin_on_beside_devpits_devflow_is_the_tools_twice() {
 }
 
 /// A `claude` that writes its arguments and the directory it was pointed at.
+#[cfg(unix)]
 fn fake_claude(log: &Path) -> tempfile::TempDir {
     use std::os::unix::fs::PermissionsExt;
     let bin = tempfile::tempdir().expect("bin");
@@ -70,6 +71,7 @@ fn fake_claude(log: &Path) -> tempfile::TempDir {
     bin
 }
 
+#[cfg(unix)]
 #[test]
 fn install_update_and_remove_run_claude_in_the_projects_profile_and_nowhere_else() {
     let log_dir = tempfile::tempdir().expect("log");
@@ -115,6 +117,7 @@ fn install_update_and_remove_run_claude_in_the_projects_profile_and_nowhere_else
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn a_failed_step_says_which_and_stops_the_rest() {
     use std::os::unix::fs::PermissionsExt;
