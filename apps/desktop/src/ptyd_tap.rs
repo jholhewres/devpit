@@ -7,8 +7,9 @@
 //! a long command's end is told with no window open.
 //!
 //! The daemon keeps one count of unacknowledged output per pane, and every
-//! attached client's `Ack` takes from it. A window acks what its page parsed;
-//! the tap acks only while no window is on the pane ([`acked`]).
+//! attached client's `Ack` takes from it, but a mirror's (`ptyd-attach`) while
+//! another watcher is on. A window acks what its page parsed; the tap acks
+//! only while no window is on the pane ([`acked`]).
 
 use std::collections::{HashMap, HashSet};
 use std::io;
