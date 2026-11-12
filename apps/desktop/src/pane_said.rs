@@ -28,7 +28,7 @@ impl PaneStates {
 
     /// Whether the screen is worth reading: the agent said it waits, or it has
     /// said nothing and was never read or was last seen on a prompt.
-    pub(crate) fn should_look(&mut self, leaf: &str) -> bool {
+    pub(crate) fn should_look(&self, leaf: &str) -> bool {
         match self.heard.get(leaf) {
             Some(Doing::Waiting) => true,
             Some(_) => false,
@@ -55,9 +55,7 @@ pub(crate) fn read(leaf: &str, prompt: bool) {
 }
 
 pub(crate) fn should_look(leaf: &str) -> bool {
-    states()
-        .lock()
-        .is_ok_and(|mut states| states.should_look(leaf))
+    states().lock().is_ok_and(|states| states.should_look(leaf))
 }
 
 #[cfg(test)]
