@@ -114,6 +114,19 @@ fn a_request_for_a_pane_that_is_not_there_is_refused_and_the_connection_lives() 
     assert_eq!(got[0].kind(), Some(Kind::Refused), "a bad spawn is refused");
 }
 
+/// A history request too short to say how much the client holds is refused,
+/// as a short ack is, not read as holding nothing.
+#[test]
+fn a_history_request_without_its_count_is_refused() {
+    let (_dir, at) = listening(socket::own_uid());
+    let mut stream = connected(&at);
+    send(&mut stream, 5, Kind::Spawn, shell().encode());
+    send(&mut stream, 5, Kind::History, vec![0, 0, 0]);
+    let got = read_until(&mut stream, |got| !got.is_empty());
+    send(&mut stream, 5, Kind::Kill, Vec::new());
+    assert_eq!(got.first().and_then(Frame::kind), Some(Kind::Refused));
+}
+
 /// A peer of another uid is closed before it is greeted: the hello gets no
 /// answer. The daemon is told its own uid is someone else's, which is how a
 /// test stands where another user's process would.
