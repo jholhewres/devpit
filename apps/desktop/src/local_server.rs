@@ -44,8 +44,8 @@ const MOST_OPEN: usize = 256;
 const CODE_LIFE: Duration = Duration::from_secs(60);
 
 /// Commands a browser may not run here: each streams over a Tauri channel
-/// (the browser gets that stream over the events socket), or opens UI on the
-/// desktop's screen.
+/// (the browser gets that stream over the events socket), opens something on
+/// the desktop's screen, or hands out a file by a scheme only the window has.
 const DESKTOP_ONLY: &[&str] = &[
     "chat_send",
     "chat_rejoin",
@@ -55,6 +55,9 @@ const DESKTOP_ONLY: &[&str] = &[
     "path_open",
     "path_reveal",
     "url_open",
+    "apps_open",
+    "media_open",
+    "mcp_app_open",
 ];
 /// Whole families of desktop-only commands, by prefix.
 const DESKTOP_ONLY_FAMILIES: &[&str] = &["browser_", "island_", "tray_", "plugin:"];

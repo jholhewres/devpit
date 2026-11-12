@@ -167,6 +167,9 @@ fn a_stream_or_the_desktops_own_ui_is_not_run_from_a_browser() {
         "tray_read",
         "path_reveal",
         "url_open",
+        "apps_open",
+        "media_open",
+        "mcp_app_open",
         "plugin:dialog|open",
     ] {
         assert!(desktop_only(command), "{command}");
