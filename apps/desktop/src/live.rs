@@ -55,19 +55,19 @@ pub(crate) trait Sink: Send + Sync {
 /// and the reader stops reading until it catches up.
 pub(crate) async fn pump(
     frames: &mut tokio::sync::mpsc::Receiver<Vec<u8>>,
-    live: &Live,
+    flow: &Flow,
     sink: &dyn Sink,
 ) {
     let acks = sink.acks();
     while let Some(frame) = frames.recv().await {
         if acks {
-            live.flow.sent(frame.len());
+            flow.sent(frame.len());
         }
         if !sink.send(Out::Output, frame) {
             break;
         }
         if acks {
-            live.flow.room().await;
+            flow.room().await;
         }
     }
 }
@@ -273,3 +273,7 @@ impl Live {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "live_tests.rs"]
+mod tests;

@@ -289,7 +289,7 @@ pub(crate) async fn attach_with(
         ));
     }
 
-    crate::live::pump(&mut session.frames, &live, sink.as_ref()).await;
+    crate::live::pump(&mut session.frames, &live.flow, sink.as_ref()).await;
 
     state.claims.forget_exactly(&pane_id, &live);
     let _ = state.claims.release(&pane_id, &client_id);
