@@ -90,12 +90,33 @@ describe('a flood cut down to what can still be seen', () => {
     expect(taken).toBeGreaterThan(0)
   })
 
-  it('cuts nothing that moves the cursor up or that a sequence split between chunks still holds', async () => {
-    const flood = encode(
-      '\x1b]0;title\nwith a line feed\x07' + 'x\r\n'.repeat(200) + '\x1b[3;6r' + 'y\r\n'.repeat(200) + '\x1b[A'.repeat(3) + 'z\r\n'.repeat(200),
-    )
-    const { whole, cut } = await bothWays(chunked(flood, () => 7))
-    expect(cut).toEqual(whole)
+  /* Moved up, the cursor writes over rows instead of scrolling them out: the
+     line feeds a cut keeps are counted only past it. */
+  it('keeps the line feeds a cut needs past a cursor moved up', async () => {
+    const lines = (n: number): string => Array.from({ length: n }, (_, i) => `${i}\r\n`).join('')
+    for (let after = 1; after <= SCROLLBACK + 2 * ROWS + 4; after += 1) {
+      const { whole, cut, taken } = await bothWays([encode(`${lines(300)}\x1b[${ROWS}A${lines(after)}`)])
+      expect(cut, `${after} lines after`).toEqual(whole)
+      expect(taken).toBeGreaterThan(0)
+    }
+  })
+
+  /* xterm parses a write after it is cut, and the pane can grow in between. */
+  it('ends alike when the pane grows to its tallest before the cut write is parsed', async () => {
+    const tallest = ROWS * 4
+    const old = encode(`${'old '.repeat(7)}\r\n`.repeat(ROWS + SCROLLBACK))
+    const flood = encode(Array.from({ length: 3000 }, (_, i) => `${i}\r\n`).join(''))
+    const whole = terminal()
+    const cut = terminal()
+    await written(whole, old)
+    await written(cut, old)
+    const done = cutFlood(flood, ground(), { rows: ROWS, scrollback: SCROLLBACK, tallest })
+    whole.resize(COLS, tallest)
+    cut.resize(COLS, tallest)
+    await written(whole, flood)
+    await written(cut, done.bytes)
+    expect(await seen(cut)).toEqual(await seen(whole))
+    expect(done.cut).toBeGreaterThan(0)
   })
 
   /* A region set, or a buffer swapped, by a sequence a write ends inside of:

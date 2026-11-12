@@ -321,10 +321,14 @@ export function Leaf({
     }
 
     /* A flood is cut only with the view at the bottom: scrolled up, the
-       person is reading rows a cut would move. */
+       person is reading rows a cut would move. The pane can grow before the
+       cut is parsed, at most to the rows the display holds at this font. */
     const floodScreen = (): Screen => {
       const { active } = terminal.buffer
-      return active.viewportY === active.baseY ? { rows: terminal.rows, scrollback: terminal.options.scrollback ?? 0 } : null
+      if (active.viewportY !== active.baseY) return null
+      const row = (terminal.options.fontSize ?? 14) * (terminal.options.lineHeight ?? 1)
+      const tallest = Math.ceil(window.screen.height / row)
+      return { rows: terminal.rows, scrollback: terminal.options.scrollback ?? 0, tallest }
     }
 
     /* On screen, the pane streams; off it, it lets go at once. */

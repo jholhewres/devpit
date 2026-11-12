@@ -70,15 +70,19 @@ export interface Cut {
    none), and whether a CR comes right before it in that run. */
 const SLOT = 3
 
-/** The terminal's size, or `null` to cut nothing. */
-export type Screen = { rows: number; scrollback: number } | null
+/**
+ * The terminal's size, or `null` to cut nothing. `tallest`: the most rows the
+ * pane can grow to before xterm parses the write, which comes after the cut.
+ */
+export type Screen = { rows: number; scrollback: number; tallest?: number } | null
 
 /**
  * Line feeds that must follow a cut: up to a screen of them to bring the
  * cursor down to the last row, then a screen and the scrollback to push out
  * every row written before, with one to spare either side.
  */
-const keepFor = (screen: { rows: number; scrollback: number }): number => screen.scrollback + 2 * screen.rows + 2
+const keepFor = (screen: NonNullable<Screen>): number =>
+  screen.scrollback + 2 * Math.max(screen.rows, screen.tallest ?? 0) + 2
 
 /**
  * Cuts `bytes`, which start where `stream` left off, at a CR LF followed by
