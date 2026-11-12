@@ -274,8 +274,23 @@ pub fn asks_to_stop(said: &str, session: &str, running: &[&str]) -> bool {
                 *name == session || running.iter().any(|one| one.to_lowercase() == *name)
             })
     };
-    if let Some(beside) = marked(&said) {
-        return only_names(&beside.iter().map(String::as_str).collect::<Vec<_>>());
+    let of_a_mark = |c: char| YES_MARKS.contains(&c) || dresses_a_mark(c);
+    let named = |names: &str| {
+        names == session
+            || only_names(
+                &names
+                    .split(|c: char| c.is_whitespace() || c == ',')
+                    .map(|name| name.trim_matches(of_a_mark))
+                    .filter(|name| !name.is_empty())
+                    .collect::<Vec<_>>(),
+            )
+    };
+    if marked(&said).is_some() {
+        // Punctuation only at the end, as on the verb route: `✅ !name` is not `✅ name`.
+        return named(
+            said.trim_end_matches(HANGING)
+                .trim_matches(|c: char| c.is_whitespace() || of_a_mark(c)),
+        );
     }
     let Some((verb, names)) = said
         .trim_end_matches(HANGING)
@@ -283,15 +298,7 @@ pub fn asks_to_stop(said: &str, session: &str, running: &[&str]) -> bool {
     else {
         return false;
     };
-    let names = names.trim();
-    STOP.contains(&verb)
-        && (names == session
-            || only_names(
-                &names
-                    .split(|c: char| c.is_whitespace() || c == ',')
-                    .filter(|name| !name.is_empty())
-                    .collect::<Vec<_>>(),
-            ))
+    STOP.contains(&verb) && named(names.trim())
 }
 
 /// Whether `said` is a yes mark or a send word alone, which names no session:
