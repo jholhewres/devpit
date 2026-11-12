@@ -245,7 +245,7 @@ export function Leaf({
     let wiped = false
     /* xterm cannot prepend, so it is reset in order — after whatever is still
        waiting — and written again whole around the older page. */
-    const rewrite = (): void => {
+    const rewrite = (paged = false): void => {
       if (!held) return
       const lines = terminal.buffer.active.length
       batch?.flush()
@@ -265,6 +265,8 @@ export function Leaf({
         terminal.scrollToLine(Math.max(0, gained))
         rewriting = false
         paging = false
+        /* The view is still at the top, where no scroll asks again. */
+        if (paged && gained <= 0 && more) void page()
       })
       if (heldBytes > HELD_MOST) held = null
     }
@@ -287,7 +289,7 @@ export function Leaf({
       more = got.left > 0
       held.unshift(got.bytes)
       heldBytes += got.bytes.length
-      rewrite()
+      rewrite(true)
     }
     const scrolled = terminal.onScroll((top) => {
       if (top === 0) void page()
