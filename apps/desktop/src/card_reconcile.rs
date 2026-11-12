@@ -180,10 +180,7 @@ pub(crate) fn rebuild_on_start(app: tauri::AppHandle) {
         let Some(project_id) = last_opened(&projects) else {
             return;
         };
-        // Stamped before tmux and `ps` are asked, so a hook heard in between
-        // is newer and wins.
-        let seq = crate::card_activity::next_seq();
-        let fronts = crate::shell_launch::running_in(&project_id).unwrap_or_default();
+        let (seq, fronts) = crate::shell_launch::running_since(&project_id);
         reconcile(&app, &project_id, &fronts, seq);
     });
 }

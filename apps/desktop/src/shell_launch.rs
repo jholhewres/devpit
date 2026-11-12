@@ -113,10 +113,7 @@ pub async fn session_running(
     project_id: String,
 ) -> Result<Vec<PaneRunning>, RpcError> {
     tauri::async_runtime::spawn_blocking(move || {
-        // Read before tmux and `ps` are asked: a hook heard after this is
-        // newer than anything they say.
-        let seq = crate::card_activity::next_seq();
-        let panes = running_in(&project_id)?;
+        let (seq, panes) = running_since(&project_id);
         crate::card_reconcile::reconcile(&app, &project_id, &panes, seq);
         Ok(panes)
     })
@@ -125,11 +122,17 @@ pub async fn session_running(
 }
 
 pub(crate) fn running_in(project_id: &str) -> Result<Vec<PaneRunning>, RpcError> {
-    let rows = crate::pane_snapshot::rows();
-    let mut panes = named_panes(crate::pane_snapshot::in_project(&rows, project_id));
+    Ok(running_since(project_id).1)
+}
+
+/// What a project's panes run, and the hook sequence read before tmux was
+/// asked for it, which a kept listing may predate by seconds.
+pub(crate) fn running_since(project_id: &str) -> (u64, Vec<PaneRunning>) {
+    let listing = crate::pane_snapshot::listing();
+    let mut panes = named_panes(crate::pane_snapshot::in_project(&listing.rows, project_id));
     #[cfg(unix)]
     panes.extend(crate::ptyd_watch::running_in(project_id));
-    Ok(panes)
+    (listing.seq, panes)
 }
 
 /// A ptyd pane, by the program its daemon says is in front.

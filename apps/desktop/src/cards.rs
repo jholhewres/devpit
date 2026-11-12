@@ -107,11 +107,9 @@ pub(crate) fn detail_of(project_id: String, card_id: String) -> Result<CardDetai
     let mut leaves = crate::card_reconcile::card_leaves(&store, &project_id);
     leaves.retain(|_, pane| pane.card_id == card_id);
     if !leaves.is_empty() {
-        let seq = crate::card_activity::next_seq();
-        if let Ok(fronts) = crate::shell_launch::running_in(&project_id) {
-            let registry = crate::card_activity::registry();
-            crate::card_reconcile::reconcile_in(registry, &leaves, &fronts, seq);
-        }
+        let (seq, fronts) = crate::shell_launch::running_since(&project_id);
+        let registry = crate::card_activity::registry();
+        crate::card_reconcile::reconcile_in(registry, &leaves, &fronts, seq);
     }
     let heard = crate::card_activity::snapshot(&card_id);
     let sessions =
