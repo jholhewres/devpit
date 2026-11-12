@@ -25,6 +25,8 @@ interface Watch {
   /* Reads still out. A tick waits for them: tmux under load answers late, and
      a read every tick regardless piles up one waiting thread each. */
   out: number
+  /* A hook was heard while a read was out: read once more when it ends. */
+  again: boolean
 }
 
 const watches = new Map<string, Watch>()
@@ -41,19 +43,26 @@ function hearHooks(): void {
       if (watch.timer === null || watch.soon !== null) continue
       watch.soon = window.setTimeout(() => {
         watch.soon = null
-        read(profileId, watch)
+        read(profileId, watch, false, true)
       }, AFTER_HOOK_MS)
     }
   })
 }
 
-function read(profileId: string, watch: Watch, forced = false): void {
+function read(profileId: string, watch: Watch, forced = false, hooked = false): void {
   /* Nobody is looking at a hidden window; it is read again on the next tick. */
   if (!forced && typeof document !== 'undefined' && document.hidden) return
-  if (!forced && watch.out > 0) return
+  if (!forced && watch.out > 0) {
+    watch.again ||= hooked
+    return
+  }
   watch.out += 1
   void ask(() => commands.orchestratorSessions(profileId)).then((answer) => {
     watch.out -= 1
+    if (watch.again && watch.out === 0) {
+      watch.again = false
+      read(profileId, watch, false, true)
+    }
     const sessions = answer.data?.sessions ?? []
     const said = JSON.stringify(sessions)
     if (said === watch.said) return
@@ -80,7 +89,7 @@ export function useLiveSessions(profileId: string | null): readonly LiveSession[
     if (!profileId) return
     let watch = watches.get(profileId)
     if (!watch) {
-      watch = { sessions: [], said: '', heard: new Set(), timer: null, out: 0, soon: null }
+      watch = { sessions: [], said: '', heard: new Set(), timer: null, out: 0, soon: null, again: false }
       watches.set(profileId, watch)
     }
     hearHooks()

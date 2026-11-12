@@ -40,6 +40,25 @@ describe('the sessions beside an orchestrator', () => {
     }
   })
 
+  /* A hook heard while a read is out is about a state that read may predate. */
+  it('are read again as soon as the read out ends, when an agent spoke meanwhile', async () => {
+    vi.useFakeTimers()
+    try {
+      asked.mockClear()
+      const { unmount } = renderHook(() => useLiveSessions('profile_3'))
+      expect(asked).toHaveBeenCalledTimes(1)
+      act(() => heard?.({ paneId: 'leaf_a', what: 'agent', detail: 'waiting' }))
+      act(() => void vi.advanceTimersByTime(1000))
+      expect(asked).toHaveBeenCalledTimes(1)
+      await act(async () => answer())
+      act(() => void vi.advanceTimersByTime(1000))
+      expect(asked).toHaveBeenCalledTimes(2)
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('put the busy ones first, then go by name', () => {
     const listed = inOrder([session('b-idle', 'idle'), session('z-busy', 'busy'), session('a-idle', 'idle'), session('c-busy', 'busy')])
     expect(listed.map((one) => one.name)).toEqual(['c-busy', 'z-busy', 'a-idle', 'b-idle'])
