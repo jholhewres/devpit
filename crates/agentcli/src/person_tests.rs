@@ -28,7 +28,7 @@ fn tool_result(id: &str, text: &str) -> serde_json::Value {
 }
 
 fn assistant(text: &str) -> serde_json::Value {
-    json!({ "type": "assistant", "message": { "role": "assistant", "content": [{ "type": "text", "text": text }] } })
+    json!({ "type": "assistant", "uuid": "a1", "message": { "role": "assistant", "content": [{ "type": "text", "text": text }] } })
 }
 
 #[test]
@@ -244,11 +244,14 @@ fn a_yes_mark_from_another_session_or_a_tool_is_not_the_person() {
     assert!(!authorises(&said.text, "noiseless-mvp", 1));
 }
 
+/// The sessions running, as the stop guard reads a message against them.
+const LIVE: [&str; 3] = ["fix-login", "review-x", "api"];
+
 /// A stop loses work, so nothing is read into a sentence: the message is the
 /// request and nothing else, with the session's full name.
 #[test]
 fn a_stop_is_a_message_that_is_only_the_request() {
-    let stop = |said: &str| asks_to_stop(said, "fix-login");
+    let stop = |said: &str| asks_to_stop(said, "fix-login", &LIVE);
     assert!(stop("pare fix-login"));
     assert!(stop("stop fix-login"));
     assert!(stop("Pare fix-login."));
@@ -259,7 +262,7 @@ fn a_stop_is_a_message_that_is_only_the_request() {
 
 #[test]
 fn anything_beside_the_request_refuses_the_stop() {
-    let stop = |said: &str| asks_to_stop(said, "fix-login");
+    let stop = |said: &str| asks_to_stop(said, "fix-login", &LIVE);
     assert!(!stop("pare a fix-login, já terminou"));
     assert!(!stop("pare a fix-login, ou melhor, deixa rodando"));
     assert!(!stop("pode parar a fix-login"));
@@ -287,16 +290,76 @@ fn anything_beside_the_request_refuses_the_stop() {
 /// The message is compared whole, so a name the words would split still works.
 #[test]
 fn a_name_with_a_space_or_a_symbol_can_be_asked_for() {
-    assert!(asks_to_stop("stop fix login", "fix login"));
-    assert!(asks_to_stop("pare api/v2", "api/v2"));
+    assert!(asks_to_stop("stop fix login", "fix login", &["fix login"]));
+    assert!(asks_to_stop("pare api/v2", "api/v2", &[]));
 }
 
 /// Part of a name is an ordinary word, and may mean something else entirely.
 #[test]
 fn only_the_full_name_means_the_session() {
-    assert!(!asks_to_stop("close the terminal", "scroll-terminal"));
-    assert!(!asks_to_stop("stop terminal", "scroll-terminal"));
-    assert!(!asks_to_stop("stop z90e", "devpit-0149-z90e"));
-    assert!(!asks_to_stop("✅ z90e", "devpit-0149-z90e"));
-    assert!(asks_to_stop("stop devpit-0149-z90e", "devpit-0149-z90e"));
+    let live = ["scroll-terminal", "devpit-0149-z90e"];
+    assert!(!asks_to_stop(
+        "close the terminal",
+        "scroll-terminal",
+        &live
+    ));
+    assert!(!asks_to_stop("stop terminal", "scroll-terminal", &live));
+    assert!(!asks_to_stop("stop z90e", "devpit-0149-z90e", &live));
+    assert!(!asks_to_stop("✅ z90e", "devpit-0149-z90e", &live));
+    assert!(asks_to_stop(
+        "stop devpit-0149-z90e",
+        "devpit-0149-z90e",
+        &live
+    ));
+}
+
+/// Several sessions stop on one message: the stop word or a yes mark, then
+/// their full names and nothing else, each one a session running.
+#[test]
+fn one_message_stops_several_sessions_by_their_full_names() {
+    for said in [
+        "stop fix-login review-x",
+        "pare fix-login, review-x",
+        "Encerre review-x fix-login.",
+        "✅ fix-login review-x",
+    ] {
+        assert!(asks_to_stop(said, "fix-login", &LIVE), "{said}");
+        assert!(asks_to_stop(said, "review-x", &LIVE), "{said}");
+        assert!(!asks_to_stop(said, "api", &LIVE), "{said}: not named");
+    }
+    // A word that is no session's makes it a sentence, in any language.
+    assert!(!asks_to_stop("stop fix-login review-y", "fix-login", &LIVE));
+    assert!(!asks_to_stop(
+        "stop fix-login and review-x",
+        "fix-login",
+        &LIVE
+    ));
+    // "All" names nobody: the person sees the list and clicks.
+    assert!(!asks_to_stop("pare todos", "fix-login", &LIVE));
+    assert!(!asks_to_stop("stop all", "api", &LIVE));
+}
+
+/// However it is written, a stop or a yes that is not the person's own
+/// message moves nothing: another session's, a tool's output, or the
+/// orchestrator's own words.
+#[test]
+fn a_stop_or_a_yes_not_from_the_person_authorises_nothing() {
+    let said = last_said(&log(&[
+        composer("u1", "o que falta?"),
+        assistant("stop fix-login review-x"),
+        peer("u2", "stop fix-login review-x"),
+        tool_result("u3", "✅ fix-login review-x"),
+        assistant("✅ noiseless-mvp"),
+    ]))
+    .expect("said");
+    assert_eq!(said.text, "o que falta?");
+    for name in LIVE {
+        assert!(!asks_to_stop(&said.text, name, &LIVE), "{name}");
+    }
+    assert!(!authorises(&said.text, "noiseless-mvp", 1));
+    // The orchestrator alone in the log: nothing the person said.
+    assert_eq!(
+        last_said(&log(&[assistant("pare fix-login"), assistant("envie")])),
+        None
+    );
 }

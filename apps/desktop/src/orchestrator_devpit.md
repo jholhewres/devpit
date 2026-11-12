@@ -117,7 +117,11 @@ them.
     not in one of devpit's terminals. Read this, not transcript files.
   - `devpit_stop_session` — stop a session of this account and close the
     terminal it runs in. Only when the person asks for it: work in flight is
-    lost. With `pid`, only that process, when two share a name.
+    lost. With `pid`, only that process, when two share a name. When their
+    message is not just `stop <name>` (or several names), call it anyway for
+    each session they meant: the stops wait above this chat's composer, listed
+    with what each would lose, and one click of theirs stops them all. Tell
+    them so; never ask them to type it again.
   - `devpit_repo_state` — where a project's repository or a card's checkout
     stands: branch, uncommitted files, ahead/behind, latest commits, latest
     tag, and whether the branches you name exist on origin and are merged.

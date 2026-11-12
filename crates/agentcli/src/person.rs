@@ -261,18 +261,37 @@ const STOP: [&str; 21] = [
 ];
 
 /// Whether what the person said is a request to stop `session`, which loses
-/// its work: the whole message is a stop verb or a yes mark, and the session's
-/// full name. Nothing is read into a sentence, and a part of a name is an
-/// ordinary word. Anything else is no, and the refusal says what to send.
-pub fn asks_to_stop(said: &str, session: &str) -> bool {
+/// its work: the whole message is a stop verb or a yes mark, then full names
+/// and nothing else — the session's, and others of `running` to stop several.
+/// Nothing is read into a sentence, and a part of a name is an ordinary word.
+/// Anything else is no, and the stop waits for the person's click.
+pub fn asks_to_stop(said: &str, session: &str, running: &[&str]) -> bool {
     let said = said.trim().to_lowercase();
     let session = session.to_lowercase();
+    let only_names = |names: &[&str]| {
+        names.contains(&session.as_str())
+            && names.iter().all(|name| {
+                *name == session || running.iter().any(|one| one.to_lowercase() == *name)
+            })
+    };
     if let Some(beside) = marked(&said) {
-        return beside == [session];
+        return only_names(&beside.iter().map(String::as_str).collect::<Vec<_>>());
     }
-    said.trim_end_matches(HANGING)
+    let Some((verb, names)) = said
+        .trim_end_matches(HANGING)
         .split_once(char::is_whitespace)
-        .is_some_and(|(verb, name)| STOP.contains(&verb) && name.trim() == session)
+    else {
+        return false;
+    };
+    let names = names.trim();
+    STOP.contains(&verb)
+        && (names == session
+            || only_names(
+                &names
+                    .split(|c: char| c.is_whitespace() || c == ',')
+                    .filter(|name| !name.is_empty())
+                    .collect::<Vec<_>>(),
+            ))
 }
 
 /// Whether `said` is a yes mark or a send word alone, which names no session:

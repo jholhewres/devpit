@@ -85,19 +85,62 @@ pub(crate) fn close_pane(
     Ok(tab_id)
 }
 
-/// Why stopping a session would lose work, if it would: it is working, or
-/// its folder holds changes not committed.
-pub(crate) fn would_lose(name: &str, busy: bool, dirty: Option<u32>) -> Option<String> {
+/// What stopping a session would lose, if anything: it is working, or its
+/// folder holds changes not committed.
+pub(crate) fn at_stake(busy: bool, dirty: Option<u32>) -> Option<String> {
     let dirty = dirty.filter(|files| *files > 0);
-    let why = match (busy, dirty) {
+    Some(match (busy, dirty) {
         (false, None) => return None,
         (true, None) => "it is working right now".to_owned(),
         (false, Some(files)) => format!("its folder has {files} file(s) not committed"),
         (true, Some(files)) => {
             format!("it is working right now and its folder has {files} file(s) not committed")
         }
-    };
-    Some(format!("{name}: {why} — stop it anyway?"))
+    })
+}
+
+/// Why stopping a session would lose work, if it would, asked as a question.
+pub(crate) fn would_lose(name: &str, busy: bool, dirty: Option<u32>) -> Option<String> {
+    at_stake(busy, dirty).map(|why| format!("{name}: {why} — stop it anyway?"))
+}
+
+/// The sessions called `name` running now, only `only` when given.
+fn running(
+    profile_id: &str,
+    name: &str,
+    only: Option<i32>,
+) -> Result<Vec<crate::live_sessions::Running>, RpcError> {
+    let found: Vec<_> = crate::live_sessions::running_named(profile_id, name)?
+        .into_iter()
+        .filter(|one| only.is_none_or(|pid| one.pid == pid))
+        .collect();
+    if found.is_empty() {
+        return Err(RpcError::new(
+            ErrorCode::NotFound,
+            format!("no session called {name} is running with that process"),
+        ));
+    }
+    Ok(found)
+}
+
+/// Whether any of `found` is working, and the most files one leaves.
+fn stake(found: &[crate::live_sessions::Running]) -> (bool, Option<u32>) {
+    let busy = found.iter().any(|one| one.status == "busy");
+    let dirty = found
+        .iter()
+        .filter_map(|one| crate::ended_sessions::dirty_in(&one.cwd))
+        .max();
+    (busy, dirty)
+}
+
+/// What stopping `name` (only `only`) would lose now, if anything.
+pub(crate) fn losing(
+    profile_id: &str,
+    name: &str,
+    only: Option<i32>,
+) -> Result<Option<String>, RpcError> {
+    let (busy, dirty) = stake(&running(profile_id, name, only)?);
+    Ok(at_stake(busy, dirty))
 }
 
 /// Stops the sessions called `name` of this account — every one, since a
@@ -113,22 +156,9 @@ pub(crate) fn stop(
     by: &str,
     force: bool,
 ) -> Result<Value, RpcError> {
-    let found: Vec<_> = crate::live_sessions::running_named(profile_id, name)?
-        .into_iter()
-        .filter(|one| only.is_none_or(|pid| one.pid == pid))
-        .collect();
-    if found.is_empty() {
-        return Err(RpcError::new(
-            ErrorCode::NotFound,
-            format!("no session called {name} is running with that process"),
-        ));
-    }
+    let found = running(profile_id, name, only)?;
     if !force {
-        let busy = found.iter().any(|one| one.status == "busy");
-        let dirty = found
-            .iter()
-            .filter_map(|one| crate::ended_sessions::dirty_in(&one.cwd))
-            .max();
+        let (busy, dirty) = stake(&found);
         if let Some(why) = would_lose(name, busy, dirty) {
             return Err(RpcError::new(ErrorCode::Conflict, why));
         }
@@ -158,6 +188,7 @@ pub(crate) fn stop(
             }
         }
     }
+    crate::stop_asked::forget(profile_id, name);
     let said = match (found.len(), terminal.is_null()) {
         (1, true) => format!("{name} was stopped"),
         (1, false) => format!("{name} was stopped, and its terminal closed"),

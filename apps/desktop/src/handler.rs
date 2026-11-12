@@ -24,8 +24,8 @@ use crate::{
     recipes, regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves,
     search, session_cost, session_search, session_window, sessions, settings, shell_launch,
     sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering, steps,
-    stopping, tab_opening, threads, transcribe, tray, update, watching, workspace, worktree_base,
-    worktree_setup, worktrees, wsfiles,
+    stop_asked, stopping, tab_opening, threads, transcribe, tray, update, watching, workspace,
+    worktree_base, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -143,6 +143,9 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         project_proposals::orchestrator_proposal_drop,
         session_window::session_changes,
         reply_drafts::orchestrator_draft_drop,
+        stop_asked::orchestrator_stops_asked,
+        stop_asked::orchestrator_stops_confirm,
+        stop_asked::orchestrator_stops_drop,
         reply_drafts::island_draft,
         reply_drafts::island_draft_send,
         pausing::pause_read,
