@@ -2,6 +2,15 @@ use std::os::unix::fs::PermissionsExt;
 
 use super::*;
 
+/// A temporary directory a socket may be made in whatever the umask: its
+/// user's alone, as `$XDG_RUNTIME_DIR` and devpit's home are.
+pub(crate) fn private_tempdir() -> tempfile::TempDir {
+    tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .expect("dir")
+}
+
 #[test]
 fn the_socket_is_in_the_runtime_dir_and_else_in_devpits_home() {
     let runtime = tempfile::tempdir().expect("runtime");
@@ -36,7 +45,7 @@ fn each_home_has_a_socket_of_its_own_and_keeps_it() {
 
 #[test]
 fn the_socket_is_owner_only_and_a_dead_one_is_replaced() {
-    let dir = tempfile::tempdir().expect("dir");
+    let dir = private_tempdir();
     let at = dir.path().join("devpit-ptyd.sock");
     drop(listen(&at).expect("first"));
     // The listener is gone but its file stays: the next daemon replaces it.
@@ -55,11 +64,57 @@ fn the_socket_is_owner_only_and_a_dead_one_is_replaced() {
     drop(listener);
 }
 
+/// Without a runtime dir the socket's directory is made owner-only, whatever
+/// the umask: that it is the user's alone is what keeps the socket theirs.
+#[test]
+fn a_directory_made_for_the_socket_is_owner_only() {
+    let dir = tempfile::tempdir().expect("dir");
+    let home = dir.path().join("home");
+    let listener = listen(&home.join(NAME)).expect("listen");
+    let mode = std::fs::metadata(&home).expect("home").permissions().mode();
+    drop(listener);
+    assert_eq!(mode & 0o777, 0o700);
+}
+
+/// A directory others can write to is refused: they could put their own
+/// socket where this one is.
+#[test]
+fn a_directory_others_can_write_to_is_refused() {
+    let dir = tempfile::tempdir().expect("dir");
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o775)).expect("chmod");
+    let err = listen(&dir.path().join(NAME)).expect_err("refused");
+    assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+}
+
+#[test]
+fn only_a_directory_its_user_alone_can_write_to_is_private() {
+    assert!(private_dir(1000, 0o40700, 1000));
+    assert!(
+        private_dir(1000, 0o40755, 1000),
+        "others may read, not write"
+    );
+    assert!(!private_dir(1000, 0o40775, 1000), "group-writable");
+    assert!(!private_dir(1000, 0o40757, 1000), "writable by anyone");
+    assert!(!private_dir(0, 0o40700, 1000), "another user's");
+}
+
+/// The client asks the kernel who the daemon is, as the daemon asks of it:
+/// a socket of another user's is refused before a byte is written to it.
+#[test]
+fn a_client_refuses_a_daemon_of_another_user() {
+    let dir = private_tempdir();
+    let at = dir.path().join(NAME);
+    let listener = listen(&at).expect("listen");
+    let err = connect_as(&at, own_uid().wrapping_add(1)).expect_err("refused");
+    drop(listener);
+    assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+}
+
 /// Only a socket is taken for a dead daemon's: anything else at that path is
 /// somebody's file, and is left where it is.
 #[test]
 fn a_file_that_is_not_a_socket_is_never_removed() {
-    let dir = tempfile::tempdir().expect("dir");
+    let dir = private_tempdir();
     let at = dir.path().join("devpit-ptyd.sock");
     std::fs::write(&at, "notes").expect("a file");
     assert!(listen(&at).is_err());
