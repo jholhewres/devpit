@@ -114,6 +114,18 @@ fn a_request_for_a_pane_that_is_not_there_is_refused_and_the_connection_lives() 
     assert_eq!(got[0].kind(), Some(Kind::Refused), "a bad spawn is refused");
 }
 
+/// An accept that fails, out of descriptors say, is tried again after a
+/// rest, not at once round and round on a core.
+#[test]
+fn a_failing_accept_rests_before_it_is_tried_again() {
+    let failing = (0..3)
+        .map(|_| -> io::Result<UnixStream> { Err(io::Error::from_raw_os_error(libc::EMFILE)) });
+    let started = Instant::now();
+    Daemon::new().admit(failing, socket::own_uid());
+    let took = started.elapsed();
+    assert!(took >= 3 * ACCEPT_RETRY, "three failures in {took:?}");
+}
+
 /// A history request too short to say how much the client holds is refused,
 /// as a short ack is, not read as holding nothing.
 #[test]

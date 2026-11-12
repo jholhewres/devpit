@@ -2,13 +2,19 @@
 //! frames against the panes it holds.
 
 use std::collections::HashMap;
+use std::io;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use crate::client::Client;
 use crate::frame::{self, Frame, Kind};
 use crate::pane::{Asked, Pane};
 use crate::socket;
+
+/// How long accepting rests after it fails: out of descriptors, it would fail
+/// again at once, round and round on a core.
+const ACCEPT_RETRY: Duration = Duration::from_millis(100);
 
 #[derive(Default)]
 pub struct Daemon {
@@ -31,7 +37,16 @@ impl Daemon {
     /// [`Daemon::serve`], admitting only peers whose uid is `own`. A peer that
     /// is anyone else is closed before a byte is read from it.
     pub fn serve_as(self: &Arc<Daemon>, listener: UnixListener, own: u32) {
-        for stream in listener.incoming().flatten() {
+        self.admit(listener.incoming(), own);
+    }
+
+    /// Serves each connection `incoming` brings from a peer whose uid is `own`.
+    fn admit(self: &Arc<Daemon>, incoming: impl Iterator<Item = io::Result<UnixStream>>, own: u32) {
+        for accepted in incoming {
+            let Ok(stream) = accepted else {
+                std::thread::sleep(ACCEPT_RETRY);
+                continue;
+            };
             let admitted = socket::peer_uid(&stream).is_ok_and(|peer| socket::admitted(peer, own));
             if !admitted {
                 continue;
