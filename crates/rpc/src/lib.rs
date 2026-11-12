@@ -111,6 +111,7 @@ pub use island::{
 pub use live::{
     EndedSession, EndedSessions, LivePane, LiveSession, LiveSessions, PendingPrompt,
     ProjectProposal, PromptOption, RemoteState, SessionOnCard, SessionTold, SessionsOnCard,
+    StopAsked, StopsAsked, StopsConfirmed,
 };
 pub use mcp_health::{AgentHealth, McpHealth, McpServerHealth, McpState};
 pub use pause::Paused;

@@ -310,11 +310,20 @@ fn respond_in(
             }
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
             let word = crate::draft_sending::last_word(profile, Path::new(&here.root_path)).ok();
-            crate::stop_asked::allowed(
+            let running: Vec<&str> = live.sessions.iter().map(|one| one.name.as_str()).collect();
+            let losing = crate::stopping::losing(profile, &name, pid).map_err(said)?;
+            if let Err(why) = crate::stop_asked::allowed(
                 word.as_ref(),
                 &name,
+                &running,
                 crate::stop_asked::swapped(&live.sessions, &name, pid),
-            )?;
+                losing.as_deref(),
+                force,
+            ) {
+                let asked = crate::stop_asked::ask(profile, &name, pid, losing, &why);
+                let _ = app.emit(crate::stop_asked::STOP_ASKED, profile);
+                return Ok(asked);
+            }
             return crate::stopping::stop(app, profile, &name, pid, "orchestrator", force)
                 .map_err(said);
         }

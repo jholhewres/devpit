@@ -174,3 +174,32 @@ pub struct ProjectProposal {
     /// its link as it is.
     pub link: Option<bool>,
 }
+
+/// A stop an orchestrator asked for that the person's own words did not
+/// cover, waiting on their click above its chat's composer.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StopAsked {
+    pub name: String,
+    /// Only this process, when two sessions share the name.
+    pub pid: Option<i32>,
+    /// What stopping it loses — it is working, files not committed — as
+    /// devpit saw it when it was asked.
+    pub losing: Option<String>,
+}
+
+/// A list, so tomorrow's field has somewhere to go.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct StopsAsked {
+    pub stops: Vec<StopAsked>,
+}
+
+/// What the person's click on the stops asked did.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct StopsConfirmed {
+    pub stopped: Vec<String>,
+    /// `name: why`, for each that could not be stopped.
+    pub failed: Vec<String>,
+}

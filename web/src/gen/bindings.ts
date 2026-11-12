@@ -559,6 +559,15 @@ export const commands = {
 	sessionChanges: (cwd: string, cardId: string | null) => typedError<SessionChanges, RpcError>(__TAURI_INVOKE("session_changes", { cwd, cardId })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**  `orchestrator.stops_asked` — the stops waiting for the person's click. */
+	orchestratorStopsAsked: (profileId: string) => __TAURI_INVOKE<StopsAsked>("orchestrator_stops_asked", { profileId }),
+	/**
+	 *  `orchestrator.stops_confirm` — the person's click: each of `names` still
+	 *  waiting stops as theirs, with what it loses, which the click was shown.
+	 */
+	orchestratorStopsConfirm: (profileId: string, names: string[]) => typedError<StopsConfirmed, RpcError>(__TAURI_INVOKE("orchestrator_stops_confirm", { profileId, names })),
+	/**  `orchestrator.stops_drop` — the person keeps them running. */
+	orchestratorStopsDrop: (profileId: string) => __TAURI_INVOKE<void>("orchestrator_stops_drop", { profileId }),
 	/**  `island.draft` — the reply drafted for a session the island shows, if any. */
 	islandDraft: (sessionId: string) => typedError<string | null, RpcError>(__TAURI_INVOKE("island_draft", { sessionId })),
 	/**  `island.draft_send` — sends that draft into the session's terminal, as the person. */
@@ -5732,6 +5741,33 @@ export type StepKind =
 "session" | 
 /**  A command of yours: tests, a build, a deploy. */
 "command";
+
+/**
+ *  A stop an orchestrator asked for that the person's own words did not
+ *  cover, waiting on their click above its chat's composer.
+ */
+export type StopAsked = {
+	name: string,
+	/**  Only this process, when two sessions share the name. */
+	pid: number | null,
+	/**
+	 *  What stopping it loses — it is working, files not committed — as
+	 *  devpit saw it when it was asked.
+	 */
+	losing: string | null,
+};
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type StopsAsked = {
+	stops: StopAsked[],
+};
+
+/**  What the person's click on the stops asked did. */
+export type StopsConfirmed = {
+	stopped: string[],
+	/**  `name: why`, for each that could not be stopped. */
+	failed: string[],
+};
 
 /**  A cookie store on this machine that a pane could be given. */
 export type Store = {

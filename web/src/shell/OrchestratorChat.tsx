@@ -6,6 +6,7 @@ import { ProjectProposals } from './ProjectProposals'
 import { ReplyDrafts } from './ReplyDrafts'
 import { SHOW_PANEL } from './RightPanel'
 import { SessionTerminal } from './SessionTerminal'
+import { StopsAsked } from './StopsAsked'
 import { useShell } from './useShell'
 import { WaitingPrompts } from './WaitingPrompts'
 
@@ -13,8 +14,8 @@ import { WaitingPrompts } from './WaitingPrompts'
  * What an orchestrator's chat adds for the sessions it works with: their
  * count in its corner, which opens the Sessions panel, and — above the
  * composer — every question one of them is stopped on, answered from here or
- * in its own terminal opened over the chat, and every reply the orchestrator
- * drafted for the person to send as theirs.
+ * in its own terminal opened over the chat, every reply the orchestrator
+ * drafted for the person to send as theirs, and the stops it asked for.
  */
 
 export function SessionsChip({ profileId }: { profileId: string }): React.JSX.Element {
@@ -36,6 +37,7 @@ export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX
     <>
       <WaitingPrompts profileId={profileId} sessions={live} onAnswered={() => refreshSessions(profileId)} onOpen={setTerminal} />
       <ReplyDrafts profileId={profileId} sessions={live} onDone={() => refreshSessions(profileId)} />
+      <StopsAsked profileId={profileId} sessions={live} onDone={() => refreshSessions(profileId)} />
       <ProjectProposals />
       {terminal && (
         <SessionTerminal
