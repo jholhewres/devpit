@@ -205,6 +205,26 @@ struct Pairing {
     name: String,
 }
 
+/// Why a pairing over the tailnet is refused, if it is: its code must be the
+/// one on the machine's screen, and then the person must allow the device.
+fn refused(
+    asked: &Pairing,
+    take: impl FnOnce(&str) -> bool,
+    ask: impl FnOnce(&str) -> bool,
+) -> Option<&'static [u8]> {
+    if !take(&asked.code) {
+        return Some(br#"{"error":"that code is not the one on the machine's screen, or it ran out - open a new one"}"#);
+    }
+    let who = crate::remote_relay::Who::Asking {
+        name: asked.name.clone(),
+        mcp: false,
+    };
+    if !crate::remote_relay::allowed_for(&who, ask) {
+        return Some(br#"{"error":"the person at the machine did not allow this device"}"#);
+    }
+    None
+}
+
 fn pair(app: &tauri::AppHandle, stream: &mut TcpStream, request: &Request, root: &std::path::Path) {
     let Ok(asked) = serde_json::from_slice::<Pairing>(&request.body) else {
         reply(
@@ -215,17 +235,13 @@ fn pair(app: &tauri::AppHandle, stream: &mut TcpStream, request: &Request, root:
         );
         return;
     };
-    if !crate::remote_pairing::take(&asked.code, crate::remote::now()) {
-        reply(stream, "403 Forbidden", "application/json", br#"{"error":"that code is not the one on the machine's screen, or it ran out - open a new one"}"#);
-        return;
-    }
-    if !crate::remote_approval::allowed(app, &asked.name) {
-        reply(
-            stream,
-            "403 Forbidden",
-            "application/json",
-            br#"{"error":"the person at the machine did not allow this device"}"#,
-        );
+    let refusal = refused(
+        &asked,
+        |code| crate::remote_pairing::take(code, crate::remote::now()),
+        |name| crate::remote_approval::allowed(app, name),
+    );
+    if let Some(why) = refusal {
+        reply(stream, "403 Forbidden", "application/json", why);
         return;
     }
     let Some(token) = crate::remote_devices::fresh_token() else {
@@ -295,3 +311,7 @@ fn upgrade(app: tauri::AppHandle, mut stream: TcpStream, request: &Request, root
     );
     crate::remote_conn::run(app, ws, root);
 }
+
+#[cfg(test)]
+#[path = "remote_host_tests.rs"]
+mod tests;

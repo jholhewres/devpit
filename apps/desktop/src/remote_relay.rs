@@ -227,16 +227,13 @@ fn join(app: tauri::AppHandle, root: PathBuf, relay: Relay, keys: Keys, splice: 
             return wire.end();
         }
     };
-    let allowed = match &who {
-        Who::Asking { name, mcp: false } => {
-            crate::remote_conn::send(&mut wire, &RemoteOut::Approving);
-            let yes = crate::remote_approval::allowed(&app, name);
-            // Read again: devices may have changed while the person decided.
-            devices = Devices::read(&root);
-            yes
-        }
-        _ => true,
-    };
+    let allowed = allowed_for(&who, |name| {
+        crate::remote_conn::send(&mut wire, &RemoteOut::Approving);
+        let yes = crate::remote_approval::allowed(&app, name);
+        // Read again: devices may have changed while the person decided.
+        devices = Devices::read(&root);
+        yes
+    });
     let identified = admit(&mut devices, &peer, who, allowed, crate::remote::now());
     let device = match identified {
         Ok((device, fresh)) => {
@@ -306,9 +303,18 @@ pub(crate) fn identify(
     Ok(Who::Asking { name, mcp })
 }
 
+/// Whether `who` may pair: a device asking, only once the person at the
+/// machine allows it by the name it gave (`ask`). An MCP client's offer was
+/// made for it on this machine and is never scanned, so it is not asked about.
+pub(crate) fn allowed_for(who: &Who, ask: impl FnOnce(&str) -> bool) -> bool {
+    match who {
+        Who::Asking { name, mcp: false } => ask(name),
+        _ => true,
+    }
+}
+
 /// The device `who` is, and whether it is new: one asking is paired by its
-/// key only when the person `allowed` it. An MCP client's offer was made for
-/// it on this machine and is never scanned, so it is not asked about.
+/// key only when [`allowed_for`] said so.
 pub(crate) fn admit(
     devices: &mut Devices,
     peer: &[u8; 32],
@@ -319,7 +325,7 @@ pub(crate) fn admit(
     match who {
         Who::Paired(device) => Ok((device, false)),
         Who::Asking { name, mcp } => {
-            if !mcp && !allowed {
+            if !allowed {
                 return Err("the person at the machine did not allow this device".to_owned());
             }
             devices
