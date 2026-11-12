@@ -174,11 +174,14 @@ fn a_client_of_another_protocol_is_told_the_daemons_and_served_nothing() {
         socket::PROTOCOL
     );
     // Closed after the welcome: the spawn either cannot be written or is never
-    // answered, and no pane is started.
+    // answered, and no pane is started. An end, not a timeout, which would
+    // pass a daemon that served it. Closed with the spawn unread is a reset.
     let _ = frame::write(&mut stream, &Frame::new(1, Kind::Spawn, shell().encode()));
+    let read = frame::read(&mut stream);
     assert!(
-        matches!(frame::read(&mut stream), Ok(None) | Err(_)),
-        "closed after the welcome"
+        matches!(&read, Ok(None))
+            || matches!(&read, Err(err) if err.kind() == io::ErrorKind::ConnectionReset),
+        "closed after the welcome: {read:?}"
     );
 }
 
