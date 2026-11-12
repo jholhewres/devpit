@@ -105,10 +105,8 @@ pub(crate) fn settled(target: &str) -> Ready {
     }
 }
 
-/// A ptyd pane's [`settled`]: the daemon names what is in front only once
-/// the pane has printed and gone quiet, so an idle shell named on
-/// consecutive looks stands for a shell at its prompt. A shell that never
-/// prints is never named, and stays Unknown.
+/// A ptyd pane's [`settled`]: the daemon names the front once output goes
+/// quiet, so an idle shell named on consecutive looks is at its prompt.
 pub(crate) fn settled_on(mut front: impl FnMut() -> Option<String>, at_most: Duration) -> Ready {
     let deadline = Instant::now() + at_most;
     let mut settling = devpit_pty::Settling::new();

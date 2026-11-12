@@ -1,16 +1,7 @@
-//! `devpit ptyd-attach <leaf>`: one pane the daemon holds, on this terminal.
-//!
-//! What makes a ptyd pane reachable over ssh: run inside a tmux session, the
-//! person attaches to that. Keys go in as `Input`, the tty's size as `Resize`
-//! when it changes, and the pane's output is written out as it comes.
-//!
-//! The daemon keeps one count of unacknowledged output per pane, shared by
-//! every attached client. This one attaches as a mirror ([`frame::MIRROR`]):
-//! beside a desktop window its acks are dropped, so the pane runs at the
-//! window's pace. Alone, it acks all it was sent ([`owed`]), and when it goes
-//! quiet whatever the count still holds, as the desktop's tap does: an ack can
-//! land before the daemon counts the output it answers, and the leftover
-//! would otherwise creep up until the pane stops.
+//! `devpit ptyd-attach <leaf>`: one pane the daemon holds, on this terminal,
+//! which is what makes a ptyd pane reachable over ssh. It attaches as a
+//! mirror ([`frame::MIRROR`]): beside a window its acks are dropped; alone it
+//! acks what it was sent and, once quiet, the leftover ([`owed`]).
 
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
