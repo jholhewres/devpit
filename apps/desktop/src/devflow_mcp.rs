@@ -103,7 +103,7 @@ pub(crate) fn added_in(tool: Tool, text: &str) -> bool {
                 .and_then(|all| all.get(NAME))
                 .is_some()
         }),
-        _ => serde_json::from_str::<Value>(text)
+        _ => serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}'))
             .ok()
             .is_some_and(|value| value[tool.servers()].get(NAME).is_some()),
     }
