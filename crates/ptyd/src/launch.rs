@@ -71,13 +71,13 @@ pub fn installed_at(home: &Path) -> PathBuf {
         .join(BINARY)
 }
 
-/// The copy of `from` for this protocol, made if there is none. One already
-/// there is kept: it may be the one running, and a daemon of the same
-/// protocol is the same daemon as far as any desktop can tell.
+/// The copy of `from` for this protocol, made when there is none or it holds
+/// another build: a fix that keeps the protocol reaches the next daemon
+/// started. A daemon running from the old copy keeps its file until it ends.
 pub fn install(from: &Path, home: &Path) -> io::Result<PathBuf> {
     use std::os::unix::fs::PermissionsExt;
     let at = installed_at(home);
-    if at.is_file() {
+    if at.is_file() && same_bytes(from, &at)? {
         return Ok(at);
     }
     let dir = at.parent().unwrap_or(home);
@@ -89,6 +89,15 @@ pub fn install(from: &Path, home: &Path) -> io::Result<PathBuf> {
     std::fs::set_permissions(staged.path(), std::fs::Permissions::from_mode(0o700))?;
     staged.persist(&at).map_err(|err| err.error)?;
     Ok(at)
+}
+
+/// Whether `a` and `b` hold the same bytes. Sizes first: another build is
+/// almost always another size, and then neither is read.
+fn same_bytes(a: &Path, b: &Path) -> io::Result<bool> {
+    if std::fs::metadata(a)?.len() != std::fs::metadata(b)?.len() {
+        return Ok(false);
+    }
+    Ok(std::fs::read(a)? == std::fs::read(b)?)
 }
 
 /// Starts `exe` with `args`, detached: a session of its own, nothing on its
