@@ -171,6 +171,34 @@ fn the_foreground_program_is_told_once_the_output_settles() {
     pane.kill();
 }
 
+/// An agent run as a script is told by the script's name, not as the
+/// interpreter that runs it.
+#[test]
+fn a_script_in_the_foreground_is_told_by_its_own_name() {
+    let dir = tempfile::tempdir().expect("dir");
+    let script = dir.path().join("fake-agent.pl");
+    std::fs::write(&script, "sleep 30;\n").expect("script");
+    let (client, queue) = crate::client::Client::queued();
+    let pane = Pane::spawn(
+        13,
+        &asked(&format!("echo start; exec perl '{}'", script.display())),
+        |_| {},
+    )
+    .expect("spawn");
+    pane.attach(&client);
+    let told = |got: &[Frame]| {
+        got.iter()
+            .filter(|f| f.kind() == Some(Kind::Program))
+            .map(|f| String::from_utf8_lossy(&f.bytes).into_owned())
+            .collect::<Vec<_>>()
+    };
+    let got = gather(&queue, Duration::from_secs(5), |got| {
+        told(got).iter().any(|name| name != "sh")
+    });
+    pane.kill();
+    assert_eq!(told(&got).last().map(String::as_str), Some("fake-agent"));
+}
+
 /// A window that attaches after the program settled is told it at once,
 /// as it is told the cwd: no change is coming to say it again.
 #[test]
