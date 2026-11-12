@@ -167,3 +167,23 @@ fn a_failed_wayland_start_keeps_the_version_on_x11_until_wayland_is_chosen_again
     after_load(root.path(), true);
     assert_eq!(start(root.path()).why, DisplayWhy::Default);
 }
+
+/// A second launch writes its record and hands over before its page loads.
+/// That record holds the version on X11 only when this copy's own Wayland
+/// start is what ended up on X11: a copy that never tried keeps no record.
+#[test]
+fn a_launch_handed_over_leaves_no_record_unless_this_copy_fell_back_itself() {
+    let root = tempfile::tempdir().unwrap();
+    let handed = |tried: bool, running: Option<DisplayBackend>| {
+        starting(root.path(), "0.1.47");
+        hand_over_at(root.path(), tried, running);
+        failed_before(root.path(), "0.1.47")
+    };
+    assert!(!handed(false, Some(DisplayBackend::X11)), "X11 by choice");
+    assert!(!handed(true, Some(DisplayBackend::Wayland)));
+    assert!(!handed(false, None), "not up yet");
+    assert!(
+        handed(true, Some(DisplayBackend::X11)),
+        "this copy fell back"
+    );
+}

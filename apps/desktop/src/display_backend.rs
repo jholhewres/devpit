@@ -128,6 +128,9 @@ pub(crate) fn after_load(root: &Path, wayland: bool) {
 }
 
 static WHY: OnceLock<DisplayWhy> = OnceLock::new();
+/// Whether this start asked GTK for Wayland.
+#[cfg(target_os = "linux")]
+static TRIED_WAYLAND: OnceLock<bool> = OnceLock::new();
 static RUNNING: OnceLock<DisplayBackend> = OnceLock::new();
 
 fn chosen(store: &Store) -> Option<DisplayBackend> {
@@ -202,6 +205,11 @@ pub(crate) fn choose() {
     if let Some(root) = root.as_deref() {
         before_gtk(root, version, &decision);
     }
+    let _ = TRIED_WAYLAND.set(
+        decision
+            .gdk_backend
+            .is_some_and(|value| value.starts_with("wayland")),
+    );
     if matches!(
         decision.why,
         DisplayWhy::KnownCrash | DisplayWhy::FailedBefore
@@ -225,11 +233,24 @@ pub(crate) fn page_loaded(wayland: bool) {
 }
 
 /// A second launch handed over to this one before its page could load: the
-/// record it left is not a failed start when this one is up on Wayland.
+/// record it left is no failed start.
 #[cfg(target_os = "linux")]
 pub(crate) fn handed_over() {
     if let Ok(root) = Store::root() {
-        after_load(&root, RUNNING.get() == Some(&DisplayBackend::Wayland));
+        hand_over_at(
+            &root,
+            TRIED_WAYLAND.get() == Some(&true),
+            RUNNING.get().copied(),
+        );
+    }
+}
+
+/// [`handed_over`]: the record stays only when this copy's own start tried
+/// Wayland and is up on X11, the failure it records being this copy's.
+#[cfg(target_os = "linux")]
+pub(crate) fn hand_over_at(root: &Path, tried_wayland: bool, running: Option<DisplayBackend>) {
+    if !(tried_wayland && running == Some(DisplayBackend::X11)) {
+        started(root);
     }
 }
 
