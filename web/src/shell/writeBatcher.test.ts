@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import type { Screen } from './floodCut'
 import { ACK_EVERY, writeBatcher } from './writeBatcher'
 
 /* A terminal that parses on demand, and a frame clock moved by hand. */
-function setup() {
+function setup(screen: Screen = null) {
   const writes: number[][] = []
   const parsing: (() => void)[] = []
   const term = {
@@ -14,7 +15,7 @@ function setup() {
   }
   let frame: (() => void) | null = null
   const acks: number[] = []
-  const batcher = writeBatcher(term, (bytes) => acks.push(bytes), () => null, {
+  const batcher = writeBatcher(term, (bytes) => acks.push(bytes), () => screen, {
     frame: (run) => {
       frame = run
       return () => (frame = null)
@@ -91,6 +92,18 @@ describe('the frame batcher in front of a terminal', () => {
     t.batcher.flush()
     expect(t.writes.map((w) => w.length)).toEqual([600])
     expect(t.scheduled()).toBe(false)
+  })
+
+  /* The pty is paced by acks: bytes a cut took out were never parsed, but
+     acknowledging less would hold the pane for good. */
+  it('acknowledges a flood whole, the bytes the cut took out included', () => {
+    const t = setup({ rows: 24, scrollback: 1000 })
+    const flood = new TextEncoder().encode('y\r\n'.repeat(30_000))
+    t.batcher.push(flood)
+    t.tick()
+    t.parse()
+    expect(t.writes.flat().length).toBeLessThan(flood.length / 2)
+    expect(t.acks).toEqual([flood.length])
   })
 
   it('writes nothing and acknowledges nothing once disposed', () => {
