@@ -10,8 +10,9 @@
 //! - **Checked before writing.** What was read is compared again just before
 //!   the write, and a file changed in between is refused.
 //! - **Shown first.** The change is a unified diff the person sees.
-//! - **Backed up.** The file as it was is kept beside it, stamped to the
-//!   second, before anything is written.
+//! - **Backed up.** The file as it was is kept beside it as
+//!   `<name>.devpit-backup`, one copy replaced by the next write, not a file
+//!   more for every change.
 //! - **Written whole.** Into a temporary file in the same folder, then renamed
 //!   over — never half-written. A symlink is followed, so a dotfiles link
 //!   stays a link, and the file's permissions are kept, never widened.
@@ -94,13 +95,8 @@ pub fn plan(loaded: &Loaded, change: impl FnOnce(&mut Map<String, Value>)) -> Pl
 
 /// Writes a planned change, refusing a file changed since it was read.
 /// Answers the backup, when there was a file to keep.
-pub fn write(loaded: &Loaded, planned: &Planned, now: &str) -> Result<Option<PathBuf>, String> {
-    write_text(
-        &loaded.path,
-        loaded.original.as_deref(),
-        &planned.after,
-        now,
-    )
+pub fn write(loaded: &Loaded, planned: &Planned) -> Result<Option<PathBuf>, String> {
+    write_text(&loaded.path, loaded.original.as_deref(), &planned.after)
 }
 
 /// Puts `after` in `path`, a file of any format last read as `before` (`None`:
@@ -109,7 +105,6 @@ pub fn write_text(
     path: &Path,
     before: Option<&str>,
     after: &str,
-    now: &str,
 ) -> Result<Option<PathBuf>, String> {
     let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let current = match std::fs::read_to_string(&target) {
@@ -133,7 +128,7 @@ pub fn write_text(
     let backup = match &current {
         Some(text) => {
             let name = format!(
-                "{}.devpit-backup-{now}",
+                "{}.devpit-backup",
                 target
                     .file_name()
                     .and_then(|name| name.to_str())

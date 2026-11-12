@@ -313,6 +313,7 @@ mod head_tests;
 pub mod history;
 #[cfg(test)]
 mod history_tests;
+pub mod json_in_place;
 mod mcp_health;
 pub mod outside;
 pub mod peers;

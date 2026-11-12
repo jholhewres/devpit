@@ -26,6 +26,9 @@ serde_json = "1.0.151"
 sha2 = "0.10"
 # Whether a release found later is newer than the update already downloaded.
 semver = "1"
+# Codex's config.toml, read as TOML and changed where devflow's entry stands.
+# The line already in the lockfile, so it adds no tree of its own.
+toml_edit = "0.25"
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 specta-typescript = "0.0.12"
 # `unstable` is on for one thing: `Window::add_child`, which is the only way
