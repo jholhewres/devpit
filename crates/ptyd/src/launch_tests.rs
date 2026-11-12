@@ -58,19 +58,30 @@ fn a_started_daemon_has_a_clean_environment() {
     assert!(!env.contains("DEVPIT_SECRET_TOKEN"), "{env}");
 }
 
+/// A desktop update that fixes the daemon without a new protocol reaches the
+/// next daemon started; the same build installed again leaves the copy be.
 #[test]
-fn the_copy_is_per_protocol_and_one_there_is_kept() {
+fn the_copy_is_per_protocol_and_refreshed_when_the_build_differs() {
+    use std::os::unix::fs::MetadataExt;
     let home = tempfile::tempdir().expect("home");
     let source = home.path().join("source");
-    std::fs::write(&source, b"first").expect("source");
+    std::fs::write(&source, b"first build").expect("source");
     let at = install(&source, home.path()).expect("install");
     assert_eq!(at, installed_at(home.path()));
     assert!(at.ends_with(format!("ptyd/v{}/{BINARY}", socket::PROTOCOL)));
-    // A newer desktop of the same protocol keeps the copy, which may be the
-    // one running.
-    std::fs::write(&source, b"second").expect("source");
+
+    std::fs::write(&source, b"fixed build").expect("source");
     install(&source, home.path()).expect("again");
-    assert_eq!(std::fs::read(&at).expect("copy"), b"first");
+    assert_eq!(std::fs::read(&at).expect("copy"), b"fixed build");
+
+    let before = std::fs::metadata(&at).expect("copy");
+    install(&source, home.path()).expect("the same again");
+    let after = std::fs::metadata(&at).expect("copy");
+    assert_eq!(
+        (after.ino(), after.modified().ok()),
+        (before.ino(), before.modified().ok()),
+        "the same build was copied over itself"
+    );
 }
 
 #[test]
