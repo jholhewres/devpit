@@ -48,6 +48,13 @@ impl History {
         let end = all.len().saturating_sub(have);
         let from = end.saturating_sub(PAGE);
         let cut = self.cut_at(from, &all[from..end]);
+        // A page with nowhere safe to start is sent whole: cut to nothing, it
+        // would say history is left and give none of it.
+        let cut = if from > 0 && cut == end - from {
+            0
+        } else {
+            cut
+        };
         // From the ring's oldest byte this is the last page there is: what
         // the cut dropped is a partial line no client could draw, not more
         // history, and a client pages until it is told none is left.

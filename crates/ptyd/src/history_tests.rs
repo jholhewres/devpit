@@ -112,3 +112,29 @@ fn paging_a_wrapped_ring_ends() {
         }
     }
 }
+
+/// A page with nowhere a terminal can start, here a run of continuation
+/// bytes, is sent whole: cut to nothing, it would end the paging early.
+#[test]
+fn a_page_with_no_safe_start_is_sent_whole_and_paging_reaches_the_start() {
+    let mut history = History::new(4 * PAGE);
+    let mut written = b"first line\n".to_vec();
+    written.extend(vec![0x80; 2 * PAGE]);
+    history.write(&written);
+    let mut got = Vec::new();
+    for round in 0.. {
+        assert!(
+            round < 8,
+            "paging stalled at {} of {} bytes",
+            got.len(),
+            written.len()
+        );
+        let (mut page, left) = history.older(got.len());
+        page.extend_from_slice(&got);
+        got = page;
+        if left == 0 {
+            break;
+        }
+    }
+    assert_eq!(got, written);
+}
