@@ -231,6 +231,6 @@ pub async fn devflow_binary_install() -> Result<DevflowBinary, RpcError> {
     crate::off_main::blocking(move || Ok(state_of(&bin, true))).await
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[path = "devflow_binary_tests.rs"]
 mod tests;
