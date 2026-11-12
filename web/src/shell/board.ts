@@ -16,6 +16,40 @@ export function lanes(board: Board | null): readonly Lane[] {
   }))
 }
 
+/** A board read again, keeping the shown board's objects wherever they did not
+ *  change, so a memoized tile redraws only for its own card. By content, not an
+ *  updated time: runs, comments and activity change a card without its row. */
+export function kept(shown: Board | null, read: Board): Board {
+  if (!shown || shown.projectId !== read.projectId) return read
+  const cards = keptById(shown.cards, read.cards)
+  const columns = keptById(shown.columns, read.columns)
+  const steps = keptById(shown.steps, read.steps)
+  if (cards === shown.cards && columns === shown.columns && steps === shown.steps) return shown
+  return { ...read, cards, columns, steps }
+}
+
+function keptById<T extends { id: string }>(shown: T[], read: T[]): T[] {
+  const before = new Map(shown.map((one) => [one.id, one]))
+  let same = shown.length === read.length
+  const out = read.map((one, at) => {
+    const was = before.get(one.id)
+    const taken = was && alike(was, one) ? was : one
+    if (taken !== shown[at]) same = false
+    return taken
+  })
+  return same ? shown : out
+}
+
+/** Equal as JSON is: what the backend answers twice for something unchanged. */
+export function alike(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  const keys = Object.keys(a)
+  if (keys.length !== Object.keys(b).length) return false
+  return keys.every((key) => key in b && alike((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
+}
+
 /* Where a card lands, applied to the board we already hold — the screen must
    not wait for a round trip to show what the drop did. */
 export function landed(board: Board, cardId: string, columnId: string, at: number): Board {
