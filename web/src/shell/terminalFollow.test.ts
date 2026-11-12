@@ -8,9 +8,9 @@ const written = (term: Terminal, data: string): Promise<void> => new Promise((do
 /* Claude Code's full redraw: screen and scrollback cleared, home, then more than a screen. */
 const REDRAW = '\x1b[2J\x1b[3J\x1b[H' + 'new line\r\n'.repeat(30)
 
-function terminal(replaying: () => boolean = () => false): Terminal {
+function terminal(replaying: () => boolean = () => false, replayedClear: () => void = () => {}): Terminal {
   const term = new Terminal({ rows: 10, cols: 40, scrollback: 1000, allowProposedApi: true })
-  followAfterClear(term, replaying)
+  followAfterClear(term, replaying, replayedClear)
   return term
 }
 
@@ -62,6 +62,20 @@ describe('a terminal whose program clears its scrollback', () => {
     await new Promise((done) => setTimeout(done, 0))
     expect(gained).toBeGreaterThan(0)
     expect(term.buffer.active.viewportY).toBe(gained)
+  })
+
+  /* Leaf stops asking for older pages only when what it wrote again wiped them. */
+  it('tells whoever replays that a clear of the scrollback was among the bytes', async () => {
+    let replaying = true
+    let told = 0
+    const term = terminal(() => replaying, () => (told += 1))
+    await written(term, 'old line\r\n'.repeat(20) + '\r\x1b[2Kprogress 50%\x1b[2J')
+    expect(told).toBe(0)
+    await written(term, '\x1b[3J')
+    expect(told).toBe(1)
+    replaying = false
+    await written(term, '\x1b[3J')
+    expect(told).toBe(1)
   })
 
   it('leaves a view the person scrolled up where it is while nothing clears', async () => {

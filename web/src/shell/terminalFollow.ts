@@ -16,11 +16,18 @@ export interface Follower {
 }
 
 /** `replaying`: held bytes are being written again, old clears among them, and
- *  whoever writes them puts the view back: those clears say nothing new. */
-export function followAfterClear(terminal: Follower, replaying: () => boolean): { dispose: () => void } {
+ *  whoever writes them puts the view back: those clears say nothing new, and
+ *  `replayedClear` hears of each one instead. */
+export function followAfterClear(
+  terminal: Follower,
+  replaying: () => boolean,
+  replayedClear: () => void = () => {},
+): { dispose: () => void } {
   let cleared = false
   const csi = terminal.parser.registerCsiHandler({ final: 'J' }, (params) => {
-    if (params[0] === 3 && terminal.buffer.active.type === 'normal' && !replaying()) cleared = true
+    if (params[0] !== 3 || terminal.buffer.active.type !== 'normal') return false
+    if (replaying()) replayedClear()
+    else cleared = true
     return false
   })
   /* Once the redraw has rows above the screen: scrolling nowhere would leave
