@@ -196,6 +196,27 @@ fn the_token_is_made_once_owner_only_and_kept() {
 
 /// Nothing listens off loopback: the socket is bound to 127.0.0.1, and the
 /// port is kept for next time.
+/// A local.json from before the name (a port alone, 0644) keeps its port,
+/// gains a name of this install's own and is made owner-only.
+#[cfg(unix)]
+#[test]
+fn an_old_local_json_keeps_its_port_and_gains_a_name_owner_only() {
+    use std::os::unix::fs::PermissionsExt;
+    let home = tempfile::tempdir().expect("home");
+    let free = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|probe| probe.local_addr())
+        .expect("a free port")
+        .port();
+    let path = home.path().join(PORT_FILE);
+    std::fs::write(&path, format!(r#"{{"port":{free}}}"#)).expect("old file");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("0644");
+    let (_listener, place) = bound(home.path()).expect("bound");
+    assert_eq!(place.port, free);
+    assert!(is_own_name(&place.name), "{}", place.name);
+    let mode = std::fs::metadata(&path).expect("kept").permissions().mode();
+    assert_eq!(mode & 0o777, 0o600);
+}
+
 #[test]
 fn the_server_binds_loopback_alone_and_keeps_its_port() {
     let home = tempfile::tempdir().expect("home");
