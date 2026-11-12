@@ -70,7 +70,7 @@ function McpSteps(): React.JSX.Element {
       <ol className="prefhow">
         <li>On the other computer, install devpit and sign in to the same devpit account — or let the pairing command sign it in.</li>
         <li>
-          <b>Pair an MCP client</b> here and run the command it shows there. The link in it is good once, for two minutes; the key it makes stays in that computer&rsquo;s devpit folder, readable by its user alone.
+          <b>Pair an MCP client</b> here and run the command it shows there. The link in it is good once, for ten minutes; the key it makes stays in that computer&rsquo;s devpit folder, readable by its user alone.
         </li>
         <li>
           Add <code>devpit mcp --remote</code> to the MCP client there, for example <code>claude mcp add devpit-remote -- devpit mcp --remote</code>.
@@ -104,7 +104,7 @@ function McpPairing({ pairing, onDone }: { pairing: RemotePairing; onDone: () =>
           Done
         </button>
       </span>
-      <span className="pref__d">Good once, for two minutes.</span>
+      <span className="pref__d">Good once, for ten minutes.</span>
     </span>
   )
 }

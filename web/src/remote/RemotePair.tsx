@@ -5,7 +5,7 @@ import { pair } from './socket'
 
 /*
  * Pairing: the code shown on the machine's screen, typed or carried in the
- * link the QR code opens. Good once, for two minutes.
+ * link the QR code opens. Good once, for ten minutes.
  */
 
 const fromLink = (): string => new URLSearchParams(location.hash.slice(1)).get('pair') ?? ''
@@ -32,7 +32,7 @@ export function RemotePair({ onPaired }: { onPaired: (token: string) => void }):
   return (
     <main className="rm rm--center">
       <h1 className="rm__title">Pair this device</h1>
-      <p className="rm__said">On the machine: Settings → General → Remote → Pair a device. The code is good once, for two minutes.</p>
+      <p className="rm__said">On the machine: Settings → General → Remote → Pair a device. The code is good once, for ten minutes.</p>
       <label className="rm__field">
         <span>Code</span>
         <input value={code} onChange={(event) => setCode(event.target.value)} autoCapitalize="characters" autoComplete="off" spellCheck={false} />

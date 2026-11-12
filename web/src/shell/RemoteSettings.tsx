@@ -112,7 +112,7 @@ function TailnetSteps({ login }: { login: string | null }): React.JSX.Element {
       <ol className="prefhow">
         <li>Install Tailscale on the phone or computer and sign in as the owner of this machine{login && <> ({login})</>}. Anyone else in the tailnet is refused.</li>
         <li>Open this machine&rsquo;s address on that device.</li>
-        <li><b>Pair a device</b> here, then scan the code or type it there. It is good once, for two minutes.</li>
+        <li><b>Pair a device</b> here, then scan the code or type it there. It is good once, for ten minutes.</li>
         <li>Choose what the device may do. Watching is always allowed; <b>type</b> sends keys to terminals and moves cards; <b>answer</b> allows or denies a question an agent is waiting on. Chats are read there, not written.</li>
       </ol>
       <p>
@@ -127,7 +127,7 @@ function RelaySteps(): React.JSX.Element {
     <>
       <ol className="prefhow">
         <li>Sign in to your devpit account on this machine (Settings → Account), and at devpit.app on the device — the same account.</li>
-        <li><b>Pair a device</b> here and scan the code with its camera. It opens devpit.app/remote with this machine&rsquo;s key and a secret good once, for two minutes.</li>
+        <li><b>Pair a device</b> here and scan the code with its camera. It opens devpit.app/remote with this machine&rsquo;s key and a secret good once, for ten minutes.</li>
         <li>Choose what the device may do. Watching is always allowed; <b>type</b> sends keys to terminals and moves cards; <b>answer</b> allows or denies a question an agent is waiting on.</li>
         <li><b>Forget</b> a device here and it is cut off at once: its connection ends, and its key opens nothing after.</li>
       </ol>

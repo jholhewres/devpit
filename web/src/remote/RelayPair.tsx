@@ -59,7 +59,7 @@ export function RelayNothing(): React.JSX.Element {
   return (
     <main className="rm rm--center">
       <h1 className="rm__title">Pair this device</h1>
-      <p className="rm__said">On the machine: Settings → General → Remote, through devpit.app, then Pair a device. Scan the code with this device&rsquo;s camera. It is good once, for two minutes.</p>
+      <p className="rm__said">On the machine: Settings → General → Remote, through devpit.app, then Pair a device. Scan the code with this device&rsquo;s camera. It is good once, for ten minutes.</p>
     </main>
   )
 }
