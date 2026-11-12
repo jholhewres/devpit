@@ -95,32 +95,13 @@ pub fn listen(path: &Path) -> io::Result<UnixListener> {
 
 /// The uid on the other end of `stream`, as the kernel knows it.
 pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
-    use std::os::unix::io::AsRawFd;
     #[cfg(target_os = "linux")]
     {
-        let mut cred = libc::ucred {
-            pid: 0,
-            uid: 0,
-            gid: 0,
-        };
-        let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-        // SAFETY: `len` is the size of `cred`, which outlives the call.
-        let done = unsafe {
-            libc::getsockopt(
-                stream.as_raw_fd(),
-                libc::SOL_SOCKET,
-                libc::SO_PEERCRED,
-                (&mut cred as *mut libc::ucred).cast(),
-                &mut len,
-            )
-        };
-        if done != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(cred.uid)
+        peer_cred(stream).map(|cred| cred.uid)
     }
     #[cfg(not(target_os = "linux"))]
     {
+        use std::os::unix::io::AsRawFd;
         let (mut uid, mut gid) = (0, 0);
         // SAFETY: both out-pointers are this frame's own u32s.
         if unsafe { libc::getpeereid(stream.as_raw_fd(), &mut uid, &mut gid) } != 0 {
@@ -135,33 +116,39 @@ pub fn peer_uid(stream: &UnixStream) -> io::Result<u32> {
 pub fn peer_pid(stream: &UnixStream) -> io::Result<u32> {
     #[cfg(target_os = "linux")]
     {
-        use std::os::unix::io::AsRawFd;
-        let mut cred = libc::ucred {
-            pid: 0,
-            uid: 0,
-            gid: 0,
-        };
-        let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-        // SAFETY: `len` is the size of `cred`, which outlives the call.
-        let done = unsafe {
-            libc::getsockopt(
-                stream.as_raw_fd(),
-                libc::SOL_SOCKET,
-                libc::SO_PEERCRED,
-                (&mut cred as *mut libc::ucred).cast(),
-                &mut len,
-            )
-        };
-        if done != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        u32::try_from(cred.pid).map_err(|_| io::Error::other("no peer pid"))
+        u32::try_from(peer_cred(stream)?.pid).map_err(|_| io::Error::other("no peer pid"))
     }
     #[cfg(not(target_os = "linux"))]
     {
         let _ = stream;
         Err(io::ErrorKind::Unsupported.into())
     }
+}
+
+/// The other end of `stream`'s credentials, as `SO_PEERCRED` gives them.
+#[cfg(target_os = "linux")]
+fn peer_cred(stream: &UnixStream) -> io::Result<libc::ucred> {
+    use std::os::unix::io::AsRawFd;
+    let mut cred = libc::ucred {
+        pid: 0,
+        uid: 0,
+        gid: 0,
+    };
+    let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: `len` is the size of `cred`, which outlives the call.
+    let done = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            (&mut cred as *mut libc::ucred).cast(),
+            &mut len,
+        )
+    };
+    if done != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(cred)
 }
 
 /// Whether a directory of `owner` and `mode` may hold the socket: its user's,
