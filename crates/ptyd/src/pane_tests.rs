@@ -81,6 +81,30 @@ fn a_late_client_is_put_back_in_the_modes_then_shown_the_tail() {
     pane.kill();
 }
 
+/// A pane that printed more than a replay holds shows a late client only the
+/// last of it; older pages are asked for.
+#[test]
+fn a_late_client_is_replayed_at_most_the_last_256_kb() {
+    let printed_bytes = 3 * crate::history::REPLAYED;
+    let script = format!("head -c {printed_bytes} /dev/zero | tr '\\0' x; printf end; sleep 5");
+    let pane = Pane::spawn(10, &asked(&script), |_| {}).expect("spawn");
+    let (early, early_queue) = crate::client::Client::queued();
+    pane.attach(&early);
+    gather(&early_queue, Duration::from_secs(10), |got| {
+        printed(got).ends_with(b"end")
+    });
+    let (late, late_queue) = crate::client::Client::queued();
+    pane.attach(&late);
+    let replay = printed(&gather(&late_queue, Duration::from_millis(300), |_| false));
+    pane.kill();
+    assert!(replay.ends_with(b"xend"), "the replay is the tail");
+    assert!(
+        replay.len() <= crate::history::REPLAYED,
+        "replayed {} bytes",
+        replay.len()
+    );
+}
+
 #[test]
 fn the_end_is_told_with_its_code() {
     let (client, queue) = crate::client::Client::queued();
