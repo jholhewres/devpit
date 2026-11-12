@@ -130,7 +130,7 @@ export function Leaf({
     terminal.loadAddon(fit)
     terminal.open(box)
     const linked = linkPaths(terminal, openingRef)
-    const follows = followAfterClear(terminal, () => paging)
+    const follows = followAfterClear(terminal, () => rewriting, () => (wiped = true))
     // After `open`, which is when there is a canvas to take a context from.
     measureWideCharacters(terminal)
     /* tmux sends only what changes, so a screen that was emptied under it —
@@ -239,6 +239,10 @@ export function Leaf({
     }
     let paging = false
     let more = true
+    /* Held bytes being written again, and whether a clear of the scrollback
+       was among them. Not the wait for a page: a clear then is the program's. */
+    let rewriting = false
+    let wiped = false
     /* xterm cannot prepend, so it is reset in order — after whatever is still
        waiting — and written again whole around the older page. */
     const rewrite = (): void => {
@@ -248,14 +252,18 @@ export function Leaf({
       /* The reset scrolls to the top too: no page is asked for until the
          rewrite is in. */
       paging = true
+      rewriting = true
+      wiped = false
       terminal.write('\x1bc')
       for (const one of held) terminal.write(one)
       terminal.write(new Uint8Array(), () => {
         const gained = terminal.buffer.active.length - lines
-        /* Nothing above: older bytes only redraw what a later clear wiped, and
-           each page more would reset the screen and pull the view up again. */
-        if (gained <= 0) more = false
+        /* Nothing above because a later clear wiped it: older pages would be
+           wiped too, and each would reset the screen and pull the view up.
+           A page redrawn in place draws nothing either, with rows before it. */
+        if (gained <= 0 && wiped) more = false
         terminal.scrollToLine(Math.max(0, gained))
+        rewriting = false
         paging = false
       })
       if (heldBytes > HELD_MOST) held = null

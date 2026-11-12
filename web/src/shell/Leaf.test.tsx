@@ -43,7 +43,17 @@ const fake = vi.hoisted(() => {
       this.disposed = true
     }
   }
-  return { terms, attaches, Terminal, pages, asked: () => asked, ask: () => (asked += 1), replaying: { current: (() => false) as () => boolean } }
+  return {
+    terms,
+    attaches,
+    Terminal,
+    pages,
+    asked: () => asked,
+    ask: () => (asked += 1),
+    waiting: { current: null as Promise<void> | null },
+    replaying: { current: (() => false) as () => boolean },
+    replayedClear: { current: (() => {}) as () => void },
+  }
 })
 
 vi.mock('@xterm/xterm', () => ({ Terminal: fake.Terminal }))
@@ -57,8 +67,9 @@ vi.mock('./live', () => ({
 vi.mock('./terminal', () => ({ contrastFor: () => 1, darkNow: () => true, options: () => ({}), palette: () => ({}) }))
 vi.mock('./terminalPathLinks', () => ({ linkPaths: () => ({ dispose() {} }) }))
 vi.mock('./terminalFollow', () => ({
-  followAfterClear: (_terminal: unknown, replaying: () => boolean) => {
+  followAfterClear: (_terminal: unknown, replaying: () => boolean, replayedClear: () => void) => {
     fake.replaying.current = replaying
+    fake.replayedClear.current = replayedClear
     return { dispose() {} }
   },
 }))
@@ -78,6 +89,7 @@ vi.mock('./attach', () => ({
       ack() {},
       older: async () => {
         fake.ask()
+        await fake.waiting.current
         return fake.pages.shift() ?? null
       },
       detach: () => {
@@ -105,6 +117,7 @@ beforeEach(() => {
   seen = []
   fake.terms.length = 0
   fake.attaches.length = 0
+  fake.waiting.current = null
   vi.stubGlobal('IntersectionObserver', Observer)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   vi.stubGlobal('requestAnimationFrame', () => 0)
@@ -233,7 +246,31 @@ describe('a terminal off screen', () => {
     expect(fake.replaying.current()).toBe(false)
   })
 
-  it('asks no further page once one drew no rows above, so the view is not pulled to the top again', async () => {
+  it('asks no further page once a clear in what it wrote again left the page no rows', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
+    await settle()
+    const term = fake.terms[0]
+    act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
+    fake.pages.push({ left: 5, bytes: Uint8Array.from([65]) }, { left: 4, bytes: Uint8Array.from([67]) })
+    const write = term.write.bind(term)
+    term.write = (data: unknown, done?: () => void) => {
+      /* The held bytes after the page clear the scrollback, as a redraw does. */
+      if (data instanceof Uint8Array && data[0] === 66) fake.replayedClear.current()
+      write(data, done)
+    }
+    const before = fake.asked()
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    await act(async () => term.scrolled?.(0))
+    await settle()
+    expect(fake.asked() - before).toBe(1)
+    fake.pages.length = 0
+  })
+
+  /* A page redrawn in place (a progress bar) draws no rows, yet older rows
+     still sit before it. */
+  it('keeps asking for older pages after one that drew no rows while nothing cleared', async () => {
     render(<Leaf paneId="leaf_1" projectId="prj_1" />)
     onScreen(true)
     await settle()
@@ -245,7 +282,25 @@ describe('a terminal off screen', () => {
     await settle()
     await act(async () => term.scrolled?.(0))
     await settle()
-    expect(fake.asked() - before).toBe(1)
+    expect(fake.asked() - before).toBe(2)
     fake.pages.length = 0
+  })
+
+  it('takes a clear that arrives while an older page is on its way as the program’s own', async () => {
+    render(<Leaf paneId="leaf_1" projectId="prj_1" />)
+    onScreen(true)
+    await settle()
+    const term = fake.terms[0]
+    act(() => fake.attaches[0].on.output(Uint8Array.from([66]), true))
+    let arrive = (): void => {}
+    fake.waiting.current = new Promise<void>((done) => (arrive = done))
+    fake.pages.push({ left: 0, bytes: Uint8Array.from([65]) })
+    const before = fake.asked()
+    await act(async () => term.scrolled?.(0))
+    expect(fake.asked() - before).toBe(1)
+    expect(fake.replaying.current()).toBe(false)
+    fake.waiting.current = null
+    arrive()
+    await settle()
   })
 })
