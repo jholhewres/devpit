@@ -415,12 +415,9 @@ pub(crate) fn stop_whatever_runs(server: &devpit_tmux::Server, session: &str, le
     }
 }
 
-/// [`stop_whatever_runs`] for the ptyd panes of the daemon at `socket`: its
-/// children started with each leaf's name, never a daemon one of them left.
-///
-/// Where the process table cannot be read this stops nothing, and the
-/// daemon's `Kill` is only a `SIGHUP` to the shell: an agent that ignores it
-/// outlives the pane, holding its pty open.
+/// [`stop_whatever_runs`] for the ptyd panes at `socket`: the daemon's children
+/// started with each leaf's name, never a daemon one left. Without a process
+/// table it stops nothing, and an agent that ignores `SIGHUP` outlives the pane.
 #[cfg(unix)]
 pub(crate) fn stop_whatever_runs_in_ptyd(socket: &Path, leaves: &[String]) {
     let Some(daemon) = devpit_ptyd::socket::connect(socket)

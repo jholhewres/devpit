@@ -228,10 +228,8 @@ impl Tap {
         Ok(())
     }
 
-    /// Everything printed has been heard and acked, so whatever the daemon
-    /// still counts for a pane no window is on is an ack it lost: it sends
-    /// output before counting it, and an ack quick enough lands in between.
-    /// Left alone, the count creeps up to the ceiling and the pane stops.
+    /// Acks what the daemon still counts for a pane no window is on: an ack can
+    /// land before it counts the output, and the leftover would stop the pane.
     fn settle(&self, owed: &mut HashSet<u32>, ears: &dyn Ears) {
         for pane in owed.drain() {
             let leaf = self

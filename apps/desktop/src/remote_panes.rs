@@ -1,10 +1,6 @@
-//! The terminals a viewer watches, their bytes put on the viewer's queue:
-//! a tmux pane through a tmux client of its own, running in a pty here; a
-//! ptyd pane attached over the daemon's socket.
-//!
-//! A ptyd watcher never resizes the pane, so a phone does not shrink the
-//! desk's, and never acks: the daemon keeps one count per pane, and the
-//! window on it or the tap ([`crate::ptyd_tap`]) acks it whole.
+//! The terminals a viewer watches: a tmux pane through a tmux client of its
+//! own, a ptyd pane over the daemon's socket. A ptyd watcher never resizes
+//! (a phone must not shrink the desk's) nor acks ([`crate::ptyd_tap`] does).
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender, SyncSender};
