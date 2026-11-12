@@ -286,11 +286,14 @@ pub fn asks_to_stop(said: &str, session: &str, running: &[&str]) -> bool {
             )
     };
     if marked(&said).is_some() {
-        // Punctuation only at the end, as on the verb route: `✅ !name` is not `✅ name`.
-        return named(
-            said.trim_end_matches(HANGING)
-                .trim_matches(|c: char| c.is_whitespace() || of_a_mark(c)),
-        );
+        // Punctuation only at the end of the names, as on the verb route:
+        // `✅ !name` is not `✅ name`, and `name. ✅` is.
+        fn unmarked(text: &str) -> &str {
+            text.trim_matches(|c: char| {
+                c.is_whitespace() || YES_MARKS.contains(&c) || dresses_a_mark(c)
+            })
+        }
+        return named(unmarked(unmarked(&said).trim_end_matches(HANGING)));
     }
     let Some((verb, names)) = said
         .trim_end_matches(HANGING)
