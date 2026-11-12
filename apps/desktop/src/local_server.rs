@@ -1,11 +1,12 @@
 //! devpit on loopback: the same app in a browser at `127.0.0.1:<port>`.
 //!
 //! **Loopback alone, and a cookie at the door.** It binds only `127.0.0.1`.
-//! A browser trades the token kept owner-only in the home (`/auth?t=…`) for a
-//! session cookie made per run, under a name of this install's own
-//! (`<random>.localhost`), since a cookie is kept per name and not per port.
-//! `Host` and `Origin` must be this port under that name, `127.0.0.1` or
-//! `localhost`, which refuses DNS rebinding before anything runs.
+//! A browser trades a one-time code (`/auth?c=…`), or the token kept
+//! owner-only in the home (`/auth?t=…`), for a session cookie made per run,
+//! under a name of this install's own (`<random>.localhost`), since a cookie
+//! is kept per name and not per port. `Host` and `Origin` must be this port
+//! under that name, `127.0.0.1` or `localhost`, which refuses DNS rebinding
+//! before anything runs.
 //!
 //! **One way in for every command.** `POST /rpc/<command>` hands the call to
 //! the main webview's own invoke handler, as the window's IPC does, so a
@@ -15,13 +16,14 @@
 //! desktop, answers 501 here: a browser must not make the desktop's window
 //! open a dialog nobody in front of it asked for.
 
-use std::io::{BufReader, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-use crate::remote_http::{read_up_to, reply, Request};
+use crate::remote_http::{read_body, read_head, reply, Deadline, Request};
 
 /// The port and the name, owner-only in the home, so "open in Chrome" and a
 /// restart find them.
@@ -32,6 +34,14 @@ const COOKIE: &str = "devpit_local";
 /// The largest call a browser sends: a pasted picture (8 MiB, as base64) or a
 /// saved file, with room for the JSON around it.
 const MOST_BODY: usize = 16 * 1024 * 1024;
+/// How long a request's head may take to arrive, and then its body.
+const HEAD_WITHIN: Duration = Duration::from_secs(10);
+const BODY_WITHIN: Duration = Duration::from_secs(60);
+/// Connections served at once: every browser tab keeps an events socket and
+/// a panes socket, and anyone on the machine can connect to loopback.
+const MOST_OPEN: usize = 256;
+/// How long a one-time sign-in code is good for.
+const CODE_LIFE: Duration = Duration::from_secs(60);
 
 /// Commands a browser may not run here: each streams over a Tauri channel
 /// (the browser gets that stream over the events socket), or opens UI on the
@@ -114,13 +124,48 @@ pub(crate) fn same_secret(said: &str, kept: &str) -> bool {
             == 0
 }
 
-/// The token in `/auth?t=…`, from the request's first line.
-fn token_in_query(query: &str) -> Option<&str> {
+/// The value of `name` in a query string, when it has one.
+fn in_query<'a>(query: &'a str, name: &str) -> Option<&'a str> {
     query
         .split('&')
-        .find_map(|pair| pair.strip_prefix("t="))
-        .filter(|token| !token.is_empty())
+        .find_map(|pair| pair.strip_prefix(name)?.strip_prefix('='))
+        .filter(|value| !value.is_empty())
 }
+
+/// Codes "Open in browser" signs in with, each good once and for
+/// [`CODE_LIFE`]: the link sits on Chromium's command line, which every user
+/// of the machine can read, so it must not carry the lasting token.
+pub(crate) struct Codes(Mutex<Vec<(String, Instant)>>);
+
+impl Codes {
+    pub(crate) const fn new() -> Codes {
+        Codes(Mutex::new(Vec::new()))
+    }
+
+    pub(crate) fn issue(&self, now: Instant) -> std::io::Result<String> {
+        let code = secret()?;
+        let mut codes = self
+            .0
+            .lock()
+            .map_err(|_| std::io::Error::other("poisoned"))?;
+        codes.retain(|(_, until)| *until > now);
+        codes.push((code.clone(), now + CODE_LIFE));
+        Ok(code)
+    }
+
+    /// Whether `said` is a code still good at `now`; it is good no more.
+    pub(crate) fn redeem(&self, said: &str, now: Instant) -> bool {
+        let Ok(mut codes) = self.0.lock() else {
+            return false;
+        };
+        let found = codes
+            .iter()
+            .position(|(code, until)| *until > now && same_secret(said, code));
+        found.map(|at| codes.remove(at)).is_some()
+    }
+}
+
+static CODES: Codes = Codes::new();
 
 /// What one request gets, decided before anything runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,15 +180,25 @@ pub(crate) enum Door {
     In,
 }
 
-/// `token` is the one in the home, traded once per browser at `/auth`;
-/// `session` is the cookie it is traded for, made for this run of the app.
-pub(crate) fn door(
-    request: &Request,
-    query: &str,
-    place: &Place,
-    token: &str,
-    session: &str,
-) -> Door {
+/// What a request is checked against: where this server is, the token in the
+/// home and the one-time codes traded at `/auth`, the cookie they are traded
+/// for (made for this run of the app) and the desktop window's panes ticket.
+pub(crate) struct Keys<'a> {
+    pub place: &'a Place,
+    pub token: &'a str,
+    pub codes: &'a Codes,
+    pub session: &'a str,
+    pub ticket: &'a str,
+}
+
+pub(crate) fn door(request: &Request, keys: &Keys) -> Door {
+    let Keys {
+        place,
+        token,
+        codes,
+        session,
+        ..
+    } = *keys;
     if !host_allowed(request.header("host"), place)
         || !origin_allowed(request.header("origin"), place)
     {
@@ -155,9 +210,13 @@ pub(crate) fn door(
         if request.header("host") != Some(&place.signed_in_host()) {
             return Door::Unauthorized;
         }
-        return match token_in_query(query) {
-            Some(said) if same_secret(said, token) => Door::Admit,
-            _ => Door::Unauthorized,
+        let query = request.query.as_str();
+        let code = in_query(query, "c").is_some_and(|said| codes.redeem(said, Instant::now()));
+        let token = in_query(query, "t").is_some_and(|said| same_secret(said, token));
+        return if code || token {
+            Door::Admit
+        } else {
+            Door::Unauthorized
         };
     }
     if cookies_of(request.header("cookie")).any(|said| same_secret(said, session)) {
@@ -246,9 +305,27 @@ pub(crate) fn bound(home: &Path) -> std::io::Result<(TcpListener, Place)> {
     Ok((listener, place))
 }
 
-/// Where the browser is sent to sign in, token and all: for "open in Chrome".
-pub(crate) fn sign_in_url(place: &Place, token: &str) -> String {
-    format!("http://{}/auth?t={token}", place.signed_in_host())
+/// Where the browser is sent to sign in with a one-time code: "open in Chrome".
+pub(crate) fn sign_in_url(place: &Place, code: &str) -> String {
+    format!("http://{}/auth?c={code}", place.signed_in_host())
+}
+
+/// A connection served; one fewer open once it is dropped.
+pub(crate) struct Opened(Arc<AtomicUsize>);
+
+impl Drop for Opened {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// One more connection, unless `most` are open already.
+pub(crate) fn open_one(open: &Arc<AtomicUsize>, most: usize) -> Option<Opened> {
+    open.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |now| {
+        (now < most).then_some(now + 1)
+    })
+    .ok()?;
+    Some(Opened(Arc::clone(open)))
 }
 
 static PLACE: Mutex<Option<Place>> = Mutex::new(None);
@@ -266,7 +343,7 @@ pub(crate) fn place() -> Option<Place> {
 }
 
 /// Starts the server on loopback, its door kept by `token`. Each request
-/// runs on its own thread; `serve` decides what it is.
+/// runs on its own thread, up to [`MOST_OPEN`]; `serve` decides what it is.
 pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> {
     let token = token_in(home)?;
     let session = secret()?;
@@ -279,8 +356,17 @@ pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> 
     if let Ok(mut kept) = PANES_URL.lock() {
         *kept = Some(format!("ws://127.0.0.1:{port}/panes?k={ticket}"));
     }
+    let open = Arc::new(AtomicUsize::new(0));
     std::thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
+        for stream in listener.incoming() {
+            let Ok(stream) = stream else {
+                // Out of descriptors, most likely: spinning on it would not free one.
+                std::thread::sleep(Duration::from_millis(100));
+                continue;
+            };
+            let Some(opened) = open_one(&open, MOST_OPEN) else {
+                continue;
+            };
             let (app, place, token, session, ticket) = (
                 app.clone(),
                 place.clone(),
@@ -288,31 +374,35 @@ pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> 
                 session.clone(),
                 ticket.clone(),
             );
-            std::thread::spawn(move || serve(app, stream, &place, &token, &session, &ticket));
+            let _ = std::thread::Builder::new()
+                .name("devpit-local".into())
+                .spawn(move || {
+                    let _opened = opened;
+                    let keys = Keys {
+                        place: &place,
+                        token: &token,
+                        codes: &CODES,
+                        session: &session,
+                        ticket: &ticket,
+                    };
+                    serve(app, stream, &keys);
+                });
         }
     });
     Ok(port)
 }
 
-fn serve(
-    app: tauri::AppHandle,
-    mut stream: TcpStream,
-    place: &Place,
-    token: &str,
-    session: &str,
-    ticket: &str,
-) {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
+fn serve(app: tauri::AppHandle, mut stream: TcpStream, keys: &Keys) {
     let Some(reader) = stream.try_clone().ok() else {
         return;
     };
-    let mut reader = BufReader::new(reader);
-    let Some((request, query)) = read_with_query(&mut reader) else {
+    let mut reader = BufReader::new(Deadline::new(reader, HEAD_WITHIN));
+    let Some((entry, request)) = admitted(&mut reader, keys, |reader| {
+        reader.get_mut().renew(BODY_WITHIN);
+    }) else {
         reply(&mut stream, "400 Bad Request", "text/plain", b"");
         return;
     };
-    let entry = crate::pane_socket::ticket_door(&request, &query, place, ticket)
-        .unwrap_or_else(|| door(&request, &query, place, token, session));
     match entry {
         Door::Foreign => reply(
             &mut stream,
@@ -326,7 +416,7 @@ fn serve(
             "text/plain",
             b"sign in from devpit",
         ),
-        Door::Admit => admitted(&mut stream, session),
+        Door::Admit => signed_in(&mut stream, keys.session),
         Door::In => match (request.method.as_str(), request.path.as_str()) {
             ("POST", path) if path.starts_with("/rpc/") => {
                 crate::local_rpc::call(&app, &mut stream, &path["/rpc/".len()..], &request.body)
@@ -343,25 +433,26 @@ fn serve(
     }
 }
 
-/// The request and its query string, which [`read_up_to`] drops.
-pub(crate) fn read_with_query(reader: &mut impl std::io::BufRead) -> Option<(Request, String)> {
-    let first = reader.fill_buf().ok()?;
-    let line_end = first
-        .iter()
-        .position(|b| *b == b'\n')
-        .unwrap_or(first.len());
-    let line = String::from_utf8_lossy(&first[..line_end]).into_owned();
-    let query = line
-        .split_whitespace()
-        .nth(1)
-        .and_then(|target| target.split_once('?'))
-        .map(|(_, query)| query.to_owned())
-        .unwrap_or_default();
-    Some((read_up_to(reader, MOST_BODY)?, query))
+/// A request's head and what the door says of it, and its body only for a
+/// call past the door: nobody unknown gets megabytes read. `before_body`
+/// runs first, to give the body a deadline of its own.
+pub(crate) fn admitted<R: BufRead>(
+    reader: &mut R,
+    keys: &Keys,
+    before_body: impl FnOnce(&mut R),
+) -> Option<(Door, Request)> {
+    let mut request = read_head(&mut *reader)?;
+    let entry = crate::pane_socket::ticket_door(&request, &request.query, keys.place, keys.ticket)
+        .unwrap_or_else(|| door(&request, keys));
+    if entry == Door::In && request.method == "POST" && request.path.starts_with("/rpc/") {
+        before_body(reader);
+        read_body(&mut *reader, &mut request, MOST_BODY)?;
+    }
+    Some((entry, request))
 }
 
 /// The cookie set, and the browser sent on to the app without the token.
-fn admitted(stream: &mut TcpStream, session: &str) {
+fn signed_in(stream: &mut TcpStream, session: &str) {
     let head = format!(
         "HTTP/1.1 303 See Other\r\nlocation: /\r\n\
          set-cookie: {COOKIE}={session}; HttpOnly; SameSite=Strict; Path=/\r\n\
@@ -398,17 +489,17 @@ pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
 }
 
 /// "Open in browser": signs this browser in and opens the app, off the
-/// window's thread. The token goes on the command line of a process the
-/// person's own user runs, and leaves the URL at the first redirect.
+/// window's thread. A one-time code goes on the browser's command line, and
+/// leaves the URL at the first redirect.
 pub(crate) fn open_in_browser() {
-    let (Some(place), Ok(home)) = (place(), devpit_core::Store::root()) else {
+    let Some(place) = place() else {
         return;
     };
-    let Ok(token) = token_in(&home) else {
+    let Ok(code) = CODES.issue(Instant::now()) else {
         return;
     };
     std::thread::spawn(move || {
-        let url = sign_in_url(&place, &token);
+        let url = sign_in_url(&place, &code);
         let path = devpit_pty::login_path::search_path();
         let (program, app) = opener(|name| {
             devpit_pty::host_env::found_on(path, std::ffi::OsStr::new(name)).is_some()

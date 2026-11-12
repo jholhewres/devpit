@@ -32,6 +32,7 @@ fn get(path: &str, host: &str, origin: Option<&str>) -> Request {
     Request {
         method: "GET".to_owned(),
         path: path.to_owned(),
+        query: String::new(),
         headers,
         body: Vec::new(),
     }
@@ -266,3 +267,4 @@ fn a_socket_that_closes_lets_every_pane_it_held_go() {
     }
     panic!("a sink outlived its socket");
 }
+
