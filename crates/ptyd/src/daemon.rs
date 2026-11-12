@@ -201,7 +201,7 @@ impl Daemon {
         self.panes.lock().ok()?.get(&id).cloned()
     }
 
-    pub fn panes(&self) -> Vec<u32> {
+    fn panes(&self) -> Vec<u32> {
         let mut ids: Vec<u32> = self
             .panes
             .lock()

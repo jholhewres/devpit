@@ -27,7 +27,8 @@ impl Client {
     }
 
     /// A client whose frames land in `queue`, for tests.
-    pub fn queued() -> (std::sync::Arc<Client>, Receiver<Frame>) {
+    #[cfg(test)]
+    pub(crate) fn queued() -> (std::sync::Arc<Client>, Receiver<Frame>) {
         let (out, queue) = sync_channel(QUEUED);
         (std::sync::Arc::new(Client { out }), queue)
     }
