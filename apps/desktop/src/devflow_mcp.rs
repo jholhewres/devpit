@@ -158,15 +158,105 @@ pub(crate) fn with(tool: Tool, text: Option<&str>, command: &str) -> Result<Stri
 pub(crate) fn without(tool: Tool, text: &str) -> Result<String, String> {
     if tool == Tool::Codex {
         let mut doc = codex_doc(text)?;
-        if let Some(servers) = doc
-            .get_mut("mcp_servers")
-            .and_then(toml_edit::Item::as_table_like_mut)
-        {
-            servers.remove(NAME);
-        }
+        codex_remove(&mut doc);
         return Ok(codex_text(&doc, text));
     }
     devpit_agentcli::json_in_place::take(text, tool.servers(), NAME).map_err(|_| not_ours(tool))
+}
+
+/// devflow's entry taken out of Codex's file. toml_edit keeps the lines above
+/// a header or a key with it, and a comment there is the person's: it goes
+/// back where the entry was, above what followed it, else at the end.
+fn codex_remove(doc: &mut toml_edit::DocumentMut) {
+    use toml_edit::{Item, RawString};
+
+    let notes = |decor: &toml_edit::Decor| -> String {
+        decor
+            .prefix()
+            .and_then(RawString::as_str)
+            .unwrap_or_default()
+            .split_inclusive('\n')
+            .filter(|line| line.trim_start().starts_with('#'))
+            .collect()
+    };
+    let around = doc
+        .get("mcp_servers")
+        .and_then(Item::as_table)
+        .and_then(toml_edit::Table::position);
+    let Some(servers) = doc.get_mut("mcp_servers").and_then(Item::as_table_like_mut) else {
+        return;
+    };
+    // A key on its own line goes above the next key; a table, above the next header.
+    let (kept, after, next_key) = match servers.get(NAME) {
+        Some(Item::Table(ours)) => (notes(ours.decor()), ours.position(), None),
+        Some(_) => {
+            let next_key = servers
+                .iter()
+                .map(|(key, _)| key.to_owned())
+                .skip_while(|key| key != NAME)
+                .nth(1)
+                .filter(|key| servers.get(key).is_some_and(Item::is_value));
+            let kept = servers.key(NAME).map(|key| notes(key.leaf_decor()));
+            (kept.unwrap_or_default(), around, next_key)
+        }
+        None => return,
+    };
+    servers.remove(NAME);
+    if kept.is_empty() {
+        return;
+    }
+    if let Some(mut key) = next_key.and_then(|next| servers.key_mut(&next)) {
+        let was = prefix_of(key.leaf_decor().prefix());
+        key.leaf_decor_mut().set_prefix(format!("{kept}{was}"));
+        return;
+    }
+    let next = after.and_then(|after| {
+        let mut next: Option<isize> = None;
+        each_header(doc.as_table_mut(), &mut |table| {
+            if let Some(at) = table.position().filter(|at| *at > after) {
+                next = Some(next.map_or(at, |was| was.min(at)));
+            }
+        });
+        next
+    });
+    let mut placed = false;
+    if let Some(next) = next {
+        each_header(doc.as_table_mut(), &mut |table| {
+            if !placed && table.position() == Some(next) {
+                let was = prefix_of(table.decor().prefix());
+                table.decor_mut().set_prefix(format!("{kept}{was}"));
+                placed = true;
+            }
+        });
+    }
+    if !placed {
+        let was = doc.trailing().as_str().unwrap_or_default().to_owned();
+        doc.set_trailing(format!("{kept}{was}"));
+    }
+}
+
+/// The text above a header or a key, as the file had it.
+fn prefix_of(raw: Option<&toml_edit::RawString>) -> String {
+    raw.and_then(toml_edit::RawString::as_str)
+        .unwrap_or_default()
+        .to_owned()
+}
+
+/// Every table written with a header of its own, below `table`.
+fn each_header(table: &mut toml_edit::Table, visit: &mut dyn FnMut(&mut toml_edit::Table)) {
+    for (_, item) in table.iter_mut() {
+        let subs: Vec<&mut toml_edit::Table> = match item {
+            toml_edit::Item::Table(sub) => vec![sub],
+            toml_edit::Item::ArrayOfTables(all) => all.iter_mut().collect(),
+            _ => Vec::new(),
+        };
+        for sub in subs {
+            if !sub.is_implicit() && !sub.is_dotted() {
+                visit(sub);
+            }
+            each_header(sub, visit);
+        }
+    }
 }
 
 fn not_ours(tool: Tool) -> String {

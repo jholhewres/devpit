@@ -188,6 +188,28 @@ fn taking_codex_out_keeps_every_comment_that_is_not_its_own() {
     );
 }
 
+/// toml_edit keeps the lines above a header with that header, but a comment
+/// there is the person's: v0.1.49's Add put devflow's table after whatever the
+/// file ended with, notes included.
+#[test]
+fn taking_codex_out_keeps_the_comments_above_its_entry() {
+    let v0149 = "model = \"o3\"\n# model = \"o4-mini\"\n\n[mcp_servers.devflow]\ncommand = \"x\"\nargs = [\"mcp\"]\n";
+    assert_eq!(
+        without(Tool::Codex, v0149).expect("removed"),
+        "model = \"o3\"\n# model = \"o4-mini\"\n"
+    );
+    let between = "[mcp_servers.other]\ncommand = \"y\"\n# keep me\n[mcp_servers.devflow]\ncommand = \"x\"\n\n[profiles.x]\nmodel = \"m\"\n";
+    assert_eq!(
+        without(Tool::Codex, between).expect("removed"),
+        "[mcp_servers.other]\ncommand = \"y\"\n# keep me\n\n[profiles.x]\nmodel = \"m\"\n"
+    );
+    let inline = "[mcp_servers]\nother = { command = \"y\" }\n# keep me too\ndevflow = { command = \"x\" }\n";
+    assert_eq!(
+        without(Tool::Codex, inline).expect("removed"),
+        "[mcp_servers]\nother = { command = \"y\" }\n# keep me too\n"
+    );
+}
+
 #[test]
 fn codex_gets_its_own_table_and_loses_only_that_one() {
     let theirs = "model = \"o3\"\n\n[mcp_servers.other]\ncommand = \"x\"\n";
