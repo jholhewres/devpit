@@ -7,7 +7,7 @@
 //! window on it or the tap ([`crate::ptyd_tap`]) acks it whole.
 
 use std::collections::HashMap;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, SyncSender};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -16,6 +16,9 @@ use portable_pty::{CommandBuilder, PtySize};
 
 /// The most terminals one connection watches at once.
 const MOST: usize = 4;
+/// Raw reads queued for a viewer that has not taken them: past it, a viewer
+/// too slow for its pane has the watch closed rather than memory fill up.
+pub(crate) const MOST_RAW_QUEUED: usize = 256;
 
 /// A terminal's bytes for a viewer that reads them raw, under the handle it
 /// gave the pane.
@@ -29,11 +32,11 @@ pub(crate) struct Raw {
 #[derive(Clone)]
 pub(crate) enum Sink {
     Json(Sender<RemoteOut>),
-    Raw(Sender<Raw>, u32),
+    Raw(SyncSender<Raw>, u32),
 }
 
 impl Sink {
-    /// False once the connection is gone.
+    /// False once the connection is gone, or too far behind a raw pane.
     pub(crate) fn bytes(&self, pane: &str, bytes: Vec<u8>) -> bool {
         match self {
             Sink::Json(out) => out
@@ -43,7 +46,7 @@ impl Sink {
                 })
                 .is_ok(),
             Sink::Raw(out, handle) => out
-                .send(Raw {
+                .try_send(Raw {
                     handle: *handle,
                     bytes,
                 })
@@ -58,7 +61,7 @@ pub(crate) struct Watching {
     viewer: String,
     open: HashMap<String, Open>,
     /// Set for a connection that carries raw bytes.
-    pub(crate) raw: Option<Sender<Raw>>,
+    pub(crate) raw: Option<SyncSender<Raw>>,
     /// The pane each raw handle names.
     handles: HashMap<u32, String>,
 }
@@ -160,7 +163,7 @@ impl Watching {
         std::thread::spawn(move || {
             while let Some(bytes) = frames.blocking_recv() {
                 if !sink.bytes(&named, bytes) {
-                    return;
+                    break;
                 }
             }
             let _ = out.send(RemoteOut::PaneClosed { pane: named });
@@ -283,7 +286,7 @@ pub(crate) fn forward(
         match one.kind() {
             Some(Kind::Output | Kind::Replay) => {
                 if !sink.bytes(pane, one.bytes) {
-                    return;
+                    break;
                 }
             }
             Some(Kind::Exited | Kind::Refused) => break,

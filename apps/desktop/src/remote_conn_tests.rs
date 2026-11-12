@@ -237,3 +237,59 @@ fn raw_output_goes_out_as_a_frame_under_its_handle() {
         Some((9, crate::pane_socket::kind::OUTPUT, &b"\x1b[1mok"[..]))
     );
 }
+
+/// A viewer that reads slowly and keeps what it is sent.
+#[derive(Default)]
+struct SlowKept {
+    said: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl Wire for SlowKept {
+    fn hear(&mut self) -> Result<Heard, ()> {
+        std::thread::sleep(LISTEN);
+        Ok(Heard::Nothing)
+    }
+    fn say(&mut self, text: &str) {
+        self.said.lock().unwrap().push(text.to_owned());
+    }
+    fn say_bytes(&mut self, _: &[u8]) {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    fn end(&mut self) {}
+}
+
+/// The hub's messages (a chat, a question) reach a viewer whose pane floods.
+#[test]
+fn a_message_from_the_hub_goes_out_while_a_pane_floods() {
+    let device = "dev_hub_mid_flood";
+    let (id, out, heard) = crate::remote_hub::enter(device);
+    let (raw, raws) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let flood = || crate::remote_panes::Raw {
+            handle: 1,
+            bytes: vec![b'y'; 64],
+        };
+        while raw.send(flood()).is_ok() {
+            std::thread::sleep(std::time::Duration::from_micros(200));
+        }
+    });
+    out.send(devpit_rpc::RemoteOut::Failed {
+        why: "the hub speaks".to_owned(),
+    })
+    .unwrap();
+    let wire = SlowKept::default();
+    let said = wire.said.clone();
+    let stop = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        crate::remote_hub::drop_conns(device);
+    });
+    let mut wire = wire;
+    let mut watching = crate::remote_panes::Watching::new(id);
+    converse(&mut wire, id, &mut watching, &heard, &raws, |_, _| None);
+    stop.join().unwrap();
+    let said = said.lock().unwrap();
+    assert!(
+        said.iter().any(|text| text.contains("the hub speaks")),
+        "{said:?}"
+    );
+}
