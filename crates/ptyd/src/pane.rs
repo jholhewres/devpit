@@ -560,8 +560,28 @@ fn readable_now(fd: i32) -> bool {
     unsafe { libc::poll(&mut poll, 1, 0) > 0 && poll.revents & libc::POLLIN != 0 }
 }
 
-/// The name of process `pid`, as `ps` would show it.
+/// The name of what process `pid` runs. From its argv, not the executable's
+/// name: an agent run as a script is `node` or `python3` to the kernel.
 fn program_of(pid: i32) -> Option<String> {
+    argv_of(pid)
+        .and_then(|argv| devpit_pty::agents::program_of(&argv))
+        .filter(|name| !name.is_empty())
+        .or_else(|| executable_of(pid))
+}
+
+#[cfg(target_os = "linux")]
+fn argv_of(pid: i32) -> Option<Vec<String>> {
+    devpit_pty::proc_tty::argv(u32::try_from(pid).ok()?)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn argv_of(pid: i32) -> Option<Vec<String>> {
+    let args = ps(pid, "args=")?;
+    Some(args.split_whitespace().map(str::to_owned).collect())
+}
+
+/// The executable's own name, as `ps` would show it.
+fn executable_of(pid: i32) -> Option<String> {
     #[cfg(target_os = "linux")]
     {
         let comm = std::fs::read_to_string(format!("/proc/{pid}/comm")).ok()?;
@@ -569,14 +589,19 @@ fn program_of(pid: i32) -> Option<String> {
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let out = std::process::Command::new("ps")
-            .args(["-o", "comm=", "-p", &pid.to_string()])
-            .output()
-            .ok()?;
-        let name = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+        let name = ps(pid, "comm=")?;
         let base = name.rsplit('/').next().unwrap_or_default().to_owned();
         Some(base).filter(|name| !name.is_empty())
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn ps(pid: i32, column: &str) -> Option<String> {
+    let out = std::process::Command::new("ps")
+        .args(["-o", column, "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
 
 #[cfg(test)]
