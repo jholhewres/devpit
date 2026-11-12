@@ -268,3 +268,38 @@ fn a_socket_that_closes_lets_every_pane_it_held_go() {
     panic!("a sink outlived its socket");
 }
 
+/// The page writes the kinds out again in TypeScript (`paneSocket.ts`): a
+/// kind renumbered on one side only would turn typing into acks.
+#[test]
+fn the_pages_frame_kinds_are_the_servers() {
+    let page = include_str!("../../../web/src/shell/paneSocket.ts");
+    let table = page
+        .split("export const Kind = {")
+        .nth(1)
+        .and_then(|rest| rest.split("} as const").next())
+        .expect("the page's Kind table");
+    let said: Vec<(String, u8)> = table
+        .lines()
+        .filter_map(|line| {
+            let (name, number) = line.trim().split_once(": ")?;
+            let number = number.trim_end_matches(',').parse().ok()?;
+            Some((name.to_ascii_uppercase(), number))
+        })
+        .collect();
+    let ours = [
+        ("OUTPUT", kind::OUTPUT),
+        ("ACK", kind::ACK),
+        ("INPUT", kind::INPUT),
+        ("RESIZE", kind::RESIZE),
+        ("ATTACH", kind::ATTACH),
+        ("DETACH", kind::DETACH),
+        ("END", kind::END),
+        ("REPLAY", kind::REPLAY),
+        ("OLDER", kind::OLDER),
+    ];
+    let ours: Vec<(String, u8)> = ours
+        .iter()
+        .map(|(name, k)| ((*name).to_owned(), *k))
+        .collect();
+    assert_eq!(said, ours);
+}
