@@ -10,6 +10,10 @@ use std::io::{self, Read, Write};
 /// for a replay and refuses a length that is a corrupted stream, not a frame.
 pub const MOST_FRAME: u32 = 1024 * 1024;
 
+/// An `Attach` that mirrors a pane another client draws: its acks count only
+/// while no other client watches it. A daemon from before ignores the byte.
+pub const MIRROR: u8 = 1;
+
 /// What a frame is. One byte, so an unknown kind is skipped, not fatal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -27,7 +31,8 @@ pub enum Kind {
     Resize = 5,
     /// Client → daemon: end the pane.
     Kill = 6,
-    /// Client → daemon: send the pane from now on, after its replay.
+    /// Client → daemon: send the pane from now on, after its replay. Bytes:
+    /// none, or [`MIRROR`].
     Attach = 7,
     /// Client → daemon: stop sending the pane; it keeps running.
     Detach = 8,

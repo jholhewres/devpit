@@ -42,6 +42,8 @@ struct State {
     history: History,
     modes: Modes,
     watchers: Vec<Arc<Client>>,
+    /// The watchers that mirror a pane another client draws.
+    mirrors: Vec<Arc<Client>>,
     /// Hear what the pane runs, where and its end, never its output.
     observers: Vec<Arc<Client>>,
     cwd: Option<String>,
@@ -49,6 +51,17 @@ struct State {
     ended: bool,
     /// The exit code, once ended and when the process reported one.
     code: Option<i32>,
+}
+
+impl State {
+    fn is_mirror(&self, client: &Arc<Client>) -> bool {
+        self.mirrors.iter().any(|one| Arc::ptr_eq(one, client))
+    }
+
+    /// Whether a watcher that acks for itself, not a mirror, is on the pane.
+    fn drawn(&self) -> bool {
+        self.watchers.iter().any(|one| !self.is_mirror(one))
+    }
 }
 
 /// What a `Spawn` frame asks for.
@@ -155,6 +168,7 @@ impl Pane {
                 history: History::new(KEPT),
                 modes: Modes::new(),
                 watchers: Vec::new(),
+                mirrors: Vec::new(),
                 observers: Vec::new(),
                 cwd: None,
                 program: None,
@@ -229,9 +243,20 @@ impl Pane {
     /// history, then sends it everything from here on. Under the state lock,
     /// so no slice falls between the replay and the first live one.
     pub fn attach(&self, client: &Arc<Client>) {
+        self.attach_as(client, false);
+    }
+
+    /// [`Pane::attach`] for a client mirroring a pane another one draws: its
+    /// acks count only while no other watcher is on the pane.
+    pub fn mirror(&self, client: &Arc<Client>) {
+        self.attach_as(client, true);
+    }
+
+    fn attach_as(&self, client: &Arc<Client>, mirror: bool) {
         let Ok(mut state) = self.state.lock() else {
             return;
         };
+        let drawn = state.drawn();
         let restore = state.modes.restore();
         if !restore.is_empty() {
             client.send(&Frame::new(self.id, Kind::Replay, restore));
@@ -247,10 +272,23 @@ impl Pane {
             client.send(&Frame::new(self.id, Kind::Program, program));
         }
         state.watchers.retain(|one| !Arc::ptr_eq(one, client));
+        state.mirrors.retain(|one| !Arc::ptr_eq(one, client));
         if state.ended {
             client.send(&exited(self.id, state.code));
         } else {
             state.watchers.push(Arc::clone(client));
+            if mirror {
+                state.mirrors.push(Arc::clone(client));
+            }
+        }
+        self.settle_flow(drawn, &state);
+    }
+
+    /// The count is a window's while one stays on the pane. Otherwise it
+    /// starts over: what those who left owed would hold the pane for ever.
+    fn settle_flow(&self, drawn_before: bool, state: &State) {
+        if !(drawn_before && state.drawn()) {
+            self.release_flow();
         }
     }
 
@@ -282,10 +320,10 @@ impl Pane {
 
     pub fn detach(&self, client: &Arc<Client>) {
         if let Ok(mut state) = self.state.lock() {
+            let drawn = state.drawn();
             state.watchers.retain(|one| !Arc::ptr_eq(one, client));
-            if state.watchers.is_empty() {
-                self.release_flow();
-            }
+            state.mirrors.retain(|one| !Arc::ptr_eq(one, client));
+            self.settle_flow(drawn, &state);
         }
     }
 
@@ -300,7 +338,16 @@ impl Pane {
         out
     }
 
-    pub fn ack(&self, bytes: usize) {
+    /// `bytes` of output consumed by `from`. A mirror's ack beside a window
+    /// is dropped: it would let the pane run ahead of what the window drew.
+    pub fn ack(&self, from: &Arc<Client>, bytes: usize) {
+        let counts = self
+            .state
+            .lock()
+            .is_ok_and(|state| !state.is_mirror(from) || !state.drawn());
+        if !counts {
+            return;
+        }
         if let Ok(mut unacked) = self.flow.lock() {
             *unacked = unacked.saturating_sub(bytes);
             self.acked.notify_all();
@@ -421,6 +468,7 @@ impl Pane {
         state.code = code;
         let told = exited(self.id, code);
         let mut told_to: Vec<Arc<Client>> = state.watchers.drain(..).collect();
+        state.mirrors.clear();
         told_to.append(&mut state.observers);
         for client in told_to {
             client.send(&told);

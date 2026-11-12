@@ -104,7 +104,11 @@ impl Daemon {
             },
             Some(Kind::Kill) => pane.kill(),
             Some(Kind::Attach) => {
-                pane.attach(client);
+                if one.bytes.first() == Some(&frame::MIRROR) {
+                    pane.mirror(client);
+                } else {
+                    pane.attach(client);
+                }
                 attached.retain(|one| !Arc::ptr_eq(one, &pane));
                 attached.push(pane);
             }
@@ -113,7 +117,10 @@ impl Daemon {
                 attached.retain(|one| !Arc::ptr_eq(one, &pane));
             }
             Some(Kind::Ack) => match one.bytes.get(..4) {
-                Some(b) => pane.ack(u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize),
+                Some(b) => pane.ack(
+                    client,
+                    u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize,
+                ),
                 None => refuse("a short ack"),
             },
             Some(Kind::History) => {

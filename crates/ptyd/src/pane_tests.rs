@@ -216,7 +216,7 @@ fn unacknowledged_output_stops_the_reading_and_an_ack_resumes_it() {
         "nothing more read while unacknowledged"
     );
     while queue.try_recv().is_ok() {}
-    pane.ack(held);
+    pane.ack(&client, held);
     std::thread::sleep(Duration::from_millis(300));
     assert!(pane.unacked() > 0, "reading again after the ack");
     pane.kill();
@@ -231,18 +231,49 @@ fn a_client_that_never_acks_does_not_hold_the_output_from_one_that_does() {
     pane.attach(&stuck);
     let (acking, queue) = crate::client::Client::queued();
     pane.attach(&acking);
+    let seen = read_and_ack(&pane, &acking, &queue, Duration::from_secs(20));
+    pane.kill();
+    assert!(seen >= 4 * MOST_UNACKED, "held after {seen} bytes");
+}
+
+/// When the window leaves a pane a mirror watches, what the window owed no
+/// longer holds the pane: it runs on the mirror's acks.
+#[test]
+fn a_mirror_left_alone_on_a_pane_runs_it_on_its_own_acks() {
+    let pane = Pane::spawn(12, &asked("yes 0123456789abcdef"), |_| {}).expect("spawn");
+    let (window, _never_read) = crate::client::Client::queued();
+    pane.attach(&window);
+    let (mirror, queue) = crate::client::Client::queued();
+    pane.mirror(&mirror);
+    let beside = read_and_ack(&pane, &mirror, &queue, Duration::from_secs(1));
+    pane.detach(&window);
+    let alone = read_and_ack(&pane, &mirror, &queue, Duration::from_secs(20));
+    pane.kill();
+    assert!(
+        beside <= MOST_UNACKED + SLICE,
+        "ran ahead of the window: {beside}"
+    );
+    assert!(alone >= 4 * MOST_UNACKED, "held after {alone} bytes alone");
+}
+
+/// Output `client` is sent and acks, until four windows' worth or `wait`.
+fn read_and_ack(
+    pane: &Pane,
+    client: &Arc<crate::client::Client>,
+    queue: &Receiver<Frame>,
+    wait: Duration,
+) -> usize {
     let mut seen = 0usize;
     let started = Instant::now();
-    while seen < 4 * MOST_UNACKED && started.elapsed() < Duration::from_secs(20) {
+    while seen < 4 * MOST_UNACKED && started.elapsed() < wait {
         if let Ok(one) = queue.recv_timeout(Duration::from_millis(100)) {
             if one.kind() == Some(Kind::Output) {
                 seen += one.bytes.len();
-                pane.ack(one.bytes.len());
+                pane.ack(client, one.bytes.len());
             }
         }
     }
-    pane.kill();
-    assert!(seen >= 4 * MOST_UNACKED, "held after {seen} bytes");
+    seen
 }
 
 /// 500 MB through a client that acknowledges what it reads: memory is held
@@ -264,7 +295,7 @@ fn a_flood_of_500_mb_stays_bounded_and_ctrl_c_stops_it() {
         if let Ok(one) = queue.recv_timeout(Duration::from_millis(100)) {
             if one.kind() == Some(Kind::Output) {
                 seen += one.bytes.len();
-                pane.ack(one.bytes.len());
+                pane.ack(&client, one.bytes.len());
             }
         }
         most_held = most_held.max(pane.unacked());
@@ -282,7 +313,7 @@ fn a_flood_of_500_mb_stays_bounded_and_ctrl_c_stops_it() {
         match queue.recv_timeout(Duration::from_millis(20)) {
             Ok(one) => {
                 if one.kind() == Some(Kind::Output) {
-                    pane.ack(one.bytes.len());
+                    pane.ack(&client, one.bytes.len());
                     if one.bytes.contains(&b'x') {
                         quiet_since = Instant::now();
                     }

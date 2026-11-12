@@ -5,11 +5,12 @@
 //! when it changes, and the pane's output is written out as it comes.
 //!
 //! The daemon keeps one count of unacknowledged output per pane, shared by
-//! every attached client. This one acks all it was sent ([`owed`]), and when
-//! it goes quiet it acks whatever the count still holds, as the desktop's tap
-//! does: an ack can land before the daemon counts the output it answers, and
-//! the leftover would otherwise creep up until the pane stops. Acking beside
-//! the desktop lets a pane run ahead of the slower of the two, never stop.
+//! every attached client. This one attaches as a mirror ([`frame::MIRROR`]):
+//! beside a desktop window its acks are dropped, so the pane runs at the
+//! window's pace. Alone, it acks all it was sent ([`owed`]), and when it goes
+//! quiet whatever the count still holds, as the desktop's tap does: an ack can
+//! land before the daemon counts the output it answers, and the leftover
+//! would otherwise creep up until the pane stops.
 
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
@@ -103,7 +104,10 @@ pub fn serve(
 ) -> io::Result<Ended> {
     let mut reading = stream.try_clone()?;
     let writing = Arc::new(Mutex::new(stream));
-    send(&writing, Frame::new(pane, Kind::Attach, Vec::new()))?;
+    send(
+        &writing,
+        Frame::new(pane, Kind::Attach, vec![frame::MIRROR]),
+    )?;
     if let Some((rows, cols)) = size {
         send(&writing, resize(pane, rows, cols))?;
     }
