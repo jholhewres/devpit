@@ -67,6 +67,22 @@ fn with_no_daemon_a_new_terminal_falls_back_to_tmux() {
     )
     .expect_err("no daemon, nothing to start it from");
     assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    let store = Store::open(&home.path().join("state.db")).expect("store");
+    let mut tried = false;
+    let no_daemon = |_: &Path, _: &str, _: &Path, _: Vec<(String, String)>| {
+        tried = true;
+        Err(err.to_string())
+    };
+    let found = in_ptyd_with(
+        &store,
+        Some(home.path()),
+        "p",
+        "leaf_x",
+        home.path(),
+        no_daemon,
+    );
+    assert!(tried, "ptyd was not asked first");
+    assert_eq!(found, None);
 }
 
 /// A daemon of this process's own, serving a home of its own, for as long

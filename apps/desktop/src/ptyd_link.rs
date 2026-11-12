@@ -265,10 +265,28 @@ fn in_ptyd_at(
     leaf_id: &str,
     cwd: &Path,
 ) -> Option<String> {
+    #[cfg(unix)]
+    return in_ptyd_with(store, home, project_id, leaf_id, cwd, open);
+    #[cfg(not(unix))]
+    {
+        let _ = (store, home, project_id, leaf_id, cwd);
+        None
+    }
+}
+
+/// [`in_ptyd_at`], the pane opened in the daemon by `open`.
+#[cfg(unix)]
+fn in_ptyd_with(
+    store: &Store,
+    home: Option<&Path>,
+    project_id: &str,
+    leaf_id: &str,
+    cwd: &Path,
+    open: impl FnOnce(&Path, &str, &Path, Vec<(String, String)>) -> Result<String, String>,
+) -> Option<String> {
     if !wanted(store) {
         return None;
     }
-    #[cfg(unix)]
     {
         let home = home?;
         let shared = crate::checkout::shared_env_at(store, project_id, cwd);
@@ -283,8 +301,6 @@ fn in_ptyd_at(
             }
         }
     }
-    #[cfg(not(unix))]
-    let _ = (home, project_id, leaf_id, cwd);
     None
 }
 
