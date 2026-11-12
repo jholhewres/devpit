@@ -8,7 +8,7 @@ use crate::socket;
 
 /// A daemon on a socket of its own, kept at hand to look into.
 fn daemon() -> (tempfile::TempDir, std::path::PathBuf, Arc<Daemon>) {
-    let dir = tempfile::tempdir().expect("dir");
+    let dir = crate::socket::tests::private_tempdir();
     let at = dir.path().join("devpit-ptyd.sock");
     let listener = socket::listen(&at).expect("listen");
     let daemon = Daemon::new();

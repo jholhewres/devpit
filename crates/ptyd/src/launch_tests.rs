@@ -86,7 +86,7 @@ fn with_no_daemon_and_no_binary_it_is_not_found() {
 
 #[test]
 fn a_running_daemon_is_found_without_starting_another() {
-    let home = tempfile::tempdir().expect("home");
+    let home = crate::socket::tests::private_tempdir();
     let at = home.path().join("devpit-ptyd.sock");
     let listener = socket::listen(&at).expect("listen");
     let daemon = crate::daemon::Daemon::new();

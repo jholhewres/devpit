@@ -43,9 +43,26 @@ fn home_hash(home: &Path) -> u64 {
         })
 }
 
-/// Listens at `path`, owner-only from creation. A socket left by a daemon
-/// that died is removed; a live one is not, and binding then fails.
+/// Listens at `path`, owner-only from creation, in a directory its user alone
+/// can write to (made 0700 when missing). A socket left by a daemon that died
+/// is removed; a live one is not, and binding then fails.
 pub fn listen(path: &Path) -> io::Result<UnixListener> {
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+    let dir = path
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)?;
+    let made = std::fs::metadata(dir)?;
+    if !private_dir(made.uid(), made.mode(), own_uid()) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!("{} is not its user's alone", dir.display()),
+        ));
+    }
     if path.exists() {
         if UnixStream::connect(path).is_ok() {
             return Err(io::Error::new(
@@ -61,8 +78,6 @@ pub fn listen(path: &Path) -> io::Result<UnixListener> {
         }
         std::fs::remove_file(path)?;
     }
-    let dir = path.parent().unwrap_or(Path::new("."));
-    std::fs::create_dir_all(dir)?;
     // Bound inside a directory only the owner can enter, made 0600 there, and
     // only then moved into place: there is no moment the socket is reachable
     // by others. Not by umask, which is the whole process's and would race
@@ -149,6 +164,12 @@ pub fn peer_pid(stream: &UnixStream) -> io::Result<u32> {
     }
 }
 
+/// Whether a directory of `owner` and `mode` may hold the socket: its user's,
+/// and writable by nobody else, who could swap their own socket in.
+fn private_dir(owner: u32, mode: u32, own: u32) -> bool {
+    owner == own && mode & 0o022 == 0
+}
+
 /// Whether a peer may speak to the daemon: the same user, nobody else.
 pub fn admitted(peer: u32, own: u32) -> bool {
     peer == own
@@ -187,8 +208,13 @@ pub fn greet(stream: &mut UnixStream) -> io::Result<()> {
 /// protocol. Another version is `Unsupported`, which a caller tells apart from
 /// a daemon that is not there: one is replaced, the other started.
 pub fn connect(path: &Path) -> io::Result<UnixStream> {
+    connect_as(path, own_uid())
+}
+
+/// [`connect`], speaking only to a daemon whose uid is `own`.
+fn connect_as(path: &Path, own: u32) -> io::Result<UnixStream> {
     let mut stream = UnixStream::connect(path)?;
-    if !admitted(peer_uid(&stream)?, own_uid()) {
+    if !admitted(peer_uid(&stream)?, own) {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "the socket is another user's",
@@ -224,4 +250,4 @@ pub fn hello(stream: &mut UnixStream, protocol: u32) -> io::Result<u32> {
 
 #[cfg(test)]
 #[path = "socket_tests.rs"]
-mod tests;
+pub(crate) mod tests;
