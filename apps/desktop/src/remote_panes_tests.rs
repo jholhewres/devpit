@@ -113,7 +113,7 @@ fn a_ptyd_panes_bytes_reach_a_viewer_that_reads_raw_under_its_handle() {
     let number = pane_number(leaf);
     crate::ptyd_link::spawn(home, number, &shell(home)).expect("spawn");
     let (out, heard) = channel();
-    let (raw, bytes) = channel();
+    let (raw, bytes) = std::sync::mpsc::sync_channel(super::MOST_RAW_QUEUED);
     let mut watching = Watching::new(9);
     watching.raw = Some(raw);
     let sink = watching.sink(&out, Some(41));
@@ -156,4 +156,27 @@ fn a_handle_without_a_raw_connection_keeps_the_json_shape() {
     let (out, _heard) = channel();
     let watching = Watching::new(10);
     assert!(matches!(watching.sink(&out, Some(3)), Sink::Json(_)));
+}
+
+/// A viewer that takes nothing while its pane floods has the watch closed
+/// once [`super::MOST_RAW_QUEUED`] reads wait, instead of queueing for good.
+#[test]
+fn a_raw_viewer_too_far_behind_its_pane_has_the_watch_closed() {
+    use devpit_ptyd::frame::{Frame, Kind};
+    let frames: Vec<u8> = (0..super::MOST_RAW_QUEUED * 4)
+        .flat_map(|_| Frame::new(3, Kind::Output, vec![b'y'; 64]).encode())
+        .collect();
+    let (out, heard) = channel();
+    let (raw, queued) = std::sync::mpsc::sync_channel(super::MOST_RAW_QUEUED);
+    let mut reading = &frames[..];
+    super::forward(
+        &mut reading,
+        3,
+        "leaf_flood",
+        &super::Sink::Raw(raw, 5),
+        &out,
+    );
+    assert!(!reading.is_empty(), "the pane was read to its end");
+    assert_eq!(queued.try_iter().count(), super::MOST_RAW_QUEUED);
+    assert!(matches!(heard.try_recv(), Ok(RemoteOut::PaneClosed { pane }) if pane == "leaf_flood"));
 }

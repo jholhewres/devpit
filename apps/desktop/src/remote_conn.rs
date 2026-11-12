@@ -116,7 +116,7 @@ pub(crate) fn serve(
     let (id, out, heard) = crate::remote_hub::join(&app, &device.id);
     crate::remote::note(&root, &device, "connected");
     let mut watching = Watching::new(id);
-    let (raw, raws) = std::sync::mpsc::channel();
+    let (raw, raws) = std::sync::mpsc::sync_channel(crate::remote_panes::MOST_RAW_QUEUED);
     watching.raw = Some(raw);
     let mut talk = crate::remote_talk::Talk::default();
     send(
@@ -202,9 +202,14 @@ pub(crate) fn converse(
             break;
         }
         // At most one LISTEN, and only while the hub holds the connection: a
-        // pane printing faster than the wire writes cannot keep it here.
+        // pane printing faster than the wire writes cannot keep it here. The
+        // hub's messages go first, or a flood would hold a chat back for good.
         let draining = Instant::now();
         let more = || draining.elapsed() < LISTEN && crate::remote_hub::holds(id);
+        while more() {
+            let Ok(said) = heard.try_recv() else { break };
+            send(wire, &said);
+        }
         while more() {
             let Ok(one) = raws.try_recv() else { break };
             wire.say_bytes(&crate::pane_socket::encode(
@@ -212,10 +217,6 @@ pub(crate) fn converse(
                 crate::pane_socket::kind::OUTPUT,
                 &one.bytes,
             ));
-        }
-        while more() {
-            let Ok(said) = heard.try_recv() else { break };
-            send(wire, &said);
         }
     }
 }
