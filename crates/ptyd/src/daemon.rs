@@ -123,14 +123,14 @@ impl Daemon {
                 ),
                 None => refuse("a short ack"),
             },
-            Some(Kind::History) => {
-                let have = one
-                    .bytes
-                    .get(..8)
-                    .map(|b| u64::from_le_bytes(b.try_into().unwrap_or_default()))
-                    .unwrap_or(0);
-                client.send(&Frame::new(pane.id, Kind::Older, pane.older(have as usize)));
-            }
+            Some(Kind::History) => match one.bytes.get(..8) {
+                Some(b) => {
+                    let have = u64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]);
+                    let page = pane.older(usize::try_from(have).unwrap_or(usize::MAX));
+                    client.send(&Frame::new(pane.id, Kind::Older, page));
+                }
+                None => refuse("a short history request"),
+            },
             _ => refuse("not a request"),
         }
     }
