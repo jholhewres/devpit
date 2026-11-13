@@ -265,6 +265,26 @@ describe('frames between paints', () => {
     vi.unstubAllGlobals()
     vi.useRealTimers()
   })
+
+  it('are applied once the frame they waited for is painted, not inside it', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('document', { hidden: false })
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (paint: FrameRequestCallback) => frames.push(paint))
+    vi.stubGlobal('cancelAnimationFrame', () => undefined)
+    const got: Frame[][] = []
+    const { push } = batched((frames) => got.push([...frames]))
+    push(text('a', 'one'))
+
+    frames.shift()!(0)
+    const inside = got.length
+    vi.advanceTimersByTime(0)
+
+    expect(inside).toBe(0)
+    expect(got).toEqual([[text('a', 'one')]])
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
 })
 
 describe('a message sent into the turn in flight', () => {
