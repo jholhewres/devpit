@@ -157,3 +157,21 @@ fn a_ptyd_pane_is_ready_once_the_daemon_names_an_idle_shell_twice() {
         Ready::Unknown
     ));
 }
+
+/// No layout holds this leaf in the store: only the tap's places can answer.
+#[cfg(unix)]
+#[test]
+fn a_pane_the_tap_placed_is_aimed_at_without_reading_its_layout() {
+    let leaf = "leaf_placed_by_the_tap";
+    if let Ok(mut fronts) = crate::ptyd_tap::tap().fronts.lock() {
+        fronts.place(std::collections::HashMap::from([(
+            crate::ptyd_link::pane_number(leaf),
+            ("p-placed".to_owned(), leaf.to_owned()),
+        )]));
+    }
+    assert_eq!(
+        placed_target_of("p-placed", leaf).expect("placed"),
+        crate::ptyd_link::target(leaf)
+    );
+    assert!(placed_target_of("p-elsewhere", leaf).is_err());
+}

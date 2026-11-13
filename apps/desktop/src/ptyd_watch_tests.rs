@@ -58,3 +58,16 @@ fn a_pane_says_where_it_stands_without_it_being_news() {
     assert_eq!(fronts.cwd_of(7), None, "an ended pane stands nowhere");
     assert_eq!(fronts.program_of(7), None);
 }
+
+#[test]
+fn a_pane_is_held_only_by_the_project_whose_layout_placed_it() {
+    let mut fronts = Fronts::default();
+    let leaf = "leaf_held";
+    fronts.place(HashMap::from([(
+        crate::ptyd_link::pane_number(leaf),
+        ("p1".to_owned(), leaf.to_owned()),
+    )]));
+    assert!(fronts.holds("p1", leaf));
+    assert!(!fronts.holds("p2", leaf));
+    assert!(!fronts.holds("p1", "leaf_never_placed"));
+}
