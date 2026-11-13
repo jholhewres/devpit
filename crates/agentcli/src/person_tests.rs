@@ -23,8 +23,10 @@ fn peer(id: &str, text: &str) -> serde_json::Value {
     json!({ "type": "user", "uuid": id, "isMeta": true, "promptSource": "system", "origin": { "kind": "peer", "name": "other" }, "message": { "role": "user", "content": text } })
 }
 
+/// A tool's result in a turn the composer started carries its `promptSource`,
+/// so only the `tool_result` block says it is not the person.
 fn tool_result(id: &str, text: &str) -> serde_json::Value {
-    json!({ "type": "user", "uuid": id, "message": { "role": "user", "content": [{ "type": "tool_result", "tool_use_id": "t", "content": text }] } })
+    json!({ "type": "user", "uuid": id, "promptSource": "sdk", "message": { "role": "user", "content": [{ "type": "tool_result", "tool_use_id": "t", "content": text }] } })
 }
 
 fn assistant(text: &str) -> serde_json::Value {
@@ -343,6 +345,34 @@ fn one_message_stops_several_sessions_by_their_full_names() {
     // "All" names nobody: the person sees the list and clicks.
     assert!(!asks_to_stop("pare todos", "fix-login", &LIVE));
     assert!(!asks_to_stop("stop all", "api", &LIVE));
+}
+
+/// Names that run into each other read one message more than one way: then
+/// it asks for no stop at all, and each waits for the person's click.
+#[test]
+fn a_message_that_reads_as_different_names_stops_nothing() {
+    let live = ["fix", "login", "fix login"];
+    for said in ["stop fix login", "✅ fix login", "Pare fix login."] {
+        for name in live {
+            assert!(!asks_to_stop(said, name, &live), "{said}: {name}");
+        }
+    }
+    let crossed = ["a", "b c", "a b", "c"];
+    for name in crossed {
+        assert!(!asks_to_stop("stop a b c", name, &crossed), "{name}");
+    }
+    // A comma ends a name, so this reads one way.
+    assert!(asks_to_stop("stop fix, login", "fix", &live));
+    assert!(asks_to_stop("stop fix, login", "login", &live));
+    assert!(!asks_to_stop("stop fix, login", "fix login", &live));
+    // Without the colliding name, one reading each.
+    assert!(asks_to_stop(
+        "stop fix login",
+        "fix login",
+        &["fix login", "api"]
+    ));
+    assert!(asks_to_stop("stop fix login", "fix", &["fix", "login"]));
+    assert!(asks_to_stop("stop fix login", "login", &["fix", "login"]));
 }
 
 /// However it is written, a stop or a yes that is not the person's own
