@@ -129,13 +129,16 @@ export function useChat(conversationId: string): Chat {
   const [session, setSession] = useState<string | null>(null)
   const [card, setCard] = useState<ChatCard | null>(null)
   const [sending, setSending] = useState(false)
-  /* Stops asked of the turn in flight, and the one whose wait for it ran out. */
-  const [stopped, setStopped] = useState(0)
-  const [late, setLate] = useState(0)
+  /* Whether the turn in flight was asked to stop, whether that went unheeded
+     long enough to offer more, and whether more was asked. */
+  const [stopped, setStopped] = useState(false)
+  const [late, setLate] = useState(false)
+  const [forced, setForced] = useState(false)
   const over = useCallback(() => {
     setSending(false)
-    setStopped(0)
-    setLate(0)
+    setStopped(false)
+    setLate(false)
+    setForced(false)
   }, [])
   const [failed, setFailed] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -480,16 +483,20 @@ export function useChat(conversationId: string): Chat {
 
   const stop = useCallback(() => {
     /* The turn's own end clears `sending`: the send button must not come back under a turn still going. */
-    setStopped((was) => was + 1)
+    setStopped(true)
     void ask(() => commands.chatCancel(conversationId))
   }, [conversationId])
-  /* A stop not heeded — a hung tool, a process deaf to its signal — is offered a harder one. */
+  /* A stop not heeded — a hung tool, a process deaf to its signal — is offered a harder
+     one, counted from the first press: pressing again does not start the wait over. */
   useEffect(() => {
-    if (!sending || stopped === 0) return
-    const timer = window.setTimeout(() => setLate(stopped), FORCE_AFTER_MS)
+    if (!sending || !stopped) return
+    const timer = window.setTimeout(() => setLate(true), FORCE_AFTER_MS)
     return () => window.clearTimeout(timer)
   }, [sending, stopped])
-  const force = useCallback(() => void ask(() => commands.chatForceStop(conversationId)), [conversationId])
+  const force = useCallback(() => {
+    setForced(true)
+    void ask(() => commands.chatForceStop(conversationId))
+  }, [conversationId])
 
   const steer = useCallback(
     async (prompt: string, given?: Extras): Promise<boolean> => {
@@ -559,7 +566,7 @@ export function useChat(conversationId: string): Chat {
     steer,
     clearExtras,
     stop,
-    forceable: sending && stopped > 0 && late === stopped,
+    forceable: sending && stopped && late && !forced,
     force,
   }
 }

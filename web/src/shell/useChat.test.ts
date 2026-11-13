@@ -385,3 +385,27 @@ describe('a stop the turn does not heed', () => {
     }
   })
 })
+
+describe('a stop pressed again', () => {
+  it('keeps the first stop’s wait, and a forced stop is offered once', async () => {
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    vi.useFakeTimers()
+    try {
+      act(() => result.current.say('hello'))
+      act(() => result.current.stop())
+      act(() => void vi.advanceTimersByTime(8_000))
+      act(() => result.current.stop())
+      act(() => void vi.advanceTimersByTime(2_100))
+      expect(result.current.forceable).toBe(true)
+      act(() => result.current.stop())
+      expect(result.current.forceable).toBe(true)
+
+      act(() => result.current.force())
+      expect(result.current.forceable).toBe(false)
+      await act(async () => ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: 'killed', isError: true, context: null, unheard: [] }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

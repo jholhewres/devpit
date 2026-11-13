@@ -35,6 +35,8 @@ describe('a message steered in that the agent never took in', () => {
     expect(screen.getAllByText(/didn.t reach the agent/i)).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Resend' }))
     expect(onResend).toHaveBeenCalledWith('and the lane too')
+    /* Sent again, it is not offered a second time. */
+    expect(screen.queryByText(/didn.t reach the agent/i)).toBeNull()
   })
 
   it('says nothing when the agent took it in', () => {

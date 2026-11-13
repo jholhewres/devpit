@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 
 import type { Message } from '../gen/bindings'
 import { continuable, unanswered } from './chat'
@@ -53,6 +53,8 @@ export function ChatThread({
 }): React.JSX.Element {
   const view = useWindow(messages, box)
   const lost = useMemo(() => new Set(messages.flatMap((one) => one.ended?.unheard ?? [])), [messages])
+  /* Sent again from here: not offered twice. */
+  const [resent, setResent] = useState<ReadonlySet<string>>(() => new Set())
   useLayoutEffect(() => {
     if (reveal) reveal.current = view.reveal
   }, [reveal, view.reveal])
@@ -69,7 +71,11 @@ export function ChatThread({
             folder={folder}
             onOpen={onOpen}
             onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined}
-            onResend={onResend && lost.has(message.id) ? () => onResend(textOf(message)) : undefined}
+            onResend={
+              onResend && lost.has(message.id) && !resent.has(message.id)
+                ? () => (setResent((was) => new Set(was).add(message.id)), onResend(textOf(message)))
+                : undefined
+            }
           />
         </div>
       ))}
