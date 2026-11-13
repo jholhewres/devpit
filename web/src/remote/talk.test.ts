@@ -35,6 +35,16 @@ describe('what the chat view shows', () => {
     expect(after(shown, orchestrator, history([], 'c2'))).toBe(shown)
   })
 
+  it('keeps an answer that ended a moment before the transcript held it', () => {
+    const asked = message('u1', 'user', 'say hi')
+    const answer = { ...message('a1', 'assistant', 'hi'), ended: { at: 1, stopReason: 'end_turn', isError: false, error: null, unheard: [] } } as Message
+    // Read on the end of the turn, while the machine still writes the answer down.
+    expect(after([asked, answer], orchestrator, history([asked]))).toEqual([asked, answer])
+    // Read once it is written, the transcript's copy is shown.
+    const written = { ...answer, parts: [...answer.parts, { kind: 'changes', files: [] }] } as Message
+    expect(after([asked, answer], orchestrator, history([asked, written]))).toEqual([asked, written])
+  })
+
   it('is a session read from its transcript', () => {
     const read: RemoteOut = { t: 'session', profile: 'claude-work', name: 'api-worker', messages: [message('s1', 'assistant', 'done')] }
     expect(after([], session, read)).toHaveLength(1)
