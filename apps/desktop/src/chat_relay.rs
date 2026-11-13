@@ -42,6 +42,25 @@ pub(crate) fn kept(parts: &mut Vec<Part>, part: Part) {
             return;
         }
     }
+    if let Part::Thinking {
+        text: said,
+        parent: theirs,
+        duration_ms: Some(ms),
+    } = &part
+    {
+        // A streamed thought begins empty and is closed by its own repeat.
+        let open = parts.iter_mut().rev().find(|one| {
+            matches!(one, Part::Thinking { text, parent, duration_ms: None } if text.is_empty() && parent == theirs)
+        });
+        if let Some(Part::Thinking {
+            text, duration_ms, ..
+        }) = open
+        {
+            text.clone_from(said);
+            *duration_ms = Some(*ms);
+            return;
+        }
+    }
     parts.push(part);
 }
 

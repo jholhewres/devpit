@@ -42,6 +42,9 @@ pub enum Part {
         text: String,
         #[serde(default)]
         parent: Option<String>,
+        /// How long it took, once it is over and the stream timed it.
+        #[serde(default)]
+        duration_ms: Option<u32>,
     },
     ToolCall {
         id: String,
@@ -73,6 +76,9 @@ pub enum Part {
         /// `started`, `running`, then the CLI's own ending (`completed`, …).
         status: String,
         summary: Option<String>,
+        /// How long it has run, as the CLI counts it.
+        #[serde(default)]
+        duration_ms: Option<u32>,
     },
     /// What a slash command itself answered, as the CLI printed it.
     Command { content: String },

@@ -8,6 +8,7 @@ fn task(id: &str, status: &str) -> Part {
         description: None,
         status: status.to_owned(),
         summary: None,
+        duration_ms: None,
     }
 }
 
