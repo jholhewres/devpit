@@ -14,6 +14,11 @@ use tauri::ipc::{Channel, InvokeResponseBody};
 /// The longest a piece of text waits for the text after it.
 pub(crate) const WINDOW: Duration = Duration::from_millis(50);
 
+/// The most text one frame carries: past it, what is held goes at once and a
+/// longer piece goes in parts, so a burst never makes a frame over
+/// [`crate::chat_relay::FRAME_BUDGET`].
+pub(crate) const MOST_HELD: usize = 4 * 1024;
+
 /// Text held back to go out with the text after it.
 #[derive(Default)]
 pub(crate) struct Pace {
@@ -23,8 +28,16 @@ pub(crate) struct Pace {
 impl Pace {
     /// What goes out now that `frame` arrived at `now`.
     pub(crate) fn took(&mut self, frame: Frame, now: Instant) -> Vec<Frame> {
+        let mut out = Vec::new();
+        for frame in parts(frame) {
+            out.extend(self.one(frame, now));
+        }
+        out
+    }
+
+    fn one(&mut self, frame: Frame, now: Instant) -> Vec<Frame> {
         if let Some((held, since)) = &mut self.held {
-            if joined(held, &frame) {
+            if size(held) + size(&frame) <= MOST_HELD && joined(held, &frame) {
                 let waited = now.duration_since(*since) >= WINDOW;
                 return if waited {
                     self.rest().into_iter().collect()
@@ -54,6 +67,49 @@ impl Pace {
     /// Whatever is held, now.
     pub(crate) fn rest(&mut self) -> Option<Frame> {
         self.held.take().map(|(frame, _)| frame)
+    }
+}
+
+/// The bytes of text a frame carries.
+fn size(frame: &Frame) -> usize {
+    match frame {
+        Frame::Part {
+            part: Part::Text { text, .. },
+            ..
+        } => text.len(),
+        _ => 0,
+    }
+}
+
+/// `frame`, or its text in pieces of at most [`MOST_HELD`] bytes, cut on
+/// character boundaries.
+fn parts(frame: Frame) -> Vec<Frame> {
+    let Frame::Part {
+        message_id,
+        part: Part::Text { text, parent },
+    } = frame
+    else {
+        return vec![frame];
+    };
+    let mut out = Vec::new();
+    let mut rest = text.as_str();
+    loop {
+        let mut at = rest.len().min(MOST_HELD);
+        while !rest.is_char_boundary(at) {
+            at -= 1;
+        }
+        let (piece, after) = rest.split_at(at);
+        out.push(Frame::Part {
+            message_id: message_id.clone(),
+            part: Part::Text {
+                text: piece.to_owned(),
+                parent: parent.clone(),
+            },
+        });
+        if after.is_empty() {
+            return out;
+        }
+        rest = after;
     }
 }
 

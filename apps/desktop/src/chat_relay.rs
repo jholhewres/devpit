@@ -22,6 +22,10 @@ use tokio::sync::oneshot;
 /// only a late joiner misses the middle, and the transcript fills it at the end.
 const KEPT_FRAMES: usize = 20_000;
 
+/// The most a frame sent to a window may weigh as JSON: Tauri evaluates a
+/// smaller one as one script, and a larger one costs the window a fetch.
+pub(crate) const FRAME_BUDGET: usize = 8 * 1024;
+
 /// Adds a part, joining text onto the same speaker's text just before it: a
 /// streamed answer arrives in many small pieces and is kept as one.
 pub(crate) fn kept(parts: &mut Vec<Part>, part: Part) {
@@ -68,29 +72,64 @@ fn kept_frame(frames: &mut Vec<Frame>, frame: Frame) {
     }
 }
 
+/// Where a turn's frames go: a window is sent each one cut, as the history it
+/// read was, and the Remote whole, since it cuts its own way.
+#[derive(Clone)]
+pub(crate) struct Sink {
+    channel: Channel<Frame>,
+    cut: bool,
+}
+
+impl Sink {
+    pub(crate) fn window(channel: Channel<Frame>) -> Self {
+        Self { channel, cut: true }
+    }
+
+    pub(crate) fn whole(channel: Channel<Frame>) -> Self {
+        Self {
+            channel,
+            cut: false,
+        }
+    }
+
+    /// `cut` is `frame` as a window gets it, when one is listening.
+    fn send(&self, frame: &Frame, cut: Option<&Frame>) {
+        let _ = self.channel.send(match (self.cut, cut) {
+            (true, Some(cut)) => cut.clone(),
+            (true, None) => devpit_rpc::cut::cut_frame(frame.clone()),
+            (false, _) => frame.clone(),
+        });
+    }
+}
+
 struct Turn {
     id: u64,
     /// Its place among the turns that had the process, `None` while it waits.
     begun: Option<u64>,
     frames: Vec<Frame>,
     /// The window that sent it.
-    first: Channel<Frame>,
+    first: Sink,
     joined: Vec<Joined>,
 }
 
 impl Turn {
-    /// Kept for a late joiner, and sent to the window and every joiner.
+    /// Sent to the window and every joiner, and kept for a late one. Cut once
+    /// here for every window, where each used to be sent it whole and read it
+    /// back to cut it.
     fn relayed(&mut self, frame: Frame) {
-        kept_frame(&mut self.frames, frame.clone());
-        let _ = self.first.send(frame.clone());
-        for one in &self.joined {
-            let _ = one.channel.send(frame.clone());
+        let sinks = || std::iter::once(&self.first).chain(self.joined.iter().map(|one| &one.sink));
+        let cut = sinks()
+            .any(|sink| sink.cut)
+            .then(|| devpit_rpc::cut::cut_frame(frame.clone()));
+        for sink in sinks() {
+            sink.send(&frame, cut.as_ref());
         }
+        kept_frame(&mut self.frames, frame);
     }
 }
 
 struct Joined {
-    channel: Channel<Frame>,
+    sink: Sink,
     /// What `chat_leave` names it by: the window's channel, not a wrapper's.
     id: u32,
     /// Told when the turn ends; dropped unsent when the joiner leaves.
@@ -175,11 +214,7 @@ impl Relaying {
 impl Relay {
     /// The channel a turn sends through: each frame reaches `first` and anyone
     /// who joins later. The turn has begun; see [`Relay::waiting`].
-    pub(crate) fn open(
-        &self,
-        conversation: &str,
-        first: Channel<Frame>,
-    ) -> (Channel<Frame>, Relaying) {
+    pub(crate) fn open(&self, conversation: &str, first: Sink) -> (Channel<Frame>, Relaying) {
         let (channel, relaying) = self.waiting(conversation, first);
         relaying.begin();
         (channel, relaying)
@@ -188,11 +223,7 @@ impl Relay {
     /// As [`Relay::open`], for a turn that may have to wait for another to
     /// finish before it has the process. It is joined only when nothing that
     /// has begun is left, until [`Relaying::begin`] gives it its place.
-    pub(crate) fn waiting(
-        &self,
-        conversation: &str,
-        first: Channel<Frame>,
-    ) -> (Channel<Frame>, Relaying) {
+    pub(crate) fn waiting(&self, conversation: &str, first: Sink) -> (Channel<Frame>, Relaying) {
         let id = self.0.lock().ok().map(|mut all| {
             all.next += 1;
             let id = all.next;
@@ -214,7 +245,15 @@ impl Relay {
             id: id.unwrap_or_default(),
         };
         let Some(id) = id else {
-            return (first, relaying);
+            return (
+                Channel::new(move |body: InvokeResponseBody| {
+                    if let Ok(frame) = body.deserialize::<Frame>() {
+                        first.send(&frame, None);
+                    }
+                    Ok(())
+                }),
+                relaying,
+            );
         };
         // Told outside the lock: a watcher joins the turn it is told of.
         let watchers = self.0.lock().map_or_else(
@@ -256,12 +295,7 @@ impl Relay {
     /// Joins the turn that has had the process longest — or, when none has,
     /// the first waiting for it: what it has sent so far, then the rest.
     /// `None` when nothing runs in this conversation.
-    fn join(
-        &self,
-        conversation: &str,
-        channel: Channel<Frame>,
-        id: u32,
-    ) -> Option<oneshot::Receiver<()>> {
+    fn join(&self, conversation: &str, sink: Sink, id: u32) -> Option<oneshot::Receiver<()>> {
         let mut all = self.0.lock().ok()?;
         let turn = all
             .by_conversation
@@ -269,10 +303,10 @@ impl Relay {
             .iter_mut()
             .min_by_key(|turn| turn.begun.unwrap_or(u64::MAX))?;
         for frame in &turn.frames {
-            let _ = channel.send(frame.clone());
+            sink.send(frame, None);
         }
         let (ended, heard) = oneshot::channel();
-        turn.joined.push(Joined { channel, id, ended });
+        turn.joined.push(Joined { sink, id, ended });
         Some(heard)
     }
 
@@ -342,20 +376,16 @@ impl Relay {
 
     /// Every turn running in this conversation, joined one after the other
     /// until the last ends or the joiner leaves; whether one was running.
+    /// Sent whole: this is the Remote's way in.
     pub(crate) async fn rejoin(&self, conversation: &str, channel: Channel<Frame>) -> bool {
         let id = channel.id();
-        self.rejoin_as(conversation, channel, id).await
+        self.rejoin_as(conversation, Sink::whole(channel), id).await
     }
 
-    /// [`Relay::rejoin`] for a channel that `chat_leave` knows by another id.
-    pub(crate) async fn rejoin_as(
-        &self,
-        conversation: &str,
-        channel: Channel<Frame>,
-        id: u32,
-    ) -> bool {
+    /// [`Relay::rejoin`] into `sink`, which `chat_leave` knows by `id`.
+    pub(crate) async fn rejoin_as(&self, conversation: &str, sink: Sink, id: u32) -> bool {
         let mut any = false;
-        while let Some(ended) = self.join(conversation, channel.clone(), id) {
+        while let Some(ended) = self.join(conversation, sink.clone(), id) {
             any = true;
             // Dropped unsent: the joiner left, and hears nothing more.
             if ended.await.is_err() {
@@ -391,25 +421,10 @@ pub async fn chat_rejoin(
     conversation_id: String,
     on_frame: Channel<Frame>,
 ) -> Result<bool, RpcError> {
-    let (channel, id) = window_channel(on_frame);
-    Ok(relay.rejoin_as(&conversation_id, channel, id).await)
-}
-
-/// A window's channel wrapped to cut, and the id `chat_leave` knows it by:
-/// the window's own, which the wrapper does not keep.
-fn window_channel(window: Channel<Frame>) -> (Channel<Frame>, u32) {
-    let id = window.id();
-    (for_window(window), id)
-}
-
-/// A window's channel that is sent each frame cut, as the history it read was.
-pub(crate) fn for_window(window: Channel<Frame>) -> Channel<Frame> {
-    Channel::new(move |body: InvokeResponseBody| {
-        if let Ok(frame) = body.deserialize::<Frame>() {
-            let _ = window.send(devpit_rpc::cut::cut_frame(frame));
-        }
-        Ok(())
-    })
+    let id = on_frame.id();
+    Ok(relay
+        .rejoin_as(&conversation_id, Sink::window(on_frame), id)
+        .await)
 }
 
 /// `chat.leave` — stops sending a chat that has gone what it joined.
