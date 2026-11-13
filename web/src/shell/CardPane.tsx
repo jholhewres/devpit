@@ -12,6 +12,7 @@ import { CardPlay } from './CardPlay'
 import { CardSessionHistory } from './CardSessionHistory'
 import { CardSessions } from './CardSessions'
 import { CardTies } from './CardTies'
+import { LessonProposals } from './LessonProposals'
 import { PlanReview } from './PlanReview'
 import { liveWork, stopLiveWork } from './liveWork'
 import { CardWork } from './CardWork'
@@ -209,6 +210,9 @@ export function CardPane({
                   })
                 }
               />
+              {project && detail.card.number != null && (
+                <LessonProposals projectId={project.id} source={`#${detail.card.number}`} />
+              )}
               {project && detail.plan && (
                 <PlanReview
                   key={JSON.stringify(detail.plan.cards)}

@@ -477,6 +477,13 @@ export const commands = {
 	devflowAsks: () => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_asks")),
 	/**  `devflow.answer` — the person's click: yes makes the change, no drops it. */
 	devflowAnswer: (id: string, yes: boolean) => typedError<DevflowAsks, RpcError>(__TAURI_INVOKE("devflow_answer", { id, yes })),
+	/**  `lessons.proposed` — the lessons closed cards proposed, waiting for the person. */
+	lessonsProposed: () => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("lessons_proposed")),
+	/**
+	 *  `lesson.decide` — approves a proposal, as `kept` says it, or discards it
+	 *  when `kept` is absent.
+	 */
+	lessonDecide: (projectId: string, source: string, text: string, kept: string | null) => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("lesson_decide", { projectId, source, text, kept })),
 	/**  `devflow.screen` — a project's Devflow, read now. */
 	devflowScreen: (projectId: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_screen", { projectId })),
 	/**  `devflow.preview` — what a setup would write; nothing is written. */
@@ -4004,6 +4011,22 @@ title?: string } | { type: "split";
  *  stored tree to add a field nothing had asked for yet.
  */
 id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
+
+/**  One lesson a closed card proposed. */
+export type LessonProposal = {
+	projectId: string,
+	project: string,
+	/**  The day it was proposed, as YYYY-MM-DD. */
+	day: string,
+	/**  The card it came from, as `#12`. */
+	source: string,
+	text: string,
+};
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type LessonProposals = {
+	proposals: LessonProposal[],
+};
 
 /**  A devpit terminal, as a tab attaches to it. */
 export type LivePane = {

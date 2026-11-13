@@ -3,8 +3,8 @@
 //! Three Markdown files of dated entries, each naming where it came from, so
 //! a fact can be checked against its source and dropped when it goes stale.
 //! Written once, on the agent's first wake, from the guides the project
-//! already keeps; never written over after that. A project whose agent was
-//! never asked has no such folder, and nothing else reads one.
+//! already keeps; after that only the lessons the person approves are added.
+//! A project whose agent was never asked has no such folder.
 
 use std::io::Read;
 use std::path::Path;
@@ -196,6 +196,109 @@ pub(crate) fn summary(root: &Path) -> Option<String> {
         }
     }
     Some(out)
+}
+
+/// Lessons proposed by a closed card, waiting for the person's decision.
+pub(crate) const PROPOSED: &str = "proposed.md";
+/// One line per closed card: its review rounds and repeated findings.
+const METRICS: &str = "metrics.jsonl";
+/// Proposals and decisions write one at a time.
+static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Keeps `lessons`, proposed by card `source`, until the person decides each.
+pub(crate) fn propose(
+    root: &Path,
+    day: &str,
+    source: &str,
+    lessons: &[String],
+) -> Result<(), String> {
+    let text: String = lessons.iter().map(|one| line(day, source, one)).collect();
+    let _held = WRITING
+        .lock()
+        .map_err(|_| "the memory is busy".to_owned())?;
+    append(root, PROPOSED, &text)
+}
+
+/// The proposals waiting for the person, oldest first.
+pub(crate) fn proposals(root: &Path) -> Vec<Entry> {
+    entries(root, PROPOSED)
+}
+
+/// The newest approved lessons, at most [`SHOWN`], oldest first.
+pub(crate) fn lessons(root: &Path) -> Vec<Entry> {
+    let all = entries(root, "lessons.md");
+    let older = all.len().saturating_sub(SHOWN);
+    all.into_iter().skip(older).collect()
+}
+
+/// Settles the proposal of `source` saying `text`: approved as `kept` into
+/// lessons.md, dated `day`, or discarded with no trace when `kept` is `None`.
+pub(crate) fn decide(
+    root: &Path,
+    day: &str,
+    source: &str,
+    text: &str,
+    kept: Option<&str>,
+) -> Result<(), String> {
+    let _held = WRITING
+        .lock()
+        .map_err(|_| "the memory is busy".to_owned())?;
+    let file = format!("{DIR}/{PROPOSED}");
+    let was = read_inside(root, &file, MEMORY_BYTES).unwrap_or_default();
+    let mut lines: Vec<&str> = was.lines().collect();
+    let at = lines
+        .iter()
+        .position(|one| matches!(entry(one), Some(Ok(found)) if found.source == source && found.text == text))
+        .ok_or("that proposal is no longer waiting")?;
+    lines.remove(at);
+    if let Some(kept) = kept {
+        append(root, "lessons.md", &line(day, source, kept))?;
+    }
+    let rest: String = lines.iter().map(|one| format!("{one}\n")).collect();
+    let at = devpit_core::paths::resolve_writable(root, &file).map_err(|err| err.to_string())?;
+    std::fs::write(at, rest).map_err(|err| err.to_string())
+}
+
+/// Logs how many review rounds card `source` took and how many findings came back.
+pub(crate) fn measure(
+    root: &Path,
+    day: &str,
+    source: &str,
+    rounds: usize,
+    repeated: usize,
+) -> Result<(), String> {
+    let said = serde_json::json!({
+        "day": day,
+        "card": source,
+        "reviewRounds": rounds,
+        "repeatedFindings": repeated,
+    });
+    let _held = WRITING
+        .lock()
+        .map_err(|_| "the memory is busy".to_owned())?;
+    append(root, METRICS, &format!("{said}\n"))
+}
+
+fn entries(root: &Path, file: &str) -> Vec<Entry> {
+    read_inside(root, &format!("{DIR}/{file}"), MEMORY_BYTES)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(entry)
+        .filter_map(Result::ok)
+        .collect()
+}
+
+/// Appends to a file of the memory, resolved inside the project first.
+fn append(root: &Path, file: &str, text: &str) -> Result<(), String> {
+    use std::io::Write;
+    let at = devpit_core::paths::resolve_new(root, &format!("{DIR}/{file}"))
+        .map_err(|err| err.to_string())?;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(at)
+        .and_then(|mut out| out.write_all(text.as_bytes()))
+        .map_err(|err| err.to_string())
 }
 
 #[cfg(test)]
