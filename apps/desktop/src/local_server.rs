@@ -30,6 +30,8 @@ use crate::remote_http::{read_body, read_head, reply, Deadline, Request};
 pub(crate) const PORT_FILE: &str = "local.json";
 /// The token a browser trades for its cookie, owner-only in the home.
 pub(crate) const TOKEN_FILE: &str = "local-token";
+/// The page "Open in browser" hands the browser, owner-only in the home.
+pub(crate) const SIGN_IN_FILE: &str = "sign-in.html";
 const COOKIE: &str = "devpit_local";
 /// The largest call a browser sends: a pasted picture (8 MiB, as base64) or a
 /// saved file, with room for the JSON around it.
@@ -136,8 +138,7 @@ fn in_query<'a>(query: &'a str, name: &str) -> Option<&'a str> {
 }
 
 /// Codes "Open in browser" signs in with, each good once and for
-/// [`CODE_LIFE`]: the link sits on Chromium's command line, which every user
-/// of the machine can read, so it must not carry the lasting token.
+/// [`CODE_LIFE`], so the page that carries one never carries the lasting token.
 pub(crate) struct Codes(Mutex<Vec<(String, Instant)>>);
 
 impl Codes {
@@ -473,6 +474,27 @@ pub(crate) fn link_opener(os: &str) -> (&'static str, &'static [&'static str]) {
         "windows" => ("cmd", &["/C", "start", ""]),
         _ => ("xdg-open", &[]),
     }
+/// The page that sends a browser on to sign in with `code`.
+pub(crate) fn sign_in_page(place: &Place, code: &str) -> String {
+    let url = sign_in_url(place, code);
+    format!(
+        "<!doctype html><meta charset=\"utf-8\"><meta name=\"referrer\" content=\"no-referrer\">\
+         <meta http-equiv=\"refresh\" content=\"0;url={url}\"><title>devpit</title>\
+         <a href=\"{url}\">Sign in to devpit</a>"
+    )
+}
+
+/// What the browser is handed to sign in with `code`: the page, owner-only in
+/// `home`, by its `file:` URL. A command line is readable by every user of the
+/// machine, and one who redeemed the code first would be signed in instead.
+pub(crate) fn hand_over(home: &Path, place: &Place, code: &str) -> std::io::Result<String> {
+    let page = home.join(SIGN_IN_FILE);
+    owner_only(&page, &sign_in_page(place, code))?;
+    tauri::Url::from_file_path(&page)
+        .map(String::from)
+        .map_err(|()| std::io::Error::other("the home is not an absolute path"))
+}
+
 }
 
 /// The browser that opens the app as an app: Chromium's `--app`, when one is
@@ -492,17 +514,19 @@ pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
 }
 
 /// "Open in browser": signs this browser in and opens the app, off the
-/// window's thread. A one-time code goes on the browser's command line, and
-/// leaves the URL at the first redirect.
+/// window's thread. The one-time code reaches it in a page only this user can
+/// read, and leaves the URL at the first redirect.
 pub(crate) fn open_in_browser() {
-    let Some(place) = place() else {
+    let (Some(place), Ok(home)) = (place(), devpit_core::Store::root()) else {
         return;
     };
     let Ok(code) = CODES.issue(Instant::now()) else {
         return;
     };
     std::thread::spawn(move || {
-        let url = sign_in_url(&place, &code);
+        let Ok(url) = hand_over(&home, &place, &code) else {
+            return;
+        };
         let path = devpit_pty::login_path::search_path();
         let (program, app) = opener(|name| {
             devpit_pty::host_env::found_on(path, std::ffi::OsStr::new(name)).is_some()
