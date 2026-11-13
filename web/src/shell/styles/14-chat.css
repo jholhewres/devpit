@@ -282,10 +282,10 @@
 .thread__go { align-self: flex-start; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; font: inherit; font-size: 12.5px; color: var(--text-2); }
 .thread__go:hover { color: var(--text); border-color: var(--text-3); }
 
-/* Where the answer is being written, while it is. */
-.reply__caret { display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: var(--text-3); border-radius: 1px; animation: caret 1s steps(2, start) infinite; }
-@keyframes caret { to { visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { .reply__caret { animation: none; } }
+/* A block of an answer still arriving fades in as it lands; the ones above it keep their nodes and do not. */
+.reply[data-fade] .md > * { animation: reply-in 180ms ease-out both; }
+@keyframes reply-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .reply[data-fade] .md > * { animation: none; } }
 
 /* What a session has spent: dollars or tokens, the rest in its tooltip. */
 .scost { flex: none; background: none; border: 0; padding: 0 4px; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-3); }
