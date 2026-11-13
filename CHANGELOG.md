@@ -3,6 +3,15 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
+## Unreleased
+
+### Fixes
+
+- **Coming back to a project draws its terminals sooner.** Switching
+  projects moved the terminals of the project you left inside the
+  window, and each move made the whole window work out its styles again.
+  They now stay in place.
+
 ## 0.1.49 — 2026-11-05
 
 ### Fixes
