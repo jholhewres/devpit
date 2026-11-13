@@ -149,11 +149,11 @@ pub async fn chat_send(
     );
     // Every frame goes through the relay, so a chat reopened mid-turn can join.
     // A turn on a resident process may wait for a woken one: it is heard after it.
-    // The relay keeps frames whole for the Remote, which cuts its own way.
-    let on_frame = crate::chat_relay::for_window(on_frame);
+    // The relay keeps frames whole for the Remote, and cuts each once for the windows.
+    let window = crate::chat_relay::Sink::window(on_frame);
     let (on_frame, relaying) = match staying {
-        Some(_) => relay.waiting(&conversation_id, on_frame),
-        None => relay.open(&conversation_id, on_frame),
+        Some(_) => relay.waiting(&conversation_id, window),
+        None => relay.open(&conversation_id, window),
     };
     let on_frame = crate::chat_pace::paced(on_frame);
 
@@ -183,11 +183,12 @@ pub async fn chat_send(
     let steered = control.clone();
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let noticed = (project_id.clone(), profile_id.clone(), from);
+    let checkout_at = PathBuf::from(&cwd);
     let said = tauri::async_runtime::spawn_blocking(move || {
         let prompt = crate::session_notice::with_notice(&noticed, &prompt, now() * 1000.0);
         let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
-        let mut before = None;
+        let mut before = crate::turn_changes::Before::default();
         let said = crate::chat_resident::or_say(
             staying,
             driver.as_ref(),
@@ -214,7 +215,7 @@ pub async fn chat_send(
             // Only once the turn has the process: a woken turn it waited for
             // is written first, and its changes are not this turn's.
             || {
-                before = crate::turn_changes::before(checkout);
+                before = crate::turn_changes::Before::start(checkout.to_owned());
                 let _ = append(&transcript, &asked);
                 begin();
                 beginning.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -232,14 +233,29 @@ pub async fn chat_send(
             started,
         );
         talking.exited(&key);
-        crate::turn_changes::report(checkout, before.as_deref(), &collected, &sink, &answer);
-        said
+        (said, before)
     })
     .await;
+    let (said, mut before) = match said {
+        Ok((said, before)) => (Ok(said), before),
+        Err(err) => (Err(err), crate::turn_changes::Before::default()),
+    };
     // Before the answer is looked at: a turn that failed is not still working.
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Done);
     let said = said.map_err(|err| RpcError::internal(err.to_string()));
     let said = said.and_then(|said| said.map_err(crate::chat_resident::turn_refused));
+    if said.is_err() {
+        // Written with what it changed, so that is read before its end, as it was.
+        let before = std::mem::take(&mut before);
+        crate::turn_changes::reported(
+            checkout_at.clone(),
+            before,
+            parts.clone(),
+            on_frame.clone(),
+            answer_id.clone(),
+        )
+        .await;
+    }
     let kept = began
         .load(std::sync::atomic::Ordering::SeqCst)
         .then_some(&parts);
@@ -250,11 +266,10 @@ pub async fn chat_send(
         .unheard
         .extend(crate::chat_resident::unheard(&app, &conversation_id));
 
-    // The guard does both when it goes, including on the `?` above.
-    drop(guard);
-
     // Stopped while it waited for a woken turn: nothing was said, or written.
+    // The guard does both when it goes, including on the `?` above.
     if !began.load(std::sync::atomic::Ordering::SeqCst) {
+        drop(guard);
         let end = TurnEnd {
             turn_id,
             ..said.end
@@ -263,17 +278,7 @@ pub async fn chat_send(
         return Ok(end);
     }
 
-    let answered = Message {
-        parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
-        streaming: false,
-        ended: Some(devpit_rpc::Ended::of(
-            &said.end,
-            crate::chat_listening::now(),
-        )),
-        ..opened
-    };
-    let _ = append(&file, &answered);
-
+    let ended = devpit_rpc::Ended::of(&said.end, crate::chat_listening::now());
     let Said {
         end,
         session_id,
@@ -290,8 +295,27 @@ pub async fn chat_send(
         anchor,
     );
 
+    // The end goes out before git reads what the turn changed. The answer is
+    // written once it has, under the guard: a turn let in sooner would write
+    // its prompt above this answer.
     let end = TurnEnd { turn_id, ..end };
-    let _ = on_frame.send(Frame::Ended { end: end.clone() });
+    crate::turn_changes::end_then_changes(
+        checkout_at,
+        before,
+        end.clone(),
+        parts.clone(),
+        on_frame.clone(),
+        answer_id,
+    )
+    .await;
+    let answered = Message {
+        parts: parts.lock().map(|held| held.clone()).unwrap_or_default(),
+        streaming: false,
+        ended: Some(ended),
+        ..opened
+    };
+    let _ = append(&file, &answered);
+    drop(guard);
     Ok(end)
 }
 
