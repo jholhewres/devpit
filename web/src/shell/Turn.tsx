@@ -34,8 +34,11 @@ export const Turn = memo(function Turn({
   onRewind,
   folder,
   onOpen,
+  onResend,
 }: {
   message: Message
+  /** Present on a message steered in that its turn never took in. */
+  onResend?: () => void
   /** Where a file the answer names opens; a tab when absent. */
   onOpen?: (path: string) => void
   /** Where the conversation runs; relative links in the answer are read there. */
@@ -49,7 +52,7 @@ export const Turn = memo(function Turn({
   const rewound = message.parts.find((part) => part.kind === 'rewound')
   if (message.role === 'system' && rewound?.kind === 'rewound') return <Rewound part={rewound} />
 
-  if (message.role === 'user') return <Said message={message} />
+  if (message.role === 'user') return <Said message={message} onResend={onResend} />
   return <Answer message={message} rewind={rewind} folder={folder ?? null} onOpen={onOpen} />
 })
 

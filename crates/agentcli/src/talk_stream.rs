@@ -80,6 +80,9 @@ fn one_turn(
             }
             heard.session_id = Some(seen);
         }
+        if let Some(uuid) = driver.echoed(&line) {
+            control.heard(&uuid);
+        }
         heard.anchor = driver.anchor(&line).or(heard.anchor);
         match driver.read(&line) {
             Read::Parts(parts) => parts.into_iter().for_each(|part| {

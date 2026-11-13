@@ -247,6 +247,8 @@ export const commands = {
 	stopReason: string | null,
 	isError: boolean,
 	context: Context | null,
+	/**  Messages steered into the turn that the agent never took in, by id. */
+	unheard: string[],
 } | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
 	/**
 	 *  `chat.stop_task` — stops one background task of the turn in flight.
@@ -3413,6 +3415,8 @@ export type Ended = {
 	isError: boolean,
 	/**  What the turn failed on, when devpit was told. */
 	error?: string | null,
+	/**  As [`TurnEnd::unheard`]. Absent from a line written before it existed. */
+	unheard?: string[],
 };
 
 /**  A session of the account that ran and ended, as devpit saw it. */
@@ -6054,6 +6058,8 @@ export type TurnEnd = {
 	stopReason: string | null,
 	isError: boolean,
 	context: Context | null,
+	/**  Messages steered into the turn that the agent never took in, by id. */
+	unheard: string[],
 };
 
 /**  Where a turn the person sent came from, other than the composer. */

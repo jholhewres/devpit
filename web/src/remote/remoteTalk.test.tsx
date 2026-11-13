@@ -66,7 +66,7 @@ describe('the Remote chat', () => {
     // One turn at a time: the next waits for this one.
     expect((screen.getByText('Answering…') as HTMLButtonElement).disabled).toBe(true)
     send.mockClear()
-    frame({ type: 'ended', end: { turnId: 't2', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null } })
+    frame({ type: 'ended', end: { turnId: 't2', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null, unheard: [] } })
     expect(screen.queryByText('Writing…')).toBeNull()
     expect(send).toHaveBeenCalledWith({ t: 'chat', project: 'orch', conversation: 'c1' })
   })

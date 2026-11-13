@@ -176,6 +176,7 @@ pub async fn chat_send(
     let transcript = file.clone();
 
     let control = steering.hold(&conversation_id);
+    let steered = control.clone();
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let noticed = (project_id.clone(), profile_id.clone(), from);
     let said = tauri::async_runtime::spawn_blocking(move || {
@@ -242,7 +243,12 @@ pub async fn chat_send(
     let kept = began
         .load(std::sync::atomic::Ordering::SeqCst)
         .then_some(&parts);
-    let said = crate::chat_turn::or_failed(said, &turn_id, &file, kept, &opened, &on_frame)?;
+    let mut said = crate::chat_turn::or_failed(said, &turn_id, &file, kept, &opened, &on_frame)?;
+    // A steer the agent never echoed back did not reach it: the window offers to send it again.
+    said.end.unheard = steered.unheard();
+    said.end
+        .unheard
+        .extend(crate::chat_resident::unheard(&app, &conversation_id));
 
     // The guard does both when it goes, including on the `?` above.
     drop(guard);

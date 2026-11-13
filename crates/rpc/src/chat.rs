@@ -135,16 +135,3 @@ pub struct Message {
     #[serde(default)]
     pub ended: Option<crate::Ended>,
 }
-
-/// What a turn cost and why it stopped.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct TurnEnd {
-    pub turn_id: String,
-    pub cost_usd: Option<f64>,
-    pub duration_ms: Option<f64>,
-    /// The CLI's own word, kept rather than flattened into "failed".
-    pub stop_reason: Option<String>,
-    pub is_error: bool,
-    pub context: Option<crate::frame::Context>,
-}

@@ -79,6 +79,6 @@ export function statusOf(message: Pick<Message, 'createdAt' | 'ended'>): string 
 }
 
 /* How the live end frame reads, kept on the answer like a saved one. */
-export function endedNow(end: { stopReason: string | null; isError: boolean }, error: string | null = null): Ended {
-  return { at: Date.now() / 1000, stopReason: end.stopReason, isError: end.isError, error }
+export function endedNow(end: { stopReason: string | null; isError: boolean; unheard?: string[] }, error: string | null = null): Ended {
+  return { at: Date.now() / 1000, stopReason: end.stopReason, isError: end.isError, error, unheard: end.unheard ?? [] }
 }

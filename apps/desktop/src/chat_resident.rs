@@ -246,11 +246,27 @@ pub(crate) fn control(
 
 /// Hands this conversation's process a message for the turn it is on. `None`
 /// when it has no process, so the caller reaches the turn the other way.
-pub(crate) fn steer(app: &AppHandle, conversation_id: &str, prompt: &str) -> Option<bool> {
+pub(crate) fn steer(
+    app: &AppHandle,
+    conversation_id: &str,
+    prompt: &str,
+    uuid: &str,
+    id: &str,
+) -> Option<bool> {
     let residents = app.try_state::<Residents>()?;
     let all = residents.0.lock().ok()?;
     all.get(conversation_id)
-        .map(|live| live.resident.say(prompt))
+        .map(|live| live.resident.steer(prompt, uuid, id))
+}
+
+/// The steers this conversation's process never echoed back, by id.
+pub(crate) fn unheard(app: &AppHandle, conversation_id: &str) -> Vec<String> {
+    app.try_state::<Residents>()
+        .and_then(|residents| {
+            let all = residents.0.lock().ok()?;
+            all.get(conversation_id).map(|live| live.resident.unheard())
+        })
+        .unwrap_or_default()
 }
 
 /// Ends this conversation's process, if it has one: a chat no longer
@@ -305,6 +321,7 @@ fn stopped() -> Said {
             stop_reason: Some("cancelled".to_owned()),
             is_error: false,
             context: None,
+            unheard: Vec::new(),
         },
         session_id: None,
         init: None,

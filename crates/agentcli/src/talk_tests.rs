@@ -37,6 +37,16 @@ fn a_capped_chat_turn_passes_the_flag_the_cli_accepts() {
     assert!(!argv.iter().any(|a| a == "--max-cost"));
 }
 
+/// What a steer is matched against: measured on Claude Code 2.1.323, a message
+/// written into a running turn comes back with `isReplay` and the `uuid` it was
+/// sent with once the CLI takes it in.
+#[test]
+fn a_chat_turn_asks_the_cli_to_echo_what_it_is_sent() {
+    assert!(argv(&turn(None))
+        .iter()
+        .any(|a| a == "--replay-user-messages"));
+}
+
 #[test]
 fn an_uncapped_turn_names_no_cap() {
     assert!(!argv(&turn(None)).iter().any(|a| a.starts_with("--max")));

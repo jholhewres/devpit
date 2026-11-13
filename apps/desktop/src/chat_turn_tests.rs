@@ -76,6 +76,7 @@ fn a_turn_ending_after_a_woken_one_keeps_what_that_one_wrote() {
         stop_reason: None,
         is_error: false,
         context: None,
+        unheard: Vec::new(),
     };
     settle(&file, Some(began_with), "turn_1", &end, None, None);
 

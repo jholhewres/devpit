@@ -50,3 +50,35 @@ fn a_resident_turn_returns_at_its_result_while_a_task_still_runs() {
     assert!(heard.ended.is_some());
     assert_eq!(read, 2, "the task's later line is the next turn's to read");
 }
+
+/// A message steered in is heard when the CLI echoes its uuid back; one the
+/// turn ended without taking in is said to be unheard, once.
+#[cfg(unix)]
+#[test]
+fn a_steer_the_cli_echoed_is_heard_and_one_it_never_took_in_is_not() {
+    let driver = crate::driver::driver("claude").expect("claude");
+    let mut sink = std::process::Command::new("cat")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .expect("cat");
+    let control = Control::default();
+    control.attach(sink.stdin.take().expect("stdin"));
+    assert!(control.steer("also this", "u-1", "msg_1"));
+    assert!(control.steer("and this", "u-2", "msg_2"));
+    let lines = [
+        r#"{"type":"user","isReplay":true,"uuid":"u-1","message":{"role":"user","content":[{"type":"text","text":"also this"}]}}"#,
+        r#"{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01}"#,
+    ];
+    follow(
+        driver.as_ref(),
+        lines.iter().map(|line| line.to_string()),
+        &control,
+        None,
+        |_| {},
+    );
+    assert_eq!(control.unheard(), ["msg_2"]);
+    assert!(control.unheard().is_empty());
+    let _ = sink.kill();
+    let _ = sink.wait();
+}

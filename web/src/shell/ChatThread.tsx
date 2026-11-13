@@ -1,10 +1,13 @@
-import { useLayoutEffect } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 
 import type { Message } from '../gen/bindings'
 import { continuable, unanswered } from './chat'
 import { Turn } from './Turn'
 import type { Reveal } from './useJump'
 import { GAP, useWindow } from './useWindow'
+
+/* A message's words, as the person sent them. */
+const textOf = (message: Message): string => message.parts.map((part) => ('text' in part ? part.text : '')).join('')
 
 /*
  * The conversation's messages, as a window over them: the rows near the view
@@ -25,6 +28,7 @@ export function ChatThread({
   onRewind,
   onOpen,
   onContinue,
+  onResend,
   reveal,
 }: {
   messages: readonly Message[]
@@ -42,10 +46,13 @@ export function ChatThread({
   onOpen: (path: string) => void
   /** Picks the conversation up where its last turn stopped. */
   onContinue: () => void
+  /** Sends again the words of a message steered in that never reached the agent. */
+  onResend?: (text: string) => void
   /** Where the thread hands up how to bring a message into view. */
   reveal?: React.RefObject<Reveal | null>
 }): React.JSX.Element {
   const view = useWindow(messages, box)
+  const lost = useMemo(() => new Set(messages.flatMap((one) => one.ended?.unheard ?? [])), [messages])
   useLayoutEffect(() => {
     if (reveal) reveal.current = view.reveal
   }, [reveal, view.reveal])
@@ -57,7 +64,13 @@ export function ChatThread({
       {view.before > 0 && <div className="thread__gap" style={{ height: view.before - GAP }} aria-hidden />}
       {messages.slice(view.from, view.to).map((message) => (
         <div className="trow" data-id={message.id} key={message.id}>
-          <Turn message={message} folder={folder} onOpen={onOpen} onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined} />
+          <Turn
+            message={message}
+            folder={folder}
+            onOpen={onOpen}
+            onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined}
+            onResend={onResend && lost.has(message.id) ? () => onResend(textOf(message)) : undefined}
+          />
         </div>
       ))}
       {view.after > 0 && <div className="thread__gap" style={{ height: view.after - GAP }} aria-hidden />}

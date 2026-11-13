@@ -131,6 +131,7 @@ impl Resident {
                             stop_reason: ending.stop_reason,
                             is_error: ending.is_error,
                             context: ending.context,
+                            unheard: Vec::new(),
                         },
                         session_id: heard.session_id,
                         init: heard.init,
@@ -151,6 +152,16 @@ impl Resident {
     /// Hands it the person's next message. False when it no longer listens.
     pub fn say(&self, prompt: &str) -> bool {
         self.control.say(prompt)
+    }
+
+    /// See [`Control::steer`].
+    pub fn steer(&self, prompt: &str, uuid: &str, id: &str) -> bool {
+        self.control.steer(prompt, uuid, id)
+    }
+
+    /// See [`Control::unheard`].
+    pub fn unheard(&self) -> Vec<String> {
+        self.control.unheard()
     }
 
     /// Sends a control request under `id`; its answer comes back as

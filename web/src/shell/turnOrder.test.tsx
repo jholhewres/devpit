@@ -95,7 +95,7 @@ describe('how long it worked', () => {
   it('says "Worked for 1m 30s" when the end frame comes, and keeps saying it', () => {
     vi.useFakeTimers({ now: BEGAN + 90_000 })
     const live = [answer(ORDERED, { streaming: true })]
-    const [over] = appliedAll(live, [{ type: 'ended', end: { turnId: 't1', costUsd: null, durationMs: null, stopReason: 'end_turn', isError: false, context: null } }])
+    const [over] = appliedAll(live, [{ type: 'ended', end: { turnId: 't1', costUsd: null, durationMs: null, stopReason: 'end_turn', isError: false, context: null, unheard: [] } }])
     expect(over!.streaming).toBe(false)
     render(<Turn message={over!} />)
     expect(screen.getByRole('button', { name: /Worked for 1m 30s/ })).toBeTruthy()
