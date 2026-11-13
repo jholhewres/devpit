@@ -19,6 +19,9 @@ pub(crate) const WINDOW: Duration = Duration::from_millis(50);
 /// [`crate::chat_relay::FRAME_BUDGET`].
 pub(crate) const MOST_HELD: usize = 4 * 1024;
 
+// Half the budget: the rest is the frame around the text, and what escaping it as JSON adds.
+const _: () = assert!(2 * MOST_HELD <= crate::chat_relay::FRAME_BUDGET);
+
 /// Text held back to go out with the text after it.
 #[derive(Default)]
 pub(crate) struct Pace {

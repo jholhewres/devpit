@@ -45,6 +45,19 @@ describe('what the chat view shows', () => {
     expect(after([asked, answer], orchestrator, history([asked, written]))).toEqual([asked, written])
   })
 
+  it('lets go of what slid out of the last messages the phone is sent', () => {
+    const all = Array.from({ length: 82 }, (_, at) => message(`m${at}`, at % 2 ? 'assistant' : 'user', 'x'))
+    // Drawn: the 80 read on opening, then a turn's prompt and answer. Read again: the last 80.
+    expect(after(all, orchestrator, history(all.slice(2))).map((one) => one.id)).toEqual(all.slice(2).map((one) => one.id))
+  })
+
+  it('lets go of a turn that never began, which the transcript will never hold', () => {
+    const asked = message('u1', 'user', 'say hi')
+    const lost = { ...message('u2', 'user', 'and this'), turnId: 't9' }
+    const failed = { ...message('a2', 'assistant', ''), turnId: 't9' }
+    expect(after([asked, lost, failed], orchestrator, history([asked]))).toEqual([asked])
+  })
+
   it('is a session read from its transcript', () => {
     const read: RemoteOut = { t: 'session', profile: 'claude-work', name: 'api-worker', messages: [message('s1', 'assistant', 'done')] }
     expect(after([], session, read)).toHaveLength(1)
