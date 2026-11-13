@@ -208,6 +208,46 @@ describe('the screens', () => {
     await invoke(window, 'settings_write', { theme: null, automaticUpdates: true, confirmStop: null, terminalContrast: null })
   })
 
+  test('settings gives each subject that left General a pane of its own', async () => {
+    const front = () =>
+      window.executeScript(function () {
+        const open = document.querySelector('.prefs__in:not([hidden])')
+        const rows = Array.prototype.slice.call(open ? open.querySelectorAll('.pref__t') : [])
+        return {
+          heading: open?.querySelector('h1')?.innerText ?? null,
+          rows: rows.map(function (node) {
+            return node.innerText
+          }),
+        }
+      })
+    for (const [pane, row] of [
+      ['Notifications', 'Island'],
+      ['Remote', 'Remote'],
+      ['Sessions', 'Ask before stopping a terminal'],
+      ['Voice', 'Voice messages'],
+    ]) {
+      await openSettings(pane)
+      await window.wait(async () => (await front()).rows.some((title) => title.startsWith(row)), 10000)
+      assert.equal((await front()).heading, pane, `the settings pane in front is not ${pane}`)
+      await sound(`settings-${pane.toLowerCase()}`, ['.prefs__in:not([hidden]) h1'], '.prefs__in:not([hidden])')
+    }
+    await openSettings('General')
+    assert.ok(!(await front()).rows.includes('Island'), 'General still holds the island')
+
+    // A word that used to find General finds the pane its row went to.
+    const field = await window.findElement(By.css('.prefs__q'))
+    await field.sendKeys('tailscale')
+    await settle(300)
+    const listed = await window.executeScript(function () {
+      return Array.prototype.slice.call(document.querySelectorAll('.prefs__i')).map(function (node) {
+        return node.innerText.trim()
+      })
+    })
+    assert.deepEqual(listed, ['Remote'])
+    await sound('settings-search', ['.prefs__q'], '.prefs')
+    await closeSettings()
+  })
+
   /* The seeded home has no CLI sign-in, so this screen has to say so rather
      than show a number it does not have — which is also the proof that
      nothing left the machine looking for one. */
