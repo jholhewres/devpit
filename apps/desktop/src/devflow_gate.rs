@@ -112,7 +112,7 @@ struct Read {
 }
 
 /// A JSON file of a run, already resolved inside where runs are kept.
-fn json_at(path: &Path) -> Option<Value> {
+pub(crate) fn json_at(path: &Path) -> Option<Value> {
     let file = std::fs::File::open(path).ok()?;
     let raw = devpit_core::data_files::read_within(file, MOST_READ).ok()??;
     serde_json::from_slice(&raw).ok()

@@ -108,23 +108,45 @@ fn closing_a_card_asks_with_its_comments_and_findings_as_data() {
 }
 
 #[test]
-fn review_rounds_come_from_the_review_comments_and_repeats_from_the_last_review() {
-    let comments = [
+fn review_rounds_are_the_review_runs_and_repeats_add_up_over_them() {
+    let said = |headline: &str, run: &str| {
         comment(
             "devpit",
-            "[devflow] review: 2 findings (0 critical, 1 high) · verdict: request_changes",
+            &format!(
+                "[devflow] review: {headline}\n\nBASE a1 · HEAD b2 · run {run}\n\nReviewers:\n"
+            ),
+        )
+    };
+    let comments = [
+        // A session-mode round: the packet, then its answers, in one run.
+        said("no reviewer answered yet", "20261113T100000Z"),
+        said(
+            "2 findings (0 critical, 1 high) · verdict: request_changes",
+            "20261113T100000Z",
         ),
         comment("agent", "Fixed the race."),
-        comment(
-            "devpit",
-            "[devflow] review: 0 findings (0 critical, 0 high) · verdict: approve",
+        said(
+            "1 findings (0 critical, 1 high) · verdict: request_changes",
+            "20261113T110000Z",
+        ),
+        said(
+            "0 findings (0 critical, 0 high) · verdict: approve",
+            "20261113T120000Z",
         ),
         comment("devpit", "[devflow] gate: 3 of 3 criteria"),
     ];
-    assert_eq!(review_rounds(&comments), 2);
-    let findings = serde_json::json!({ "repeats": [{ "file": "a.rs" }] });
-    assert_eq!(repeated(Some(&findings)), 1);
-    assert_eq!(repeated(None), 0);
+    assert_eq!(
+        review_runs(&comments),
+        ["20261113T100000Z", "20261113T110000Z", "20261113T120000Z"]
+    );
+    // The round that found it again holds the repeats; the approving one has none.
+    let findings = [
+        serde_json::json!({ "findings": [] }),
+        serde_json::json!({ "repeats": [{ "file": "a.rs" }] }),
+        serde_json::json!({ "findings": [] }),
+    ];
+    assert_eq!(repeated(&findings), 1);
+    assert_eq!(repeated(&[]), 0);
 }
 
 #[test]

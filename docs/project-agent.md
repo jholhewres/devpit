@@ -78,9 +78,9 @@ needs the rest.
 When a card lands in the done column, devpit:
 
 1. Logs one line to `metrics.jsonl`: the day, the card, its review rounds
-   (one per `[devflow] review:` comment) and the findings its last review
-   found again (`repeats` in its `findings.json`), so the lessons' effect can
-   be measured.
+   (the runs its `[devflow] review:` comments name, each once) and the
+   findings those rounds found again (`repeats` in each round's
+   `findings.json` still kept), so the lessons' effect can be measured.
 2. Asks the project agent, under the profile of an orchestrator linked to the
    project, what the card teaches. It reads the card's comments (its handoff,
    its review and gate results, the person's corrections) and its last
