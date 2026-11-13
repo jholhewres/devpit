@@ -186,13 +186,15 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 
 /* A shade of its own rather than `--inset`: the rows sit on the thread, not
    in a well, and the three states are one step apart so a hover reads as a
-   hover and not as a selection. */
+   hover and not as a selection. A closed row is a line; the box is for the
+   one you opened. */
 .arow {
   --act: color-mix(in srgb, var(--canvas) 96.5%, var(--text) 3.5%);
   --act-hover: color-mix(in srgb, var(--canvas) 95%, var(--text) 5%);
   --act-down: color-mix(in srgb, var(--canvas) 93.5%, var(--text) 6.5%);
-  min-width: 0; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--act);
+  min-width: 0; overflow: hidden; border-radius: var(--radius-md); border: 1px solid transparent;
 }
+.arow:has(> .arow__h[aria-expanded='true']) { border-color: var(--border); background: var(--act); }
 .arow__h { display: flex; align-items: center; gap: 8px; height: 28px; width: 100%; min-width: 0; padding: 0 8px; text-align: left; font-size: var(--fs-sm); }
 .arow__h:not(:disabled):hover { background: var(--act-hover); }
 .arow__h:not(:disabled):active { background: var(--act-down); }
@@ -201,6 +203,10 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .arow__d { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 .arow__v { flex: none; color: var(--ghost); }
 .arow__x { flex: none; color: var(--danger); }
+/* The MCP server a call went to, and a subagent's state and time. */
+.arow__s { flex: none; padding: 0 6px; border-radius: var(--radius-pill); background: var(--overlay); font-size: var(--fs-2xs); color: var(--text-3); }
+.arow__t { flex: none; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-3); }
+.arow__t[data-state='failed'] { color: var(--danger); }
 /* Alive: the same pulse as the composer's dots, so one language means one
    thing across the pane. */
 .arow__live { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: breathe 1.2s ease-in-out infinite; }

@@ -44,3 +44,53 @@ describe('a subagent', () => {
     expect(screen.getByText('look around')).toBeTruthy()
   })
 })
+
+describe('a row opened to its details', () => {
+  const mcp: Part[] = [
+    { kind: 'tool_call', id: 'm', name: 'mcp__figma__get_design_context', input: JSON.stringify({ nodeId: '1:2', clientFrameworks: 'react' }), state: 'ok', parent: null },
+    { kind: 'tool_result', call_id: 'm', output: '{"frame":"Login"}', is_error: false, parent: null },
+  ]
+
+  it('names the MCP server and shows the whole input and the output, each copyable', () => {
+    render(<Acts parts={mcp} live />)
+    expect(screen.getByText('figma')).toBeTruthy()
+    fireEvent.click(screen.getByText('Get design context'))
+    expect(screen.getByText(/"clientFrameworks": "react"/)).toBeTruthy()
+    expect(screen.getByText('{"frame":"Login"}')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copy input' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copy output' })).toBeTruthy()
+  })
+
+  it('shows the rest of a command\'s input beside the command', () => {
+    const bash: Part = { kind: 'tool_call', id: 'b', name: 'Bash', input: JSON.stringify({ command: 'sleep 4', run_in_background: true }), state: 'ok', parent: null }
+    render(<Acts parts={[bash]} live />)
+    fireEvent.click(screen.getByText('sleep 4'))
+    expect(screen.getByRole('button', { name: 'Copy command' })).toBeTruthy()
+    expect(screen.getByText(/"run_in_background": true/)).toBeTruthy()
+  })
+})
+
+describe('a thought', () => {
+  it('says how long it took', () => {
+    render(<Acts parts={[{ kind: 'thinking', text: '', parent: null, duration_ms: 12400 }]} live />)
+    expect(screen.getByText('Thought for 12s')).toBeTruthy()
+  })
+})
+
+describe('subagents started together', () => {
+  const agent = (id: string, description: string): Part[] => [
+    { kind: 'tool_call', id, name: 'Agent', input: JSON.stringify({ description }), state: 'ok', parent: null },
+    { kind: 'tool_result', call_id: id, output: 'Async agent launched', is_error: false, parent: null },
+  ]
+  const task = (callId: string, status: string, ms: number): Part => ({
+    kind: 'task', task_id: `t-${callId}`, call_id: callId, task_kind: 'local_agent', description: null, status, summary: null, duration_ms: ms,
+  })
+
+  it('are one row that opens to each with its own state and time', () => {
+    render(<Acts parts={[...agent('a', 'Read the docs'), ...agent('b', 'Run the tests'), task('a', 'running', 3000), task('b', 'completed', 22611)]} live />)
+    fireEvent.click(screen.getByText('2 subagents · 1 working'))
+    expect(screen.getByText('Read the docs')).toBeTruthy()
+    expect(screen.getByText('Working · 3s')).toBeTruthy()
+    expect(screen.getByText('Done · 23s')).toBeTruthy()
+  })
+})
