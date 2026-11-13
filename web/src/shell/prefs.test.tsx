@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OpenApp, Project } from '../gen/bindings'
+import type { PrefsPane } from './shape'
 import { PrefsSide, rowFor } from './PrefsSide'
 import { matching, PREFS_NAV } from './prefsNav'
 import { OpenIn } from './OpenIn'
@@ -9,6 +10,8 @@ import { ProjectRows } from './ProjectRows'
 import { RemoveProject } from './RemoveProject'
 
 afterEach(cleanup)
+
+const found = (query: string): PrefsPane[] => matching(query).flatMap((group) => group.items.map((item) => item.id))
 
 const reveal = vi.fn()
 const opened = vi.fn()
@@ -55,7 +58,7 @@ describe('the settings sidebar', () => {
        them; a pane in none is a pane that is unreachable. */
     const ids = PREFS_NAV.flatMap((group) => group.items.map((item) => item.id))
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toHaveLength(14)
+    expect(ids).toHaveLength(18)
   })
 
   it('draws the headings, and opens the pane you click', () => {
@@ -84,14 +87,43 @@ describe('the settings sidebar', () => {
 
   it('finds a pane by what it is about, not only by its name', () => {
     /* Nobody looking for the update switch types "General". */
-    expect(matching('updates').flatMap((g) => g.items.map((i) => i.id))).toEqual(['general'])
-    expect(matching('tokens').flatMap((g) => g.items.map((i) => i.id))).toEqual(['usage'])
-    /* General's rows, found by their own names rather than only by the pane's. */
-    for (const row of ['island', 'pause', 'microphone', 'tailscale']) {
-      expect(matching(row).flatMap((g) => g.items.map((i) => i.id))).toEqual(['general'])
-    }
+    expect(found('updates')).toEqual(['general'])
+    expect(found('tokens')).toEqual(['usage'])
     /* The desktop-wide key is General's; the window's own are Keyboard's. */
-    expect(matching('shortcut').flatMap((g) => g.items.map((i) => i.id))).toEqual(['general', 'keyboard'])
+    expect(found('shortcut')).toEqual(['general', 'keyboard'])
+  })
+
+  it('opens each pane General was split into', () => {
+    const onSelect = vi.fn()
+    render(<PrefsSide pane="general" onBack={vi.fn()} onSelect={onSelect} />)
+    for (const [label, id] of [['Notifications', 'notifications'], ['Remote', 'remote'], ['Sessions', 'sessions'], ['Voice', 'voice']]) {
+      fireEvent.click(screen.getByText(label!))
+      expect(onSelect).toHaveBeenLastCalledWith(id)
+    }
+  })
+
+  it('finds a row that left General by its own name', () => {
+    expect(found('island')).toEqual(['notifications'])
+    expect(found('focus mode')).toEqual(['notifications'])
+    expect(found('hand off a full session')).toEqual(['sessions'])
+    expect(found('ask before stopping')).toEqual(['sessions'])
+    expect(found('voice messages')).toEqual(['voice'])
+    expect(found('allow remote mcp')).toEqual(['remote'])
+    expect(found('error reports')).toEqual(['general'])
+  })
+
+  it('still finds, by every word that found General, the pane that holds its row', () => {
+    /* General's words before the split, each with where its row went. */
+    const went: Record<string, PrefsPane> = {
+      updates: 'general', privacy: 'general', local: 'general', automatic: 'general', login: 'general',
+      startup: 'general', tray: 'general', shortcut: 'general', open: 'general',
+      island: 'notifications', pause: 'notifications', quiet: 'notifications', reminders: 'notifications', focus: 'notifications',
+      terminal: 'sessions', stop: 'sessions',
+      voice: 'voice', microphone: 'voice', whisper: 'voice', transcribe: 'voice',
+      remote: 'remote', phone: 'remote', tailscale: 'remote', pair: 'remote', devices: 'remote',
+      calendar: 'remote', ics: 'remote', google: 'remote', subscribe: 'remote',
+    }
+    for (const [word, pane] of Object.entries(went)) expect(found(word), word).toContain(pane)
   })
 
   it('is the whole list again once the field is emptied', () => {
