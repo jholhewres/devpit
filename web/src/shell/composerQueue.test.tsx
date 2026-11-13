@@ -5,8 +5,9 @@ import type { ChatQueue, Message } from '../gen/bindings'
 import { ChatPane } from './ChatPane'
 
 /* Every wait here ends on mocks that answer at once; only rendering the pane
-   takes time, past the default second on a loaded CI runner. */
-configure({ asyncUtilTimeout: 5000 })
+   takes time, past the default second on a loaded CI runner. Under the 5 s
+   test limit, so a stuck wait still says which query it was. */
+configure({ asyncUtilTimeout: 3000 })
 
 const user = (id: string, text: string): Message =>
   ({ id, turnId: null, role: 'user', parts: [{ kind: 'text', text, parent: null }], createdAt: 0, streaming: false }) as Message
