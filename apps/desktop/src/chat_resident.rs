@@ -269,6 +269,26 @@ pub(crate) fn unheard(app: &AppHandle, conversation_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Ends this conversation's process at once: a stop it did not heed. False
+/// when it has none.
+pub(crate) fn force(app: &AppHandle, conversation_id: &str) -> bool {
+    let gone = app.try_state::<Residents>().and_then(|residents| {
+        residents
+            .0
+            .lock()
+            .ok()
+            .and_then(|mut all| all.remove(conversation_id))
+    });
+    let Some(live) = gone else {
+        return false;
+    };
+    live.resident.close();
+    let _ = std::process::Command::new("kill")
+        .args(["-KILL", &live.resident.pid().to_string()])
+        .status();
+    true
+}
+
 /// Ends this conversation's process, if it has one: a chat no longer
 /// reachable goes back to a process per turn.
 pub(crate) fn close(app: &AppHandle, conversation_id: &str) {

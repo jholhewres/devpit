@@ -184,24 +184,30 @@ pub fn chat_cancel(
     }))
 }
 
-/// Signals the turn in flight to end. Answers whether there was one to signal.
+/// Signals the turn in flight to end. Answers whether there was one to signal:
+/// a turn still starting is stopped as its process starts.
 pub(crate) fn stop_turn(talking: &crate::chat::Talking, conversation_id: &str) -> bool {
-    let pid = talking
-        .running
-        .lock()
-        .ok()
-        // `None` is a turn that has been claimed but has no process yet: there
-        // is nothing to signal, and pid 0 would mean the whole process group.
-        .and_then(|held| held.get(conversation_id).copied().flatten());
-    let Some(pid) = pid else {
-        return false;
-    };
     // SIGTERM, not SIGKILL: the CLI gets to write its own last line.
-    let _ = std::process::Command::new("kill")
-        .arg("-TERM")
-        .arg(pid.to_string())
-        .status();
-    true
+    talking.stop(conversation_id, crate::chat_running::Signal::Term)
+}
+
+/// `chat.force_stop` — ends the turn in flight however it is: what a stop
+/// that has not ended it after a while offers. A process that stays is ended
+/// too, and the next turn starts another.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_force_stop(
+    app: tauri::AppHandle,
+    state: State<'_, crate::chat::Talking>,
+    conversation_id: String,
+) -> Result<bool, RpcError> {
+    let talking = state.inner().clone();
+    crate::off_main::blocking(move || {
+        let resident = crate::chat_resident::force(&app, &conversation_id);
+        let turn = talking.stop(&conversation_id, crate::chat_running::Signal::Kill);
+        Ok(resident || turn)
+    })
+    .await
 }
 
 #[cfg(test)]

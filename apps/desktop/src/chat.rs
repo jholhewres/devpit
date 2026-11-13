@@ -18,11 +18,14 @@ use crate::card_activity::Doing;
 use tauri::{Manager, State};
 
 /// The turns in flight, by conversation, so one can be stopped.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Talking {
     /// The pid serving each conversation, `None` while its turn is still
     /// starting. A key here means a turn is claimed — see `Talking::begin`.
     pub(crate) running: Arc<Mutex<HashMap<String, Option<u32>>>>,
+    /// Stops asked of a turn whose process had not started yet, carried out
+    /// as it starts. Written and read under `running`'s lock.
+    pub(crate) stopping: Arc<Mutex<HashMap<String, crate::chat_running::Signal>>>,
 }
 
 pub(crate) fn home() -> PathBuf {
@@ -163,8 +166,7 @@ pub async fn chat_send(
         message: opened.clone(),
     });
 
-    let running = state.running.clone();
-    let key = conversation_id.clone();
+    let started = state.on_start(&conversation_id);
     let parts = Arc::new(Mutex::new(Vec::new()));
     let collected = parts.clone();
     let sink = on_frame.clone();
@@ -225,12 +227,7 @@ pub async fn chat_send(
                     part,
                 });
             },
-            |pid| {
-                running
-                    .lock()
-                    .map(|mut held| held.insert(key.clone(), Some(pid)))
-                    .ok();
-            },
+            started,
         );
         crate::turn_changes::report(checkout, before.as_deref(), &collected, &sink, &answer);
         said

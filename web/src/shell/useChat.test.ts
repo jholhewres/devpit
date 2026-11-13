@@ -53,6 +53,8 @@ const calls = {
   chatRewind: vi.fn(),
   chatPaste: vi.fn(),
   chatSteer: vi.fn(),
+  chatCancel: vi.fn(),
+  chatForceStop: vi.fn(),
 }
 afterEach(() => {
   saved.messages = []
@@ -94,6 +96,8 @@ vi.mock('./live', () => ({
       calls.chatPaste(projectId, type, data), { name: 'pasted-1.txt', path: '/h/pasted/pasted-1.txt', kind: 'txt' }
     ),
     chatRewind: (projectId: string, id: string, turnId: string) => (calls.chatRewind(projectId, id, turnId), 'conv_fork'),
+    chatCancel: (id: string) => (calls.chatCancel(id), null),
+    chatForceStop: (id: string) => (calls.chatForceStop(id), true),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
     permissionAskFromNow: () => null,
   },
@@ -355,5 +359,29 @@ describe('a queued message steered into the turn in flight', () => {
     const ids = result.current.messages.map((one) => one.id)
     expect(ids.indexOf('msg_steered')).toBeLessThan(ids.indexOf('msg_answer'))
     expect(result.current.files.map((one) => one.path)).toEqual(['src/next.ts'])
+  })
+})
+
+describe('a stop the turn does not heed', () => {
+  it('offers to force it 10 s after the stop, forces it, and offers no more once the turn ends', async () => {
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.profileId).toBe('claude'))
+    vi.useFakeTimers()
+    try {
+      act(() => result.current.say('hello'))
+      act(() => result.current.stop())
+      expect(calls.chatCancel).toHaveBeenCalledWith('conv_a')
+      act(() => void vi.advanceTimersByTime(9_900))
+      expect(result.current.forceable).toBe(false)
+      act(() => void vi.advanceTimersByTime(200))
+      expect(result.current.forceable).toBe(true)
+
+      act(() => result.current.force())
+      expect(calls.chatForceStop).toHaveBeenCalledWith('conv_a')
+      await act(async () => ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: 'killed', isError: true, context: null, unheard: [] }))
+      expect(result.current.forceable).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

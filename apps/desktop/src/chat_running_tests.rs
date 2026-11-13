@@ -65,3 +65,68 @@ fn a_second_turn_in_the_same_conversation_is_refused() {
     drop(again);
     drop(other);
 }
+
+fn ended_within(child: &mut std::process::Child, wait: std::time::Duration) -> bool {
+    let until = std::time::Instant::now() + wait;
+    while std::time::Instant::now() < until {
+        if child.try_wait().ok().flatten().is_some() {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    false
+}
+
+/// A Stop pressed while the turn was still starting reached nothing: there
+/// was no pid to signal yet, and the turn ran on. It is kept and carried out
+/// as the process starts.
+#[cfg(unix)]
+#[test]
+fn a_stop_before_the_process_starts_stops_it_as_it_starts() {
+    let talking = Talking::default();
+    let steering = Steering::default();
+    let _guard = talking.begin("conv_1", &steering).expect("the turn");
+    assert!(talking.stop("conv_1", Signal::Term));
+
+    let mut child = std::process::Command::new("sleep")
+        .arg("30")
+        .spawn()
+        .expect("sleep");
+    talking.on_start("conv_1")(child.id());
+    let ended = ended_within(&mut child, std::time::Duration::from_secs(5));
+    let _ = child.kill();
+    let _ = child.wait();
+    assert!(ended, "the process outlived the stop asked before it");
+}
+
+/// What "Force stop" is for: a turn whose process does not end on the polite
+/// signal still ends.
+#[cfg(unix)]
+#[test]
+fn a_forced_stop_ends_a_process_the_polite_one_did_not() {
+    let talking = Talking::default();
+    let steering = Steering::default();
+    let _guard = talking.begin("conv_1", &steering).expect("the turn");
+    let mut child = std::process::Command::new("sh")
+        .args(["-c", "trap '' TERM; exec sleep 30"])
+        .spawn()
+        .expect("sh");
+    talking.on_start("conv_1")(child.id());
+    assert!(talking.stop("conv_1", Signal::Term));
+    assert!(!ended_within(
+        &mut child,
+        std::time::Duration::from_millis(300)
+    ));
+
+    assert!(talking.stop("conv_1", Signal::Kill));
+    let ended = ended_within(&mut child, std::time::Duration::from_secs(5));
+    let _ = child.kill();
+    let _ = child.wait();
+    assert!(ended, "the forced stop did not end it");
+}
+
+#[test]
+fn nothing_is_stopped_when_no_turn_runs() {
+    let talking = Talking::default();
+    assert!(!talking.stop("conv_1", Signal::Kill));
+}
