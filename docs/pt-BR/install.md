@@ -2,6 +2,11 @@
 
 A versão curta é uma linha, no Linux ou no macOS: `curl -fsSL https://devpit.app/install.sh | sh`. O resto está abaixo.
 
+Num terminal, o script desenha uma barra de progresso e marca cada etapa: a
+release, o download, o checksum, a assinatura e a instalação. Redirecionado
+para um arquivo, em CI ou com `TERM=dumb`, ele imprime linhas simples
+`devpit:`, e `NO_COLOR` mantém o layout sem as cores.
+
 ## Requisitos
 
 - **Linux**, X11 ou Wayland, é o build. macOS tem um build universal sem

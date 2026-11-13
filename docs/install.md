@@ -28,13 +28,18 @@ installed, is not signed by devpit's release key — and puts it in place: the `
 through apt on Debian and Ubuntu, the AppImage into `~/.local/bin` — with an
 entry and an icon in the application menu — on other Linux, and `devpit.app`
 into Applications on macOS. Read
-[`install.sh`](../install.sh) before piping it into a shell — it is short on
-purpose, and the site serves this same file. Run it again at any time to catch up; it says so when there is
+[`install.sh`](../install.sh) before piping it into a shell — the site serves
+this same file. Run it again at any time to catch up; it says so when there is
 nothing to do. On Windows, run the installer instead — see [Windows](#windows).
 
 Three settings, all optional: `DEVPIT_VERSION=0.1.7` installs that version,
 `DEVPIT_FORMAT=appimage` takes the AppImage even where apt is available, and
 `DEVPIT_DRY_RUN=1` downloads and verifies without installing.
+
+On a terminal it draws a progress bar and ticks off each step: the release,
+the download, the checksum, the signature and the install. Piped into a file,
+in CI or with `TERM=dumb` it prints plain `devpit:` lines instead, and
+`NO_COLOR` keeps the layout without the colour.
 
 ### Staying up to date
 
