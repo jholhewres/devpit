@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 
 import { Acts } from './ActsRows'
 import { acts, doing, tally, type Act } from './acts'
@@ -16,7 +16,6 @@ import { TurnDrafts } from './TurnDrafts'
 import { TurnChanges } from './TurnChangesView'
 import { answerOf, millis, outcome, segments, statusOf, took, type Segment } from './turnFold'
 import { foldOf, useDisclosed } from './useDisclosed'
-import { typed } from './writing'
 
 /*
  * One message, drawn part by part.
@@ -191,7 +190,8 @@ function Failed({ message }: { message: Message }): React.JSX.Element {
   )
 }
 
-/* The answer, written out at a steady pace while it is still arriving. */
+/* The answer as it has arrived: the backend paces it into batches, and each
+   new block fades in rather than the text being typed out on a timer. */
 function Reply({
   source,
   live,
@@ -204,12 +204,11 @@ function Reply({
   onOpen?: (path: string) => void
 }): React.JSX.Element {
   const show = useShellPick((shell) => shell.show)
-  const shown = useTyping(source, live)
 
   return (
-    <div className="reply" data-live={live || undefined}>
+    <div className="reply" data-live={live || undefined} data-fade={(live && !reducedMotion()) || undefined}>
       <Markdown
-        source={source.slice(0, shown)}
+        source={source}
         live={live}
         opens={(here) => {
           const path = inFolder(folder, here)
@@ -217,37 +216,12 @@ function Reply({
           else show('file', { id: `file:${path}`, path })
         }}
       />
-      {live && <span className="reply__caret" aria-hidden="true" />}
     </div>
   )
 }
 
 const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-/* How much of the answer is on screen. A timer, not animation frames: WebKitGTK
-   gives none to some visible windows. Text there when it mounts is not replayed.
-   It ticks while the text is behind: re-armed on each arrival, it never fired
-   while frames came faster than it. */
-function useTyping(source: string, live: boolean): number {
-  const [shown, setShown] = useState(source.length)
-  const at = useRef({ source, live, last: 0 })
-  at.current.source = source
-  at.current.live = live
-  const behind = shown < source.length
-  useEffect(() => {
-    if (!behind) return
-    if (!live || reducedMotion()) return setShown(at.current.source.length)
-    const timer = window.setInterval(() => {
-      const now = performance.now()
-      const elapsed = at.current.last ? Math.min(now - at.current.last, 200) : 33
-      at.current.last = now
-      setShown((was) => typed(at.current.source, was, elapsed, { live: at.current.live, reduced: false }))
-    }, 33)
-    return () => window.clearInterval(timer)
-  }, [behind, live])
-  return Math.min(shown, source.length)
-}
 
 /* How long it has been at it, counted from when the turn began rather than
    from when this was drawn: a reload mid-turn does not start again at 0. */
