@@ -260,6 +260,29 @@ fn the_sign_in_link_goes_to_loopback_with_a_code() {
     );
 }
 
+/// A command line is readable by every user of the machine: the browser is
+/// handed a page by path, owner-only, and the code is inside it.
+#[test]
+fn the_browser_is_handed_a_page_by_path_and_never_the_code() {
+    let home = tempfile::tempdir().expect("home");
+    let handed = hand_over(home.path(), &place(), "c0de").expect("handed");
+    assert!(
+        !handed.contains("c0de"),
+        "the code is on the command line: {handed}"
+    );
+    let page = std::fs::read_to_string(home.path().join(SIGN_IN_FILE)).expect("the page");
+    assert!(page.contains(&sign_in_url(&place(), "c0de")), "{page}");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(home.path().join(SIGN_IN_FILE))
+            .expect("kept")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+}
+
 #[test]
 fn a_sign_in_code_admits_once_and_only_within_its_minute() {
     let host = format!("{NAME}:41234");
