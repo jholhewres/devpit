@@ -149,6 +149,78 @@ fn the_installer_parses_in_the_shell_it_is_piped_into() {
     }
 }
 
+/// Piped into a log or run in CI, the installer prints the plain `devpit:`
+/// lines it always has, with no escape codes: its banner and bar are for a
+/// terminal only. Offline: `curl`, `uname` and `minisign` are stand-ins that
+/// serve a release from a folder.
+#[cfg(unix)]
+#[test]
+fn the_installer_piped_prints_only_its_plain_lines() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (bin, release) = (dir.path().join("bin"), dir.path().join("release"));
+    std::fs::create_dir_all(&bin).expect("bin");
+    std::fs::create_dir_all(&release).expect("release");
+    let asset = "devpit_0.1.49_amd64.AppImage";
+    let body = b"an AppImage, as far as this test goes\n".to_vec();
+    let sums = crate::release_manifest::checksums(&[(asset.to_owned(), body.clone())]);
+    std::fs::write(release.join(asset), body).expect("asset");
+    std::fs::write(release.join("SHA256SUMS"), sums).expect("sums");
+    std::fs::write(release.join(format!("{asset}.sig")), "c2lnCg==\n").expect("sig");
+    let stand_ins = [
+        (
+            "curl",
+            "out=\nwhile [ $# -gt 1 ]; do [ \"$1\" = -o ] && out=$2; shift; done\ncp \"$RELEASE/${1##*/}\" \"$out\"",
+        ),
+        ("uname", "case \"$1\" in -s) echo Linux ;; *) echo x86_64 ;; esac"),
+        ("minisign", "exit 0"),
+    ];
+    for (name, script) in stand_ins {
+        let path = bin.join(name);
+        std::fs::write(&path, format!("#!/bin/sh\n{script}\n")).expect("stand-in");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
+    let path = format!(
+        "{}:{}",
+        bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let expected = "devpit: downloading devpit_0.1.49_amd64.AppImage (0.1.49)\n\
+                    devpit: checksum matches\n\
+                    devpit: signature matches\n\
+                    devpit: dry run: would install devpit_0.1.49_amd64.AppImage as appimage, and stop here\n";
+    for shell in ["sh", "dash"] {
+        let ran = std::process::Command::new(shell)
+            .arg(crate::workspace_root().join("install.sh"))
+            .env("PATH", &path)
+            .env("RELEASE", &release)
+            .env("DEVPIT_VERSION", "0.1.49")
+            .env("DEVPIT_FORMAT", "appimage")
+            .env("DEVPIT_DRY_RUN", "1")
+            .stdin(std::process::Stdio::null())
+            .output();
+        let Ok(ran) = ran else {
+            /* `dash` is not on a Mac. */
+            assert_ne!(shell, "sh", "there is no sh to run the installer with");
+            continue;
+        };
+        let out = String::from_utf8_lossy(&ran.stdout);
+        let err = String::from_utf8_lossy(&ran.stderr);
+        assert!(ran.status.success(), "{shell}: {out}{err}");
+        // WSL adds a note of its own, which is not what this pins.
+        let plain: String = out
+            .lines()
+            .filter(|line| !line.starts_with("devpit: in WSL"))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        assert_eq!(plain, expected, "{shell}");
+        assert!(
+            !ran.stdout.contains(&0x1b) && !ran.stderr.contains(&0x1b),
+            "{shell} printed an escape code into a pipe"
+        );
+    }
+}
+
 /// Linux's gate is `make test` and the Mac's `make test-rust`; the Windows leg
 /// answers to what CI's Windows job runs, or it publishes untested.
 #[test]
