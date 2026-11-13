@@ -351,6 +351,31 @@ async function answer(prompt) {
     }
     const result = JSON.parse(recorded[recorded.length - 1])
     console.log(JSON.stringify({ ...result, result: 'the long turn is done', session_id: session }))
+  } else if (/\blong answer\b/.test(prompt)) {
+    // One long answer and nothing else, for e2e/chat-stream.mjs: 20 KB of
+    // markdown in 12-character deltas due every 8 ms on one clock, so a slow
+    // tick sends what fell due rather than stretching the stream.
+    const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))
+    const id = `answer-${Date.now()}`
+    const text = longAnswer()
+    const pieces = Math.ceil(text.length / 12)
+    event({ type: 'message_start', message: { id, role: 'assistant', content: [] } })
+    event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+    const start = Date.now()
+    for (let sent = 0; sent < pieces; ) {
+      await new Promise((done) => setTimeout(done, 8))
+      const due = Math.min(pieces, Math.floor((Date.now() - start) / 8) + 1)
+      for (; sent < due; sent += 1) event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: text.slice(sent * 12, sent * 12 + 12) } })
+    }
+    const said = JSON.parse(recorded.find((line) => line.includes('"type": "text"')))
+    said.session_id = session
+    said.message.id = id
+    said.message.content = [{ type: 'text', text }]
+    console.log(JSON.stringify(said))
+    event({ type: 'content_block_stop', index: 0 })
+    event({ type: 'message_stop' })
+    const result = JSON.parse(recorded[recorded.length - 1])
+    console.log(JSON.stringify({ ...result, result: 'the long answer is done', session_id: session }))
   } else if (/\bstream\b/.test(prompt)) {
     // Text in deltas, as `--include-partial-messages` writes it, then the whole block.
     const event = (body) => console.log(JSON.stringify({ type: 'stream_event', event: body, parent_tool_use_id: null, session_id: session }))
@@ -463,6 +488,19 @@ async function* userPrompts() {
     const content = message.message?.content
     yield Array.isArray(content) ? content.map((part) => part.text ?? '').join('') : String(content ?? '')
   }
+}
+
+/* 20 KB of markdown: prose, lists and code blocks, as #261's streaming harness wrote it. */
+function longAnswer() {
+  const words = 'the agent read the file and changed the function so that the board shows every card in its lane'.split(' ')
+  const prose = (seed, n) => Array.from({ length: n }, (_, at) => words[(seed * 7 + at * 3) % words.length]).join(' ')
+  const answer = (seed) =>
+    [`${prose(seed, 40)}.`, `- ${prose(seed + 1, 8)} \`code\`\n- ${prose(seed + 2, 9)}\n- **${prose(seed + 3, 3)}** ${prose(seed, 6)}`, `${prose(seed + 4, 30)}.`].join('\n\n')
+  let out = ''
+  for (let at = 0; out.length < 20_000; at += 1) {
+    out += at % 4 === 3 ? '```ts\n' + Array.from({ length: 30 }, (_, line) => `const v${line} = compute(${line}, "s") // n`).join('\n') + '\n```\n\n' : answer(at) + '\n\n'
+  }
+  return out.slice(0, 20_000)
 }
 
 function fixture() {
