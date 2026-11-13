@@ -43,12 +43,12 @@ DOCS="https://devpit.app/docs"
 # other case keeps the plain lines a log or a pipe has always had.
 ui() {
   rich='' open='' now='' meter='' said='' utf=''
-  accent='' bold='' dim='' green='' red='' yellow='' off='' wipe=''
+  accent='' bold='' dim='' green='' red='' yellow='' off='' wipe='' hide='' show=''
   tick='+' cross='x' skip='-' busy='.' full='#' empty='-' dot='-' arrow='->' more='...'
   [ -t 1 ] && [ -z "${CI:-}" ] && [ "${TERM:-dumb}" != dumb ] || return 0
   rich=1
   e=$(printf '\033')
-  wipe="${e}[K"
+  wipe="${e}[K" hide="${e}[?25l" show="${e}[?25h"
   if [ -z "${NO_COLOR:-}" ]; then
     case "${COLORTERM:-}:${TERM:-}" in
       truecolor:* | 24bit:*) accent="${e}[38;2;226;121;91m" ;;
@@ -62,6 +62,8 @@ ui() {
   esac
   if [ -n "$utf" ]; then
     tick='✓' cross='✗' skip='–' busy='·' full='━' empty='─' dot='·' arrow='→' more='…'
+    # In colour the rest of the bar is the same line, dimmed.
+    [ -z "$off" ] || empty='━'
   fi
   # stdin is the script itself under `curl | sh`, so the size comes from the tty.
   cols=$({ stty size </dev/tty; } 2>/dev/null | awk '{ print $2 }')
@@ -214,6 +216,7 @@ fetch_big() {
 # from the headers and the file as they arrive.
 fetch_shown() {
   : >"$1.head"
+  printf '%s' "$hide"
   meter "$1" &
   meter=$!
   rc=0
@@ -235,7 +238,7 @@ stop_meter() {
   kill "$meter" 2>/dev/null || true
   wait "$meter" 2>/dev/null || true
   meter=''
-  printf '\r%s' "$wipe"
+  printf '\r%s%s' "$wipe" "$show"
 }
 
 # Redraws the download until it is stopped: a bar once the size is known, a
@@ -274,11 +277,13 @@ mb() {
 bar() {
   pct=$(($1 * 100 / $2))
   [ "$pct" -le 100 ] || pct=100
-  tail=$(printf '%3d%%  %s / %s MB' "$pct" "$(mb "$1")" "$(mb "$2")")
+  # Padded to the total's width, so the bar's end holds still.
+  whole=$(mb "$2")
+  tail=$(printf '%3d%%  %*s / %s MB' "$pct" "${#whole}" "$(mb "$1")" "$whole")
   # One column short of the edge, so the line never wraps.
   room=$((cols - ${#tail} - 5))
   fill=$((room * pct / 100))
-  printf '\r  %s%s%s%s%s  %s%s' "$accent" "$(repeat "$full" "$fill")" "$dim" \
+  printf '\r  %s%s%s%s%s%s  %s%s' "$accent" "$(repeat "$full" "$fill")" "$off" "$dim" \
     "$(repeat "$empty" $((room - fill)))" "$off" "$tail" "$wipe"
 }
 
