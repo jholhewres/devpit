@@ -236,16 +236,25 @@ fn refusal_of_attach(stream: &mut std::os::unix::net::UnixStream, pane: u32) -> 
 
 /// A spawn answers once the daemon holds the pane, so an attach right after
 /// it, on a connection of its own, finds it.
+///
+/// The panes are killed only after the last spawn: macOS can refuse a new pty
+/// while another is being freed, and a kill right before each spawn made that
+/// race on every round.
 #[cfg(unix)]
 #[test]
 fn an_attach_right_after_a_spawn_is_never_refused() {
     let daemon = serving();
     let home = daemon.home.path();
+    let mut answers = Vec::new();
     for pane in 1..=20 {
         spawn(home, pane, &shell_in(home)).expect("spawn");
         let mut other = connect(home).expect("connect");
-        let refused = refusal_of_attach(&mut other, pane);
-        kill(home, pane);
+        answers.push((pane, refusal_of_attach(&mut other, pane)));
+    }
+    for (pane, _) in &answers {
+        kill(home, *pane);
+    }
+    for (pane, refused) in answers {
         assert_eq!(refused, None, "pane {pane}");
     }
 }
