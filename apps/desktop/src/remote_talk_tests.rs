@@ -294,8 +294,8 @@ fn a_device_reading_a_conversation_is_sent_a_turn_started_elsewhere_and_no_other
     talk.view("p1", "c1");
     let _watch = relay.watch(talk.watching(out));
 
-    let (turn, _running) = relay.open("c1", nobody());
-    let (_other, _also) = relay.open("c2", nobody());
+    let (turn, _running) = relay.open("c1", crate::chat_relay::Sink::whole(nobody()));
+    let (_other, _also) = relay.open("c2", crate::chat_relay::Sink::whole(nobody()));
     assert!(talk.follows("c1"));
     assert!(!talk.follows("c2"));
 

@@ -21,12 +21,12 @@ fn woken(relay: &Relay) -> (Woken, Arc<Mutex<Vec<Frame>>>) {
     let into = got.clone();
     let (frames, relaying) = relay.open(
         "conv",
-        Channel::new(move |body: InvokeResponseBody| {
+        crate::chat_relay::Sink::whole(Channel::new(move |body: InvokeResponseBody| {
             if let Ok(frame) = body.deserialize::<Frame>() {
                 into.lock().unwrap().push(frame);
             }
             Ok(())
-        }),
+        })),
     );
     let turn = Woken {
         turn_id: "turn_woken".to_owned(),
