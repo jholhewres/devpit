@@ -116,6 +116,45 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
     assert_eq!(said.anchor.as_deref(), Some("u-2"));
 }
 
+/// A turn's CLI leads a process group of its own, so a forced stop can end
+/// the tools it started with it. Run against a stand-in that says its group.
+#[cfg(unix)]
+#[test]
+fn a_turns_cli_leads_a_process_group_of_its_own() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join("fake-claude");
+    std::fs::write(
+        &cli,
+        "#!/bin/sh\n\
+         read -r _prompt\n\
+         group=$(ps -o pgid= -p $$ | tr -d ' ')\n\
+         echo \"{\\\"type\\\":\\\"result\\\",\\\"subtype\\\":\\\"$group-$$\\\",\\\"total_cost_usd\\\":0}\"\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let command = cli.to_string_lossy().into_owned();
+    let mut turn = turn(None);
+    turn.command = &command;
+    turn.cwd = dir.path();
+    let said = (0..5)
+        .find_map(|_| {
+            match crate::talk::say(&crate::driver::Claude::default(), &turn, |_| {}, |_| {}) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                }
+                other => Some(other),
+            }
+        })
+        .expect("the stand-in never started")
+        .expect("a turn");
+    let told = said.end.stop_reason.expect("the stand-in's group");
+    let (group, pid) = told.split_once('-').expect("group-pid");
+    assert_eq!(group, pid, "the CLI is not its own group's leader");
+}
+
 #[test]
 fn a_rewound_turn_forks_at_the_message_it_was_rewound_to() {
     let mut forked = turn(None);

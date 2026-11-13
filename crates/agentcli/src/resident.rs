@@ -79,7 +79,7 @@ impl Resident {
                 on(heard);
             }
         };
-        let mut child = devpit_pty::host_env::command(turn.command)
+        let mut child = crate::talk::own_group(&mut devpit_pty::host_env::command(turn.command))
             .args(argv(turn))
             .current_dir(turn.cwd)
             .envs(turn.env.iter().map(|(key, value)| (key, value)))

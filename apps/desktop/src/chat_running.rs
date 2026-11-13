@@ -94,44 +94,84 @@ impl Talking {
                 true
             }
             Some(None) => {
-                if let Ok(mut stopping) = self.stopping.lock() {
-                    let asked = stopping.entry(conversation.to_owned()).or_insert(signal);
-                    if signal == Signal::Kill {
-                        *asked = signal;
-                    }
-                }
+                self.ask(conversation, signal);
                 true
             }
         }
     }
 
+    /// A stop of a turn still starting, kept for it; false when the turn is
+    /// not starting — none, or one whose process already runs.
+    pub(crate) fn stop_starting(&self, conversation: &str) -> bool {
+        let Ok(held) = self.running.lock() else {
+            return false;
+        };
+        let starting = held.get(conversation) == Some(&None);
+        if starting {
+            self.ask(conversation, Signal::Term);
+        }
+        starting
+    }
+
+    fn ask(&self, conversation: &str, signal: Signal) {
+        if let Ok(mut stopping) = self.stopping.lock() {
+            let asked = stopping.entry(conversation.to_owned()).or_insert(signal);
+            if signal == Signal::Kill {
+                *asked = signal;
+            }
+        }
+    }
+
     /// What the turn calls with its process once it starts: kept to be
-    /// stopped, and stopped at once when that was asked before.
-    pub(crate) fn on_start(&self, conversation: &str) -> impl Fn(u32) + Send + Sync + 'static {
+    /// stopped. Answers whether the turn goes on. A stop asked before is
+    /// carried out on the process, or — a `resident` process, which outlives
+    /// the turn — left to the turn, which interrupts itself.
+    pub(crate) fn on_start(
+        &self,
+        conversation: &str,
+        resident: bool,
+    ) -> impl Fn(u32) -> bool + Send + Sync + 'static {
         let (running, stopping) = (self.running.clone(), self.stopping.clone());
         let key = conversation.to_owned();
         move |pid| {
             let Ok(mut held) = running.lock() else {
-                return;
+                return true;
             };
             held.insert(key.clone(), Some(pid));
             let asked = stopping.lock().ok().and_then(|mut all| all.remove(&key));
-            if let Some(signal) = asked {
-                signalled(pid, signal);
+            match asked {
+                None => true,
+                Some(_) if resident => false,
+                Some(signal) => {
+                    signalled(pid, signal);
+                    false
+                }
+            }
+        }
+    }
+
+    /// The turn's process is gone: its pid is let go of, so no stop reaches a
+    /// number the system may have given to another process.
+    pub(crate) fn exited(&self, conversation: &str) {
+        if let Ok(mut held) = self.running.lock() {
+            if let Some(pid) = held.get_mut(conversation) {
+                *pid = None;
             }
         }
     }
 }
 
+/// A polite stop to the process; a forced one to its group, the tools it
+/// started included.
 fn signalled(pid: u32, signal: Signal) {
-    let flag = match signal {
-        Signal::Term => "-TERM",
-        Signal::Kill => "-KILL",
-    };
-    let _ = std::process::Command::new("kill")
-        .arg(flag)
-        .arg(pid.to_string())
-        .status();
+    match signal {
+        Signal::Term => {
+            let _ = i32::try_from(pid).is_ok_and(devpit_pty::process::terminate);
+        }
+        Signal::Kill => {
+            devpit_pty::end_group(pid);
+        }
+    }
 }
 
 #[cfg(test)]

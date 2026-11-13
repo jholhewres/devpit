@@ -141,6 +141,19 @@ pub fn stop_group(pgid: u32, grace: Duration) -> Stopped {
     Stopped::Forced
 }
 
+/// Ends a process group at once, and with it every process its leader
+/// started: what a stop that went unheeded asks for. Whether it was sent.
+#[cfg(unix)]
+pub fn end_group(pgid: u32) -> bool {
+    signal_group(pgid, KILL)
+}
+
+/// No process groups here: the leader and the tree under it.
+#[cfg(not(unix))]
+pub fn end_group(pgid: u32) -> bool {
+    i32::try_from(pgid).is_ok_and(crate::process::terminate)
+}
+
 const TERM: i32 = 15;
 const KILL: i32 = 9;
 /// Sends nothing; asks whether the target is there.

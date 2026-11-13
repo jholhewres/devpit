@@ -69,6 +69,14 @@ pub struct Said {
     pub anchor: Option<String>,
 }
 
+/// A turn's CLI leads a process group of its own: a forced stop ends the
+/// tools it started with it, which signalling the CLI alone would leave running.
+pub(crate) fn own_group(command: &mut std::process::Command) -> &mut std::process::Command {
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(command, 0);
+    command
+}
+
 /// Runs one turn, handing every part to `on_part` as it is read.
 ///
 /// `on_start` receives the child's pid, which is what cancelling needs: the
@@ -82,7 +90,7 @@ pub fn say(
 ) -> Result<Said, AgentError> {
     let argv = argv(turn);
 
-    let mut child = devpit_pty::host_env::command(turn.command)
+    let mut child = own_group(&mut devpit_pty::host_env::command(turn.command))
         .args(&argv)
         .current_dir(turn.cwd)
         .envs(turn.env.iter().map(|(key, value)| (key, value)))

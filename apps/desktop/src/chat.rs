@@ -166,7 +166,9 @@ pub async fn chat_send(
         message: opened.clone(),
     });
 
-    let started = state.on_start(&conversation_id);
+    let started = state.on_start(&conversation_id, staying.is_some());
+    let talking = state.inner().clone();
+    let key = conversation_id.clone();
     let parts = Arc::new(Mutex::new(Vec::new()));
     let collected = parts.clone();
     let sink = on_frame.clone();
@@ -229,6 +231,7 @@ pub async fn chat_send(
             },
             started,
         );
+        talking.exited(&key);
         crate::turn_changes::report(checkout, before.as_deref(), &collected, &sink, &answer);
         said
     })
