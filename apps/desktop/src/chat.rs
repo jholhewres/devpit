@@ -152,6 +152,7 @@ pub async fn chat_send(
         Some(_) => relay.waiting(&conversation_id, on_frame),
         None => relay.open(&conversation_id, on_frame),
     };
+    let on_frame = crate::chat_pace::paced(on_frame);
 
     let (asked, opened) = crate::chat_turn::messages(&turn_id, &prompt, now() * 1000.0);
     let answer_id = opened.id.clone();

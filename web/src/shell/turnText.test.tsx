@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Message, Part } from '../gen/bindings'
@@ -19,5 +19,23 @@ describe('an answer kept in pieces', () => {
     const split = render(<Turn message={answer(pieces.map(text))} />).container.innerHTML
     expect(split).toBe(whole)
     expect(render(<Turn message={answer(pieces.map(text))} />).container.querySelectorAll('.reply')).toHaveLength(1)
+  })
+})
+
+describe('an answer still arriving', () => {
+  it('keeps moving on screen while more of it arrives faster than it is written', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] })
+    const live = (said: string): Message => ({ ...answer([text(said)]), streaming: true })
+    const words = 'word '.repeat(400)
+    const { container, rerender } = render(<Turn message={live(words.slice(0, 5))} />)
+    /* A piece every 16 ms, as the frames batched for each paint arrive. */
+    for (let at = 1; at <= 30; at += 1) {
+      rerender(<Turn message={live(words.slice(0, 5 + at * 12))} />)
+      act(() => void vi.advanceTimersByTime(16))
+    }
+    const shown = container.querySelector('.reply')!.textContent!.length
+    vi.useRealTimers()
+    /* 365 characters arrived in 480 ms; written at its pace, well over 100 are on screen. */
+    expect(shown).toBeGreaterThan(100)
   })
 })

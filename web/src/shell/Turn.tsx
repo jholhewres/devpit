@@ -223,23 +223,26 @@ const reducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /* How much of the answer is on screen. A timer, not animation frames: WebKitGTK
-   gives none to some visible windows. Text there when it mounts is not replayed. */
+   gives none to some visible windows. Text there when it mounts is not replayed.
+   It ticks while the text is behind: re-armed on each arrival, it never fired
+   while frames came faster than it. */
 function useTyping(source: string, live: boolean): number {
   const [shown, setShown] = useState(source.length)
   const at = useRef({ source, live, last: 0 })
   at.current.source = source
   at.current.live = live
+  const behind = shown < source.length
   useEffect(() => {
-    if (shown >= source.length && live) return
-    if (!live || reducedMotion()) return setShown(source.length)
-    const timer = window.setTimeout(() => {
+    if (!behind) return
+    if (!live || reducedMotion()) return setShown(at.current.source.length)
+    const timer = window.setInterval(() => {
       const now = performance.now()
       const elapsed = at.current.last ? Math.min(now - at.current.last, 200) : 33
       at.current.last = now
       setShown((was) => typed(at.current.source, was, elapsed, { live: at.current.live, reduced: false }))
     }, 33)
-    return () => window.clearTimeout(timer)
-  }, [shown, source, live])
+    return () => window.clearInterval(timer)
+  }, [behind, live])
   return Math.min(shown, source.length)
 }
 
