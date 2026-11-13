@@ -197,9 +197,9 @@ pub(crate) async fn attach_with(
 ) -> Result<(), RpcError> {
     let state = tauri::Manager::state::<SessionState>(app);
     // Which tab draws it does not matter here; that it is this project's does.
-    let layout = crate::sessions::holding(&project_id, &pane_id)?;
+    let target = crate::pane_io::placed_target_of(&project_id, &pane_id)?;
     #[cfg(unix)]
-    if crate::ptyd_link::leaf_is_ptyd(&layout, &pane_id) {
+    if crate::ptyd_link::is_ptyd(&target) {
         return crate::ptyd_attach::attach(
             app, label, &state, pane_id, client_id, rows, cols, sink,
         )

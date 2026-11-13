@@ -47,6 +47,17 @@ pub(crate) fn target_of(project_id: &str, leaf_id: &str) -> Result<String, RpcEr
     Ok(target_in(&layout, leaf_id))
 }
 
+/// [`target_of`], answered without the store for a pane the tap has placed.
+/// A project switch asks it for every pane it attaches and redraws, and
+/// opening the store each time was most of what an attach cost the backend.
+pub(crate) fn placed_target_of(project_id: &str, leaf_id: &str) -> Result<String, RpcError> {
+    #[cfg(unix)]
+    if crate::ptyd_watch::holds(project_id, leaf_id) {
+        return Ok(crate::ptyd_link::target(leaf_id));
+    }
+    target_of(project_id, leaf_id)
+}
+
 /// A tmux leaf's target is rebuilt from its names rather than read back, so
 /// a layout stored by an older build still reaches its window.
 pub(crate) fn target_in(layout: &SessionLayout, leaf_id: &str) -> String {

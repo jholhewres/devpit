@@ -46,6 +46,6 @@ pub(crate) fn session_redraw_now(
     project_id: String,
     pane_id: String,
 ) -> Result<bool, RpcError> {
-    let target = crate::pane_io::target_of(&project_id, &pane_id)?;
+    let target = crate::pane_io::placed_target_of(&project_id, &pane_id)?;
     crate::pane_io::redraw(app, &target)
 }

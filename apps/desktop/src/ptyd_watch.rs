@@ -64,6 +64,12 @@ impl Fronts {
         self.places.get(&pane)
     }
 
+    /// Whether `leaf` is a placed pane of `project`'s.
+    pub(crate) fn holds(&self, project: &str, leaf: &str) -> bool {
+        self.place_of(crate::ptyd_link::pane_number(leaf))
+            .is_some_and(|(placed_in, placed)| placed_in == project && placed == leaf)
+    }
+
     /// Every pane placed, by number.
     pub(crate) fn panes(&self) -> Vec<u32> {
         self.places.keys().copied().collect()
@@ -121,6 +127,14 @@ pub(crate) fn running_in(project_id: &str) -> Vec<PaneRunning> {
         .lock()
         .map(|fronts| fronts.running_in(project_id))
         .unwrap_or_default()
+}
+
+/// Whether `leaf` is a pane the daemon holds for `project`, as the layouts
+/// read so far and the panes opened since say.
+pub(crate) fn holds(project_id: &str, leaf_id: &str) -> bool {
+    fronts()
+        .lock()
+        .is_ok_and(|fronts| fronts.holds(project_id, leaf_id))
 }
 
 /// What pane `pane` runs in front, as the daemon last said.
