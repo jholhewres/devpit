@@ -1273,6 +1273,15 @@ export const commands = {
 	 *  field that silently rewrites what was typed is a field nobody trusts twice.
 	 */
 	worktreeBaseWrite: (projectId: string | null, typed: string) => typedError<WorktreeBase, RpcError>(__TAURI_INVOKE("worktree_base_write", { projectId, typed })),
+	/**  `worktree.cleanup_read` */
+	worktreeCleanupRead: () => typedError<WorktreeCleanup, RpcError>(__TAURI_INVOKE("worktree_cleanup_read")),
+	/**  `worktree.cleanup_write` — turns deleting merged worktrees on or off. */
+	worktreeCleanupWrite: (deleteMerged: boolean) => typedError<WorktreeCleanup, RpcError>(__TAURI_INVOKE("worktree_cleanup_write", { deleteMerged })),
+	/**
+	 *  `worktree.cleanup_now` — the Delete now button: merged worktrees go now,
+	 *  whatever the switch says, since the switch is about going on their own.
+	 */
+	worktreeCleanupNow: () => typedError<WorktreeCleanup, RpcError>(__TAURI_INVOKE("worktree_cleanup_now")),
 	/**  `worktree.sources` — the kinds this project has, and which are shown. */
 	worktreeSources: (projectId: string | null) => typedError<Source[], RpcError>(__TAURI_INVOKE("worktree_sources", { projectId })),
 	/**  `worktree.source_show` — shows or hides one kind. */
@@ -2602,6 +2611,16 @@ export type ClaudePluginInstallation = {
 export type ClaudePluginState = "missing" | 
 /**  Installed from an earlier build of the plugin. */
 "outdated" | "current";
+
+/**  What one cleanup did. */
+export type CleanupRun = {
+	/**  Seconds since the epoch. */
+	at: number | null,
+	removed: Swept[],
+	kept: Swept[],
+	branches: number,
+	freedBytes: number | null,
+};
 
 export type Column = {
 	id: string,
@@ -5854,6 +5873,18 @@ export type Surface =
 /**  A pin shown on the card face. */
 { type: "cardPin" };
 
+/**  One card the cleanup removed or kept, and why. */
+export type Swept = {
+	cardId: string,
+	title: string,
+	why: SweptWhy,
+	bytes: number | null,
+	/**  What git said, when it refused. */
+	detail: string | null,
+};
+
+export type SweptWhy = "landed" | "uncommitted" | "running" | "failed";
+
 export type SyncMachine = {
 	id: string,
 	name: string,
@@ -6323,6 +6354,12 @@ export type WorktreeBase = {
 	example: string,
 	/**  True while nothing has been chosen and the workspace default is in use. */
 	isDefault: boolean,
+};
+
+/**  The cleanup as Settings shows it. */
+export type WorktreeCleanup = {
+	deleteMerged: boolean,
+	last: CleanupRun | null,
 };
 
 /**

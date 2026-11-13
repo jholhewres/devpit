@@ -27,6 +27,11 @@ pub const SESSION_HANDOFF_PERCENT: &str = "sessions.handoff_at_percent";
 pub const OPEN_IN_APPS: &str = "apps.open_in";
 /// Which worktree origins are hidden from the lists, comma-separated.
 pub const WORKTREES_HIDDEN: &str = "worktrees.hidden";
+/// Whether a card's worktree, build cache and branch go once its work is in
+/// the default branch. On unless turned off.
+pub const WORKTREES_DELETE_MERGED: &str = "worktrees.delete_merged";
+/// What the last worktree cleanup did, as JSON.
+pub const WORKTREES_CLEANUP_LAST: &str = "worktrees.cleanup_last";
 /// The agent profiles the person declared, as JSON.
 pub const AGENT_PROFILES: &str = "agents.profiles";
 /// What sync keeps about each profile on this machine: values another

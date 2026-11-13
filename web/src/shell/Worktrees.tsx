@@ -7,6 +7,7 @@ import { ask, commands } from './live'
 import { useShell } from './useShell'
 import { Sources } from './Sources'
 import { WorktreeBase } from './WorktreeBase'
+import { WorktreeCleanup } from './WorktreeCleanup'
 
 /*
  * The checkouts the cards of this project have.
@@ -55,6 +56,9 @@ export function Worktrees(): React.JSX.Element {
 
       <WorktreeBase />
       <Sources />
+
+      <p className="prefs__gt">Cleanup</p>
+      <WorktreeCleanup />
 
       {error && <p className="pref__d">{error}</p>}
       {rows.length === 0 && !error && (

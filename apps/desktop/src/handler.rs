@@ -25,7 +25,7 @@ use crate::{
     search, session_cost, session_search, session_window, sessions, settings, shell_launch,
     sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering, steps,
     stop_asked, stopping, tab_opening, threads, transcribe, tray, update, watching, workspace,
-    worktree_base, worktree_setup, worktrees, wsfiles,
+    worktree_base, worktree_cleanup, worktree_setup, worktrees, wsfiles,
 };
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
@@ -293,6 +293,9 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         worktrees::worktree_remove,
         worktree_base::worktree_base_read,
         worktree_base::worktree_base_write,
+        worktree_cleanup::worktree_cleanup_read,
+        worktree_cleanup::worktree_cleanup_write,
+        worktree_cleanup::worktree_cleanup_now,
         sources::worktree_sources,
         sources::worktree_source_show,
         filetree::project_tree,
