@@ -50,6 +50,8 @@ type Following = Arc<Mutex<HashSet<String>>>;
 pub(crate) struct Talk {
     pub uploads: Uploads,
     following: Following,
+    /// The conversation the device last opened, and its project.
+    viewing: Arc<Mutex<Option<(String, String)>>>,
 }
 
 impl Talk {
@@ -61,7 +63,47 @@ impl Talk {
         project: &str,
         conversation: &str,
     ) {
-        follow(app, out, &self.following, project, conversation);
+        follow(
+            &app.state::<Relay>(),
+            out,
+            &self.following,
+            project,
+            conversation,
+        );
+    }
+
+    /// The conversation the device reads now.
+    pub(crate) fn view(&self, project: &str, conversation: &str) {
+        if let Ok(mut viewing) = self.viewing.lock() {
+            *viewing = Some((project.to_owned(), conversation.to_owned()));
+        }
+    }
+
+    /// For [`Relay::watch`]: a turn entering the conversation the device
+    /// reads is followed, wherever it began.
+    pub(crate) fn watching(
+        &self,
+        out: Sender<RemoteOut>,
+    ) -> impl Fn(&Relay, &str) + Send + Sync + 'static {
+        let (viewing, following) = (self.viewing.clone(), self.following.clone());
+        move |relay, conversation| {
+            let project = viewing.lock().ok().and_then(|viewing| {
+                viewing
+                    .as_ref()
+                    .filter(|(_, read)| read == conversation)
+                    .map(|(project, _)| project.clone())
+            });
+            if let Some(project) = project {
+                follow(relay, &out, &following, &project, conversation);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn follows(&self, conversation: &str) -> bool {
+        self.following
+            .lock()
+            .is_ok_and(|held| held.contains(conversation))
     }
 }
 
@@ -287,7 +329,13 @@ pub(crate) fn say(
             let (project, conversation) = (at.clone(), said.clone());
             tauri::async_runtime::spawn(async move {
                 let _ = app.emit(crate::chat_resident::WOKE, &conversation);
-                follow(&app, &out, &following, &project, &conversation);
+                follow(
+                    &app.state::<Relay>(),
+                    &out,
+                    &following,
+                    &project,
+                    &conversation,
+                );
             });
         }
         Ok(())
@@ -345,13 +393,13 @@ fn refused(out: &Sender<RemoteOut>, project: String, conversation: String, why: 
 /// Sends this connection the turns running in a conversation, from where
 /// they are, unless it is already being sent them.
 fn follow(
-    app: &tauri::AppHandle,
+    relay: &Relay,
     out: &Sender<RemoteOut>,
     following: &Following,
     project: &str,
     conversation: &str,
 ) {
-    let relay = app.state::<Relay>().inner().clone();
+    let relay = relay.clone();
     {
         let Ok(mut held) = following.lock() else {
             return;

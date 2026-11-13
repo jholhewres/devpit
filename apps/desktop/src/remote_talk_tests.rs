@@ -7,9 +7,10 @@ use devpit_rpc::{CallState, Conversation, Message, Part, Role, Transcript, TurnF
 use serde_json::json;
 
 use super::{
-    ask_of, for_phone, heard, photo, plain, voice_kind, Uploads, MOST_VOICE, PHONE_MESSAGES,
+    ask_of, for_phone, heard, photo, plain, voice_kind, Talk, Uploads, MOST_VOICE, PHONE_MESSAGES,
     PHONE_OUTPUT,
 };
+use crate::chat_relay::Relay;
 use crate::pasting::MOST_BYTES;
 
 fn message(role: Role, parts: Vec<Part>) -> Message {
@@ -279,4 +280,40 @@ fn a_device_names_a_conversation_or_a_file_only_plainly() {
     assert!(!plain("../sessions/other"));
     assert!(!plain("a/b"));
     assert!(!plain(&"x".repeat(65)));
+}
+
+fn nobody() -> tauri::ipc::Channel<devpit_rpc::Frame> {
+    tauri::ipc::Channel::new(|_| Ok(()))
+}
+
+#[test]
+fn a_device_reading_a_conversation_is_sent_a_turn_started_elsewhere_and_no_other() {
+    let relay = Relay::default();
+    let talk = Talk::default();
+    let (out, phone) = std::sync::mpsc::channel();
+    talk.view("p1", "c1");
+    let _watch = relay.watch(talk.watching(out));
+
+    let (turn, _running) = relay.open("c1", nobody());
+    let (_other, _also) = relay.open("c2", nobody());
+    assert!(talk.follows("c1"));
+    assert!(!talk.follows("c2"));
+
+    turn.send(devpit_rpc::Frame::Session {
+        session_id: "s1".to_owned(),
+    })
+    .unwrap();
+    let sent = phone
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("the turn reached the device");
+    let devpit_rpc::RemoteOut::ChatFrame {
+        project,
+        conversation,
+        frame,
+    } = sent
+    else {
+        panic!("not a chat frame");
+    };
+    assert_eq!((project.as_str(), conversation.as_str()), ("p1", "c1"));
+    assert!(matches!(frame, devpit_rpc::Frame::Session { session_id } if session_id == "s1"));
 }

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Attachment, Conversation, Frame, Message, Profile } from '../gen/bindings'
 import {
   applied,
+  appliedAll,
   ASKS,
   batched,
   steered,
@@ -73,6 +74,14 @@ describe('what arrives on the stream', () => {
       end: { turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false },
     } as Frame)
     expect(msgs[0]!.streaming).toBe(false)
+  })
+
+  it('draws a message steered into the turn before the answer still being written, which keeps growing', () => {
+    /* Heard by a window or a phone that did not steer it: the turn's own relay sends it. */
+    const said: Message = { ...message('u2', false), role: 'user', turnId: null }
+    const after = appliedAll([message('u1', false), message('a1')], [text('a1', 'Look'), { type: 'opened', message: said }, text('a1', 'ing.')])
+    expect(after.map((one) => one.id)).toEqual(['u1', 'u2', 'a1'])
+    expect(after[2]!.parts).toEqual([{ kind: 'text', text: 'Looking.', parent: null }])
   })
 
   it('ignores a frame for a message it does not have', () => {
@@ -264,6 +273,12 @@ describe('a message sent into the turn in flight', () => {
     const said = { ...message('u2', false), role: 'user' as const }
     expect(steered([asked, message('a1')], said).map((one) => one.id)).toEqual(['u1', 'u2', 'a1'])
     expect(steered([message('a0', false)], said).map((one) => one.id)).toEqual(['a0', 'u2'])
+  })
+
+  it('is drawn once when the turn sent it back before the steer answered', () => {
+    const said: Message = { ...message('u2', false), role: 'user', turnId: null }
+    const heard = appliedAll([message('a1')], [{ type: 'opened', message: said }])
+    expect(steered(heard, said).map((one) => one.id)).toEqual(['u2', 'a1'])
   })
 })
 

@@ -116,6 +116,8 @@ export { applied, appended, appliedAll, failedOn, joined, prepended, retaken, wi
 /* A message sent into the turn in flight sits before the answer still being
    written, where the transcript keeps it. */
 export function steered(messages: readonly Message[], said: Message): readonly Message[] {
+  /* The turn's relay may have drawn it before the steer answered. */
+  if (messages.some((one) => one.id === said.id)) return messages
   const at = messages.findLastIndex((one) => one.streaming)
   return at < 0 ? [...messages, said] : [...messages.slice(0, at), said, ...messages.slice(at)]
 }

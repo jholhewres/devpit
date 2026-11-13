@@ -235,3 +235,49 @@ fn a_running_turns_output_is_found_whole_in_the_relay() {
     assert_eq!(relay.running_output("conv", "m", "other"), None);
     assert_eq!(relay.running_output("elsewhere", "m", "c"), None);
 }
+
+#[test]
+fn a_frame_told_to_a_running_turn_reaches_its_window_and_a_late_joiner_in_order() {
+    let relay = Relay::default();
+    let (first, to_first) = heard();
+    let (turn, _running) = relay.open("conv", first);
+    turn.send(frame("asked")).unwrap();
+    assert!(relay.told("conv", frame("steered")));
+    turn.send(frame("answered")).unwrap();
+
+    let (late, to_late) = heard();
+    assert!(relay.join("conv", late.clone(), late.id()).is_some());
+    assert_eq!(*to_first.lock().unwrap(), ["asked", "steered", "answered"]);
+    assert_eq!(*to_late.lock().unwrap(), ["asked", "steered", "answered"]);
+}
+
+#[test]
+fn nothing_is_told_when_no_turn_runs() {
+    let relay = Relay::default();
+    assert!(!relay.told("conv", frame("steered")));
+}
+
+#[test]
+fn a_watcher_hears_each_turn_that_enters_a_conversation_once_it_can_be_joined() {
+    let relay = Relay::default();
+    let entered = Arc::new(Mutex::new(Vec::new()));
+    let into = entered.clone();
+    let watch = relay.watch(move |relay, conversation| {
+        into.lock()
+            .unwrap()
+            .push((conversation.to_owned(), relay.running(conversation)));
+    });
+    let (first, _) = heard();
+    let (_turn, running) = relay.open("conv", first);
+    drop(running);
+    let (second, _) = heard();
+    let (_waits, _waiting) = relay.waiting("other", second);
+
+    drop(watch);
+    let (third, _) = heard();
+    let _after = relay.open("conv", third);
+    assert_eq!(
+        *entered.lock().unwrap(),
+        [("conv".to_owned(), true), ("other".to_owned(), true)]
+    );
+}
