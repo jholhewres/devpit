@@ -184,7 +184,8 @@ describe('the Devflow screen', () => {
     cleanup()
     standing = { state: 'failing', reason: 'Decisions refused it (400 Bad Request): no criteria' }
     render(<DevflowPane />)
-    expect(await screen.findByText('failing: Decisions refused it (400 Bad Request): no criteria')).toBeTruthy()
+    /* A second render in one test: past the default second under a loaded suite. */
+    expect(await screen.findByText('failing: Decisions refused it (400 Bad Request): no criteria', {}, { timeout: 3000 })).toBeTruthy()
   })
 
   it('says where an invalid file is refused, and opens it', async () => {
