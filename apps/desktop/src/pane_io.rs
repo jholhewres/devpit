@@ -204,11 +204,18 @@ pub(crate) fn scroll(target: &str, lines: i32) -> Result<bool, RpcError> {
     }
 }
 
+/// A shell at its prompt, which its replay draws whole. A redraw is a resize,
+/// and after a SIGWINCH zsh's line editor now and then fails a read and exits.
+pub(crate) fn drawn_by_its_replay(front: Option<&str>) -> bool {
+    front.is_some_and(devpit_pty::agents::idle_shell)
+}
+
 /// Has a pane's screen drawn again whole. Answers whether there was a window
 /// on it to draw; the page asks again when there was not yet.
 pub(crate) fn redraw(app: &tauri::AppHandle, target: &str) -> Result<bool, RpcError> {
     match holder(target) {
         Holder::Tmux { session, window } => tmux()?.redraw(session, window).map_err(internal),
+        Holder::Ptyd(pane) if drawn_by_its_replay(told_front(pane).as_deref()) => Ok(true),
         Holder::Ptyd(_) => {
             let leaf = target
                 .strip_prefix(crate::ptyd_link::TARGET_PREFIX)

@@ -175,3 +175,15 @@ fn a_pane_the_tap_placed_is_aimed_at_without_reading_its_layout() {
     );
     assert!(placed_target_of("p-elsewhere", leaf).is_err());
 }
+
+#[test]
+fn a_shell_at_its_prompt_is_drawn_by_its_replay_and_not_resized_to_redraw() {
+    assert!(drawn_by_its_replay(Some("zsh")));
+    assert!(drawn_by_its_replay(Some("bash")));
+    assert!(!drawn_by_its_replay(Some("claude")));
+    assert!(!drawn_by_its_replay(Some("vim")));
+    assert!(
+        !drawn_by_its_replay(None),
+        "a pane not heard from yet is redrawn"
+    );
+}

@@ -11,6 +11,11 @@ release notes are taken from here when a version is tagged.
   projects moved the terminals of the project you left inside the
   window, and each move made the whole window work out its styles again.
   They now stay in place.
+- **A terminal no longer ends by itself when you come back to its
+  project.** Each return redrew every terminal by resizing it, and a
+  zsh waiting at its prompt now and then quit on one of those resizes,
+  leaving the pane empty. A shell at its prompt is no longer resized to
+  be redrawn: coming back already draws what it showed.
 
 ## 0.1.49 — 2026-11-05
 
