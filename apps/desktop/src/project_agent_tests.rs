@@ -115,6 +115,10 @@ fn the_agent_idles_out_and_wakes_where_it_left_off_with_its_memory() {
         .collect();
     assert_eq!(starts.len(), 2, "{said}");
     assert!(!starts[0].contains("--resume"), "{}", starts[0]);
+    // Read-only whatever mode the profile's own settings choose.
+    for start in &starts {
+        assert!(start.contains("--permission-mode plan"), "{start}");
+    }
     assert!(starts[1].contains("--resume s-1"), "{}", starts[1]);
     let lines: Vec<&str> = said
         .lines()

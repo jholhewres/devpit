@@ -4,9 +4,9 @@
 //!
 //! It answers from its memory (`project_memory`) and the code, and writes the
 //! brief a card's session starts with. No card session, checkout or terminal
-//! is involved. Without devpit's hook settings the CLI refuses its writes, so
-//! it only reads. Woken again after idling out, it resumes the same
-//! conversation and is handed its memory afresh.
+//! is involved. It runs in the CLI's plan mode, so it reads and never writes.
+//! Woken again after idling out, it resumes the same conversation and is
+//! handed its memory afresh.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -25,6 +25,8 @@ pub(crate) const METHODS: [&str; 2] = ["project_agent_ask", "project_agent_brief
 /// How long an agent nobody asks keeps its process.
 const IDLE: Duration = Duration::from_secs(10 * 60);
 pub(crate) const NOT_STARTED: &str = "the project agent could not start";
+/// Read-only whatever mode the profile's own settings choose.
+const READ_ONLY: &str = "plan";
 
 /// What an agent is started with.
 pub(crate) struct Wake<'a> {
@@ -179,7 +181,7 @@ fn start(wake: &Wake, session: Option<&str>) -> Result<Live, String> {
         budget_usd: None,
         session_id: session,
         fork_at: None,
-        permission: None,
+        permission: Some(READ_ONLY),
         settings: None,
         mcp_config: wake.mcp_config,
         effort: None,

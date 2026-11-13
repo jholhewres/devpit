@@ -28,9 +28,9 @@ instructions.
 ## The process
 
 The agent is a Claude Code process started in the project's folder, under
-the orchestrator's own profile, with devpit's MCP tools so it can read the
-board. It is started without devpit's hook settings, so the CLI refuses its
-writes and it only reads.
+the profile of the orchestrator that woke it, with devpit's MCP tools. It
+runs in the CLI's plan mode whatever the profile's own settings choose, so it
+reads and never writes.
 
 - **Wakes when called.** The first question starts the process. Further
   questions go to the same process, one at a time.
