@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use devpit_rpc::{CallState, Part, SessionInit};
 
@@ -61,6 +62,10 @@ pub(crate) fn system(value: &serde_json::Value) -> Read {
             description: optional_at(value, "description"),
             status,
             summary: optional_at(value, "summary"),
+            duration_ms: value
+                .pointer("/usage/duration_ms")
+                .and_then(|ms| ms.as_u64())
+                .and_then(|ms| u32::try_from(ms).ok()),
         }])
     };
     match value.get("subtype").and_then(|kind| kind.as_str()) {
@@ -102,9 +107,9 @@ pub struct Streamed(Mutex<HashMap<Option<String>, (String, Seen)>>);
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct Seen {
     pub text: bool,
-    /// A thinking block began. Its text is withheld from the stream, so the
-    /// empty block the `assistant` line repeats adds nothing.
-    pub thought: bool,
+    /// When a thinking block began. Its text is withheld from the stream, so
+    /// the block the `assistant` line repeats says when it ended.
+    pub thinking_since: Option<Instant>,
 }
 
 impl Streamed {
@@ -131,11 +136,12 @@ impl Streamed {
                     == Some("thinking") =>
             {
                 if let Some(streaming) = open.get_mut(&parent) {
-                    streaming.1.thought = true;
+                    streaming.1.thinking_since = Some(Instant::now());
                 }
                 Read::Parts(vec![Part::Thinking {
                     text: String::new(),
                     parent,
+                    duration_ms: None,
                 }])
             }
             Some("content_block_delta") => {
@@ -189,14 +195,19 @@ pub(crate) fn assistant_parts(value: &serde_json::Value, streamed: Seen) -> Vec<
                         text: text.to_owned(),
                         parent: parent.clone(),
                     }),
-                Some("thinking") => block
-                    .get("thinking")
-                    .and_then(|text| text.as_str())
-                    .filter(|text| !(streamed.thought && text.is_empty()))
-                    .map(|text| Part::Thinking {
-                        text: text.to_owned(),
-                        parent: parent.clone(),
-                    }),
+                // Streamed, it began as its own part; this one closes it.
+                Some("thinking") => {
+                    block
+                        .get("thinking")
+                        .and_then(|text| text.as_str())
+                        .map(|text| Part::Thinking {
+                            text: text.to_owned(),
+                            parent: parent.clone(),
+                            duration_ms: streamed.thinking_since.map(|since| {
+                                u32::try_from(since.elapsed().as_millis()).unwrap_or(u32::MAX)
+                            }),
+                        })
+                }
                 Some("tool_use") => Some(Part::ToolCall {
                     id: string_at(block, "id"),
                     name: string_at(block, "name"),

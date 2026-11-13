@@ -175,6 +175,25 @@ fn streamed_text_is_kept_whole_per_speaker() {
     );
 }
 
+/// A streamed thought is one part, closed with how long it took, even with a
+/// subagent's words between its start and its end.
+#[test]
+fn a_thought_is_kept_once_with_how_long_it_took() {
+    let thought = |ms: Option<u32>| devpit_rpc::Part::Thinking {
+        text: String::new(),
+        parent: None,
+        duration_ms: ms,
+    };
+    let mut parts = Vec::new();
+    super::kept(&mut parts, thought(None));
+    super::kept(&mut parts, text("inner", Some("toolu_1")));
+    super::kept(&mut parts, thought(Some(4200)));
+    assert_eq!(
+        parts,
+        vec![thought(Some(4200)), text("inner", Some("toolu_1"))]
+    );
+}
+
 /// A late joiner is handed the pieces so far as one frame, not hundreds.
 #[test]
 fn a_streamed_answer_is_relayed_whole_to_a_late_joiner() {

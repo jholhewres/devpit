@@ -41,6 +41,7 @@ fn thinking_is_not_the_answer() {
         Read::Parts(vec![Part::Thinking {
             text: "hmm".to_owned(),
             parent: None,
+            duration_ms: None,
         }])
     );
 }
@@ -220,6 +221,22 @@ mod recorded {
         }
     }
 
+    /// The subagent's timer is the CLI's own count, so a transcript read
+    /// later still says how long it ran.
+    #[test]
+    fn a_subagent_says_how_long_it_ran() {
+        let ran = parts().into_iter().find_map(|part| match part {
+            Part::Task {
+                task_kind,
+                status,
+                duration_ms,
+                ..
+            } if task_kind.is_none() && status == "completed" => duration_ms,
+            _ => None,
+        });
+        assert_eq!(ran, Some(22611));
+    }
+
     #[test]
     fn the_cli_describes_its_own_commands() {
         let init = reads()
@@ -319,9 +336,9 @@ fn a_tool_input_delta_is_not_text() {
 }
 
 /// Thinking is said when it begins, and the empty block repeated at its end
-/// is not a second one.
+/// says how long it took.
 #[test]
-fn thinking_is_heard_when_it_begins_and_once() {
+fn thinking_is_heard_when_it_begins_and_timed_when_it_ends() {
     let claude = Claude::default();
     let start = r#"{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_t","content":[]}},"parent_tool_use_id":null}"#;
     let begins = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}},"parent_tool_use_id":null}"#;
@@ -331,8 +348,12 @@ fn thinking_is_heard_when_it_begins_and_once() {
         claude.read(begins),
         Read::Parts(vec![Part::Thinking {
             text: String::new(),
-            parent: None
+            parent: None,
+            duration_ms: None,
         }])
     );
-    assert_eq!(claude.read(ends), Read::Parts(vec![]));
+    assert!(matches!(
+        claude.read(ends),
+        Read::Parts(parts) if matches!(parts.as_slice(), [Part::Thinking { duration_ms: Some(_), .. }])
+    ));
 }

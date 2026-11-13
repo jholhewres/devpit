@@ -89,6 +89,23 @@ describe('what arrives on the stream', () => {
   })
 })
 
+describe('a thought on the stream', () => {
+  const thought = (ms: number | null, parent: string | null = null): Frame => ({
+    type: 'part',
+    message_id: 'a1',
+    part: { kind: 'thinking', text: '', parent, duration_ms: ms },
+  })
+
+  it('is closed in place with how long it took, even with a subagent between', () => {
+    const between: Frame = { type: 'part', message_id: 'a1', part: { kind: 'text', text: 'inner', parent: 'toolu_1' } }
+    const after = appliedAll([message('a1')], [thought(null), between, thought(4200)])
+    expect(after[0]!.parts).toEqual([
+      { kind: 'thinking', text: '', parent: null, duration_ms: 4200 },
+      { kind: 'text', text: 'inner', parent: 'toolu_1' },
+    ])
+  })
+})
+
 describe('which profile the composer may use', () => {
   const profile = (id: string, path: string | null): Profile => ({
     id,

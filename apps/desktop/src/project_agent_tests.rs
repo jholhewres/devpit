@@ -157,6 +157,7 @@ fn the_answer_is_the_last_thing_said_after_the_tools() {
     answer.heard(Part::Thinking {
         text: "…".to_owned(),
         parent: None,
+        duration_ms: None,
     });
     answer.heard(text("Tests run "));
     answer.heard(text("with make test."));

@@ -56,6 +56,11 @@ export function appliedAll(messages: readonly Message[], frames: readonly Frame[
           const pieces = pending.get(at)
           if (pieces) pieces.push(next.text)
           else pending.set(at, [next.text])
+        } else if (closes(message.parts, next) >= 0) {
+          settle(at)
+          const was = current()[at]!
+          const open = closes(was.parts, next)
+          list()[at] = { ...was, parts: was.parts.map((part, where) => (where === open ? next : part)) }
         } else {
           settle(at)
           list()[at] = { ...current()[at]!, parts: [...current()[at]!.parts, next] }
@@ -129,6 +134,14 @@ export const joined = (parts: readonly Part[]): Part[] => parts.reduce<Part[]>(m
    came from different speakers: a subagent's words are not the agent's. */
 type Text = Extract<Part, { kind: 'text' }>
 const runsOn = (last: Part | undefined, next: Text): last is Text => last?.kind === 'text' && last.parent === next.parent
+
+/* A streamed thought begins empty and its own repeat closes it, with how long
+   it took: the open one it closes, or -1. Other speakers may talk in between. */
+function closes(parts: readonly Part[], next: Part): number {
+  if (next.kind !== 'thinking' || next.duration_ms == null) return -1
+  const parent = next.parent ?? null
+  return parts.findLastIndex((one) => one.kind === 'thinking' && !one.text && one.duration_ms == null && (one.parent ?? null) === parent)
+}
 
 function merged(parts: readonly Part[], next: Part): Part[] {
   const last = parts[parts.length - 1]

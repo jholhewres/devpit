@@ -4342,7 +4342,9 @@ export type PaneWritten = {
  */
 export type Part = { kind: "text"; text: string; parent?: string | null } | 
 /**  Reasoning the model showed. Separate because it is not the answer. */
-{ kind: "thinking"; text: string; parent?: string | null } | { kind: "tool_call"; id: string; name: string; 
+{ kind: "thinking"; text: string; parent?: string | null; 
+/**  How long it took, once it is over and the stream timed it. */
+duration_ms?: number | null } | { kind: "tool_call"; id: string; name: string; 
 /**
  *  Verbatim. Parsing it here would be this crate guessing at a shape
  *  the provider is free to change.
@@ -4360,7 +4362,9 @@ call_id: string | null;
 /**  The CLI's own word: `local_agent`, `local_bash`. */
 task_kind: string | null; description: string | null; 
 /**  `started`, `running`, then the CLI's own ending (`completed`, …). */
-status: string; summary: string | null } | 
+status: string; summary: string | null; 
+/**  How long it has run, as the CLI counts it. */
+duration_ms?: number | null } | 
 /**  What a slash command itself answered, as the CLI printed it. */
 { kind: "command"; content: string } | 
 /**  A permission question somebody answered, kept in the thread. */

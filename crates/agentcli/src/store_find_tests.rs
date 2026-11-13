@@ -49,6 +49,7 @@ fn thinking_is_not_searched_and_an_empty_query_finds_nothing() {
         vec![Part::Thinking {
             text: "parser".to_owned(),
             parent: None,
+            duration_ms: None,
         }],
     )];
     assert!(found(&messages, "parser").is_empty());
