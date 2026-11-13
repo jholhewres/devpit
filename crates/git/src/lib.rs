@@ -32,6 +32,7 @@ pub mod index;
 #[cfg(test)]
 mod index_tests;
 mod invoke;
+pub mod landing;
 pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
