@@ -105,8 +105,11 @@ pub fn apply(app: &tauri::AppHandle) {
     let wanted = crate::settings::settings_read_now()
         .map(|settings| settings.island.unwrap_or(true))
         .unwrap_or(false);
+    let drawn = drawn();
+    // The store again only where the answer can matter.
+    let anyway = drawn == devpit_rpc::IslandDrawn::Plain && asked_anyway();
     let open = app.get_webview_window(ISLAND);
-    match (opens(wanted, drawn(), asked_anyway()) && placeable(), open) {
+    match (opens(wanted, drawn, anyway) && placeable(), open) {
         (true, None) => {
             if let Err(err) = made(app) {
                 eprintln!("the island did not open: {err}");

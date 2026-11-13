@@ -20,7 +20,8 @@ pub enum IslandDrawn {
     Plain,
 }
 
-/// `island.drawn`'s answer.
+/// How the island is drawn here, and whether it was asked for anyway:
+/// `island.drawn`'s answer, and `island.anyway_set`'s.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct IslandHow {
     pub drawn: IslandDrawn,

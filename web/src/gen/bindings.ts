@@ -3794,7 +3794,10 @@ export type IslandDrawn =
  */
 "plain";
 
-/**  `island.drawn`'s answer. */
+/**
+ *  How the island is drawn here, and whether it was asked for anyway:
+ *  `island.drawn`'s answer, and `island.anyway_set`'s.
+ */
 export type IslandHow = {
 	drawn: IslandDrawn,
 	/**  Whether the person asked for the island where it is [`IslandDrawn::Plain`]. */

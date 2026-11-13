@@ -7,12 +7,14 @@ release notes are taken from here when a version is tagged.
 
 ### Fixes
 
-- **devpit keeps the front on GNOME on Wayland.** The island can only be
-  an ordinary window there: it took focus from the window you were in,
-  came first when you switched back to devpit, and clicking it left
-  devpit behind the window you came from. On that desktop it is now off
-  unless you turn on "Show the island anyway" under Settings → General.
-  Sessions waiting on you still reach you as notifications.
+- **devpit keeps the front on GNOME on Wayland.** On a Wayland desktop
+  without layers (GNOME, or one without gtk-layer-shell installed) the
+  island can only be an ordinary window: it took focus from the window
+  you were in, came first when you switched back to devpit, and clicking
+  it left devpit behind the window you came from. There it is now off
+  unless you turn on "Show the island anyway" under Settings →
+  Notifications. Sessions waiting on you still reach you as
+  notifications.
 - **Coming back to a project draws its terminals sooner.** Switching
   projects moved the terminals of the project you left inside the
   window, and each move made the whole window work out its styles again.
