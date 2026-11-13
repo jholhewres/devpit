@@ -177,6 +177,10 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .chat__try { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--orchestrate) 35%, var(--border)); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--orchestrate) 8%, transparent); color: var(--text-2); font-size: var(--fs-sm); }
 .chat__try:hover { color: var(--text); border-color: var(--orchestrate); }
 
+/* A control reached by the keyboard says so. `:where` keeps it below any
+   control that draws its own ring. */
+:where(.pane[data-pane='chat']) :where(button, summary, [role='button']):focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 2px; }
+
 /* What the agent did, under a rule: a stack of rows you can open. */
 .acts { min-width: 0; font-size: var(--fs-sm); color: var(--text-3); }
 .acts__h { display: flex; align-items: center; gap: 6px; height: 28px; width: 100%; min-width: 0; border-radius: var(--radius-xs); }
