@@ -82,19 +82,32 @@ pub(crate) fn asking(
     )
 }
 
-/// How many review rounds a card took: devflow comments once per review.
-pub(crate) fn review_rounds(comments: &[CommentRow]) -> usize {
-    comments
-        .iter()
-        .filter(|one| one.body.starts_with(REVIEWED))
-        .count()
+/// The review rounds a card went through, oldest first: the runs its review
+/// comments name, each once however many comments its run left.
+pub(crate) fn review_runs(comments: &[CommentRow]) -> Vec<String> {
+    let mut runs: Vec<String> = Vec::new();
+    for one in comments.iter().filter(|one| one.body.starts_with(REVIEWED)) {
+        let run = one
+            .body
+            .split(" · run ")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next());
+        let run = run.unwrap_or(&one.id);
+        if !runs.iter().any(|seen| seen == run) {
+            runs.push(run.to_owned());
+        }
+    }
+    runs
 }
 
-/// The findings the card's last review found again after a fix.
-pub(crate) fn repeated(findings: Option<&Value>) -> usize {
+/// The findings the card's reviews found again after a fix, over each
+/// round's findings.json: an approving round has none of its own.
+pub(crate) fn repeated(findings: &[Value]) -> usize {
     findings
-        .and_then(|findings| findings["repeats"].as_array())
-        .map_or(0, Vec::len)
+        .iter()
+        .filter_map(|one| one["repeats"].as_array())
+        .map(Vec::len)
+        .sum()
 }
 
 /// The card's body with the approved lessons as review checklist items.
@@ -182,18 +195,20 @@ fn close(app: &AppHandle, project_id: &str, card_id: &str) -> Result<(), String>
         .get(card_id)
         .map_or_else(|| card_id.to_owned(), |number| format!("#{number}"));
     let comments = store.comments(card_id).map_err(|err| err.to_string())?;
-    let findings = crate::devflow_evidence::runs_of(project_id, root)
-        .ok()
-        .and_then(|runs| crate::devflow_gate::newest(&runs, card_id, "findings.json"))
+    let runs = crate::devflow_evidence::runs_of(project_id, root).ok();
+    let rounds = review_runs(&comments);
+    // Each round still kept; devflow keeps a card's newest runs only.
+    let kept: Vec<Value> = rounds
+        .iter()
+        .filter_map(|run| runs.as_ref()?.found(card_id, Some(run), "findings.json"))
+        .filter_map(|at| crate::devflow_gate::json_at(&at))
+        .collect();
+    let findings = runs
+        .as_ref()
+        .and_then(|runs| crate::devflow_gate::newest(runs, card_id, "findings.json"))
         .map(|(_, findings)| findings);
     let day = crate::project_agent::today();
-    project_memory::measure(
-        root,
-        &day,
-        &source,
-        review_rounds(&comments),
-        repeated(findings.as_ref()),
-    )?;
+    project_memory::measure(root, &day, &source, rounds.len(), repeated(&kept))?;
     let profile = listed
         .projects
         .iter()
