@@ -49,7 +49,7 @@ pub use ring::RingBuffer;
 pub use session::{
     environ_of, members as session_members, started_under, started_with, stop_members, AGENT_GRACE,
 };
-pub use stopping::{stop, stop_group, Stopped, GRACE};
+pub use stopping::{end_group, stop, stop_group, Stopped, GRACE};
 
 use std::io::Write;
 use std::sync::atomic::AtomicU64;

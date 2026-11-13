@@ -117,11 +117,13 @@ pub(crate) fn or_say(
     turn: &Say<'_>,
     on_began: impl FnOnce(),
     mut on_part: impl FnMut(Part),
-    mut on_start: impl FnMut(u32),
+    mut on_start: impl FnMut(u32) -> bool,
 ) -> Result<Said, AgentError> {
     let Some(staying) = staying else {
         on_began();
-        return say(driver, turn, on_part, on_start);
+        return say(driver, turn, on_part, |pid| {
+            on_start(pid);
+        });
     };
     let residents = staying.app.state::<Residents>();
     let (tell, heard) = mpsc::channel();
@@ -171,12 +173,18 @@ pub(crate) fn or_say(
     on_began();
     {
         let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
+        // A stop asked while this turn started: said, then interrupted at once,
+        // so the turn ends the way any turn of this process does.
         let spoken = all
             .get(&staying.conversation_id)
             .filter(|live| Arc::ptr_eq(&live.ear, &ear))
             .is_some_and(|live| {
-                on_start(live.resident.pid());
-                live.resident.say(turn.prompt)
+                let goes_on = on_start(live.resident.pid());
+                let said = live.resident.say(turn.prompt);
+                if said && !goes_on {
+                    live.resident.interrupt();
+                }
+                said
             });
         if !spoken {
             // It exited since it last spoke, or was closed while this turn
@@ -186,8 +194,11 @@ pub(crate) fn or_say(
             }
             let live = start(&staying, turn, started_as(turn))?;
             live.ear.claim(&tell);
-            on_start(live.resident.pid());
+            let goes_on = on_start(live.resident.pid());
             let said = live.resident.say(turn.prompt);
+            if said && !goes_on {
+                live.resident.interrupt();
+            }
             all.insert(staying.conversation_id.clone(), live);
             if !said {
                 return Err(AgentError::Unreadable(
@@ -283,10 +294,18 @@ pub(crate) fn force(app: &AppHandle, conversation_id: &str) -> bool {
         return false;
     };
     live.resident.close();
-    let _ = std::process::Command::new("kill")
-        .args(["-KILL", &live.resident.pid().to_string()])
-        .status();
+    devpit_pty::end_group(live.resident.pid());
     true
+}
+
+/// Stops a turn waiting for a woken one to finish; false when none waits.
+pub(crate) fn stop_waiting(app: &AppHandle, conversation_id: &str) -> bool {
+    app.try_state::<Residents>()
+        .and_then(|residents| {
+            let all = residents.0.lock().ok()?;
+            all.get(conversation_id).map(|live| live.ear.stop_waiting())
+        })
+        .unwrap_or(false)
 }
 
 /// Ends this conversation's process, if it has one: a chat no longer

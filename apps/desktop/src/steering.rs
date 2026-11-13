@@ -166,10 +166,17 @@ pub fn chat_cancel(
     state: State<'_, crate::chat::Talking>,
     conversation_id: String,
 ) -> Result<Option<devpit_rpc::TurnEnd>, RpcError> {
+    // A turn still starting is stopped as it starts: an interrupt written now
+    // reaches a process with nothing to stop. One waiting for a woken turn stops waiting.
     // A conversation whose process stays is interrupted, not ended: ending it
     // would leave it deaf to the sessions it follows.
-    let stopped = crate::chat_resident::interrupt(&app, &conversation_id)
-        || stop_turn(&state, &conversation_id);
+    let stopped = if state.stop_starting(&conversation_id) {
+        crate::chat_resident::stop_waiting(&app, &conversation_id);
+        true
+    } else {
+        crate::chat_resident::interrupt(&app, &conversation_id)
+            || stop_turn(&state, &conversation_id)
+    };
     if !stopped {
         return Ok(None);
     }
@@ -203,9 +210,9 @@ pub async fn chat_force_stop(
 ) -> Result<bool, RpcError> {
     let talking = state.inner().clone();
     crate::off_main::blocking(move || {
+        // A process that stays was the turn's: ended there, it is not signalled twice.
         let resident = crate::chat_resident::force(&app, &conversation_id);
-        let turn = talking.stop(&conversation_id, crate::chat_running::Signal::Kill);
-        Ok(resident || turn)
+        Ok(resident || talking.stop(&conversation_id, crate::chat_running::Signal::Kill))
     })
     .await
 }
