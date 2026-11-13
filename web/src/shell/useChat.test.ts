@@ -144,14 +144,14 @@ describe("a chat's joined turns", () => {
     act(() => woke.handler?.('conv_a'))
     expect(joins).toHaveLength(1)
     await act(async () =>
-      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null }),
+      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null, unheard: [] }),
     )
     await waitFor(() => expect(joins).toHaveLength(2))
   })
 })
 
 describe("a chat's reads of the transcript", () => {
-  const end: TurnEnd = { turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null }
+  const end: TurnEnd = { turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null, unheard: [] }
 
   it('at the end of a turn are of its head, not of the whole conversation', async () => {
     const { result } = renderHook(() => useChat('conv_a'))
@@ -211,7 +211,7 @@ describe("a chat's reads of the transcript", () => {
 
     saved.after = [message('msg_woken'), message('msg_mine')]
     await act(async () =>
-      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null }),
+      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null, unheard: [] }),
     )
     await waitFor(() => expect(joins).toHaveLength(2))
     await act(async () => joins[1]!.ends(true))
@@ -280,7 +280,7 @@ describe("a chat's reads of the transcript", () => {
     act(() => result.current.say('hello'))
     act(() => sending.onFrame(said('msg_unsaved')))
     await act(async () =>
-      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null }),
+      ending({ turnId: 't', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null, unheard: [] }),
     )
     await waitFor(() => expect(result.current.sending).toBe(false))
 

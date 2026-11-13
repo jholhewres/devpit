@@ -6,7 +6,8 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::chat::{CallState, Message, Part, TurnEnd};
+use crate::chat::{CallState, Message, Part};
+use crate::ended::TurnEnd;
 
 /// How full the model's context was at the end of a turn, in tokens: what
 /// the last request carried, against the window it had. What a person needs

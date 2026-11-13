@@ -21,6 +21,8 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
         "--verbose".to_owned(),
         // Text as it is written, not a block at a time.
         "--include-partial-messages".to_owned(),
+        // A steer is taken in once the CLI echoes it back.
+        "--replay-user-messages".to_owned(),
     ];
     if let Some(model) = turn.model {
         argv.push("--model".to_owned());

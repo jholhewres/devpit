@@ -60,6 +60,11 @@ pub trait Driver: Send + Sync {
     fn anchor(&self, _line: &str) -> Option<String> {
         None
     }
+
+    /// The uuid of a message from stdin the CLI echoed back, having taken it in.
+    fn echoed(&self, _line: &str) -> Option<String> {
+        None
+    }
 }
 
 /// The Claude Code CLI, which prints one JSON object per line.
@@ -133,6 +138,19 @@ impl Driver for Claude {
             .get("session_id")?
             .as_str()
             .map(str::to_owned)
+    }
+
+    /// Measured on 2.1.323: `{"type":"user","isReplay":true,"uuid":…}`, once
+    /// the message is part of the turn, not when it is written.
+    fn echoed(&self, line: &str) -> Option<String> {
+        if !line.contains("\"isReplay\"") {
+            return None;
+        }
+        let value = serde_json::from_str::<serde_json::Value>(line).ok()?;
+        if value.get("isReplay")?.as_bool()? {
+            return value.get("uuid")?.as_str().map(str::to_owned);
+        }
+        None
     }
 
     /// Measured: a stream-json assistant line's `uuid` is the transcript's.

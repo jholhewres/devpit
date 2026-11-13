@@ -98,6 +98,7 @@ pub(crate) fn failed_end(turn_id: &str) -> devpit_rpc::TurnEnd {
         stop_reason: Some("error".to_owned()),
         is_error: true,
         context: None,
+        unheard: Vec::new(),
     }
 }
 

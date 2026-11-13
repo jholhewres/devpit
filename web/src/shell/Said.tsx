@@ -4,15 +4,16 @@ import { useShellPick } from './shellStore'
 import { useStream } from './Streamed'
 import { foldOf, useDisclosed } from './useDisclosed'
 
-/* What a person said: the files as chips and pictures, then the words. */
-export function Said({ message }: { message: Message }): React.JSX.Element {
+/* What a person said: the files as chips and pictures, then the words.
+   `onResend` when it was steered into a turn that ended without taking it in. */
+export function Said({ message, onResend }: { message: Message; onResend?: () => void }): React.JSX.Element {
   const { files, prompt } = sentWith(message.parts.map((part) => ('text' in part ? part.text : '')).join(''))
   const long = isLong(prompt)
   const projectId = useShellPick((shell) => shell.project?.id ?? null)
   const [open, setOpen] = useDisclosed(foldOf(message.id, 'said'), false)
 
   return (
-    <article className="said">
+    <article className="said" data-lost={onResend ? '' : undefined}>
       <div className="said__b">
         {files.length > 0 && (
           <div className="said__files">
@@ -30,6 +31,12 @@ export function Said({ message }: { message: Message }): React.JSX.Element {
           </button>
         )}
       </div>
+      {onResend && (
+        <p className="said__lost">
+          Didn't reach the agent.
+          <button onClick={onResend}>Resend</button>
+        </p>
+      )}
     </article>
   )
 }

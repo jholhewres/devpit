@@ -21,6 +21,8 @@ use devpit_rpc::Part;
 #[derive(Clone, Default)]
 pub struct Control {
     stdin: Arc<Mutex<Option<ChildStdin>>>,
+    /// Steers written and not echoed back yet: the uuid sent, and devpit's id for it.
+    awaiting: Arc<Mutex<Vec<(String, String)>>>,
 }
 
 impl Control {
@@ -52,6 +54,36 @@ impl Control {
         self.write(&user_line(prompt))
     }
 
+    /// Hands the running turn a message under `uuid`, kept as `id` until the
+    /// CLI echoes it back: written is not taken in, which only the echo says.
+    pub fn steer(&self, prompt: &str, uuid: &str, id: &str) -> bool {
+        // Kept before it is written: the echo may come back before this returns.
+        self.awaiting(|held| held.push((uuid.to_owned(), id.to_owned())));
+        let sent = self.write(&steer_line(prompt, uuid));
+        if !sent {
+            self.heard(uuid);
+        }
+        sent
+    }
+
+    /// The CLI echoed the message sent under `uuid`.
+    pub(crate) fn heard(&self, uuid: &str) {
+        self.awaiting(|held| held.retain(|(sent, _)| sent != uuid));
+    }
+
+    /// The steers the CLI never echoed back, by their ids, taken once.
+    pub fn unheard(&self) -> Vec<String> {
+        let mut ids = Vec::new();
+        self.awaiting(|held| ids = held.drain(..).map(|(_, id)| id).collect());
+        ids
+    }
+
+    fn awaiting(&self, change: impl FnOnce(&mut Vec<(String, String)>)) {
+        if let Ok(mut held) = self.awaiting.lock() {
+            change(&mut held);
+        }
+    }
+
     /// Asks the CLI to stop one background task, by the id it gave it.
     pub fn stop_task(&self, task_id: &str) -> bool {
         self.write(&stop_task_request(task_id))
@@ -76,6 +108,16 @@ impl Control {
 pub fn user_line(prompt: &str) -> String {
     serde_json::json!({
         "type": "user",
+        "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
+    })
+    .to_string()
+}
+
+/// [`user_line`] under `uuid`, which the CLI's echo of it carries back.
+pub fn steer_line(prompt: &str, uuid: &str) -> String {
+    serde_json::json!({
+        "type": "user",
+        "uuid": uuid,
         "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
     })
     .to_string()

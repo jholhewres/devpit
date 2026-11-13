@@ -133,6 +133,7 @@ pub fn say(
             stop_reason: ending.stop_reason,
             is_error: ending.is_error,
             context: ending.context,
+            unheard: Vec::new(),
         },
         session_id: heard.session_id,
         init: heard.init,

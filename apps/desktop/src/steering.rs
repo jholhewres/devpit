@@ -111,21 +111,22 @@ fn steer_now(
     if !running || prompt.trim().is_empty() {
         return Err(busy("no turn is running to take it"));
     }
-    let taken = crate::chat_resident::steer(app, conversation_id, prompt)
-        .or_else(|| {
-            steering
-                .get(conversation_id)
-                .map(|control| control.say(prompt))
-        })
-        .unwrap_or(false);
-    if !taken {
-        return Err(busy("the turn is ending; it goes next"));
-    }
     // No turn of its own: it is part of the one running.
     let said = devpit_rpc::Message {
         turn_id: None,
         ..crate::chat_turn::messages("", prompt, crate::chat::now() * 1000.0).0
     };
+    let uuid = steer_uuid(ulid::Ulid::generate().0);
+    let taken = crate::chat_resident::steer(app, conversation_id, prompt, &uuid, &said.id)
+        .or_else(|| {
+            steering
+                .get(conversation_id)
+                .map(|control| control.steer(prompt, &uuid, &said.id))
+        })
+        .unwrap_or(false);
+    if !taken {
+        return Err(busy("the turn is ending; it goes next"));
+    }
     let sessions = crate::projects::project_home(project_id)?.sessions();
     let file = devpit_agentcli::store::conversation_path(&sessions, conversation_id);
     let _ = devpit_agentcli::store::append(&file, &said);
@@ -138,6 +139,21 @@ fn steer_now(
         },
     );
     Ok(said)
+}
+
+/// A version-4 uuid made of `bits`: the form the CLI echoes a message's id back in.
+fn steer_uuid(bits: u128) -> String {
+    let bits = (bits & !(0xf << 76)) | (0x4 << 76);
+    let bits = (bits & !(0x3 << 62)) | (0x2 << 62);
+    let hex = format!("{bits:032x}");
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    )
 }
 
 /// `chat.cancel` — stops the turn in flight, keeping what already arrived.
@@ -164,6 +180,7 @@ pub fn chat_cancel(
         stop_reason: Some("cancelled".to_owned()),
         is_error: false,
         context: None,
+        unheard: Vec::new(),
     }))
 }
 
@@ -190,6 +207,13 @@ pub(crate) fn stop_turn(talking: &crate::chat::Talking, conversation_id: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_steer_is_sent_under_a_version_4_uuid() {
+        let uuid = steer_uuid(u128::MAX);
+        assert_eq!(uuid, "ffffffff-ffff-4fff-bfff-ffffffffffff");
+        assert_eq!(steer_uuid(0), "00000000-0000-4000-8000-000000000000");
+    }
 
     #[test]
     fn a_conversation_with_no_turn_running_cannot_be_steered() {

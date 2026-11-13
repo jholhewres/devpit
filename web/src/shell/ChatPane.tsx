@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ASKS, CONTINUE, money } from './chat'
+import type { Extras } from './queueing'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
 import { ChatFind } from './ChatFind'
@@ -24,6 +25,9 @@ import { useChat } from './useChat'
 import { useJump, type Reveal } from './useJump'
 import { useShell } from './useShell'
 import { useShortcut } from './useShortcut'
+
+/* A message sent again goes as it was written: its files are already named in its words. */
+const NONE: Extras = { files: [], skills: [] }
 
 /*
  * One conversation, per tab.
@@ -100,7 +104,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         ) : (
           <AppsScopeContext.Provider value={scope}>
             <WholeFrom conversationId={tab.id}>
-              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} onContinue={() => chat.say(CONTINUE)} reveal={reveal} />
+              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} onContinue={() => chat.say(CONTINUE)} onResend={(text) => (chat.sending ? void chat.steer(text, NONE) : chat.say(text, undefined, NONE))} reveal={reveal} />
             </WholeFrom>
           </AppsScopeContext.Provider>
         )}

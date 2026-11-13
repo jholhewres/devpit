@@ -29,7 +29,7 @@ describe('what the chat view shows', () => {
     expect(shown[1]!.streaming).toBe(true)
     // Read again mid-turn, the transcript has none of it yet: the frames stay.
     expect(after(shown, orchestrator, history([message('m1', 'user', 'how is the api?')]))).toBe(shown)
-    shown = after(shown, orchestrator, frame({ type: 'ended', end: { turnId: 't1', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null } }))
+    shown = after(shown, orchestrator, frame({ type: 'ended', end: { turnId: 't1', costUsd: null, durationMs: null, stopReason: null, isError: false, context: null, unheard: [] } }))
     expect(shown[1]!.streaming).toBe(false)
     // Another conversation's words are not this one's.
     expect(after(shown, orchestrator, history([], 'c2'))).toBe(shown)
