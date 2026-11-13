@@ -8,7 +8,8 @@
 .said__b { max-width: 85%; min-width: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-lg); background: var(--raised); font-size: var(--fs-lg); line-height: 1.4; color: var(--text); white-space: pre-wrap; word-break: break-word; }
 /* A reply is as wide as the thread; the prose cap belongs to documents. */
 .thread .md { max-width: none; }
-.reply { font-size: var(--fs-lg); line-height: 1.62; color: var(--text-2); }
+.reply { font-size: var(--fs-lg); line-height: 1.62; color: var(--text); }
+.reply .md { color: var(--text); }
 .reply p { margin: 0 0 11px; }
 .reply p:last-child { margin-bottom: 0; }
 
