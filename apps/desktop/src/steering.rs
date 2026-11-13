@@ -73,6 +73,7 @@ pub async fn chat_steer(
     app: tauri::AppHandle,
     talking: State<'_, crate::chat::Talking>,
     steering: State<'_, Steering>,
+    relay: State<'_, crate::chat_relay::Relay>,
     project_id: String,
     conversation_id: String,
     prompt: String,
@@ -82,10 +83,12 @@ pub async fn chat_steer(
         .lock()
         .is_ok_and(|held| held.contains_key(&conversation_id));
     let steering = steering.inner().clone();
+    let relay = relay.inner().clone();
     crate::off_main::blocking(move || {
         steer_now(
             &app,
             &steering,
+            &relay,
             running,
             &project_id,
             &conversation_id,
@@ -98,6 +101,7 @@ pub async fn chat_steer(
 fn steer_now(
     app: &tauri::AppHandle,
     steering: &Steering,
+    relay: &crate::chat_relay::Relay,
     running: bool,
     project_id: &str,
     conversation_id: &str,
@@ -125,6 +129,14 @@ fn steer_now(
     let sessions = crate::projects::project_home(project_id)?.sessions();
     let file = devpit_agentcli::store::conversation_path(&sessions, conversation_id);
     let _ = devpit_agentcli::store::append(&file, &said);
+    // Through the turn's relay: a second window, a chat rejoining and the
+    // Remote draw it too, not only the composer that sent it.
+    relay.told(
+        conversation_id,
+        devpit_rpc::Frame::Opened {
+            message: said.clone(),
+        },
+    );
     Ok(said)
 }
 

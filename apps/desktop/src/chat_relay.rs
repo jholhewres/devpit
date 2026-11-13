@@ -78,6 +78,17 @@ struct Turn {
     joined: Vec<Joined>,
 }
 
+impl Turn {
+    /// Kept for a late joiner, and sent to the window and every joiner.
+    fn relayed(&mut self, frame: Frame) {
+        kept_frame(&mut self.frames, frame.clone());
+        let _ = self.first.send(frame.clone());
+        for one in &self.joined {
+            let _ = one.channel.send(frame.clone());
+        }
+    }
+}
+
 struct Joined {
     channel: Channel<Frame>,
     /// What `chat_leave` names it by: the window's channel, not a wrapper's.
@@ -86,11 +97,15 @@ struct Joined {
     ended: oneshot::Sender<()>,
 }
 
+/// Told each conversation a turn enters.
+type Watcher = Arc<dyn Fn(&Relay, &str) + Send + Sync>;
+
 #[derive(Default)]
 struct Turns {
     /// One counter for ids and places, so both only grow.
     next: u64,
     by_conversation: HashMap<String, Vec<Turn>>,
+    watchers: Vec<(u64, Watcher)>,
 }
 
 impl Turns {
@@ -104,6 +119,20 @@ impl Turns {
 
 #[derive(Default, Clone)]
 pub(crate) struct Relay(Arc<Mutex<Turns>>);
+
+/// A watcher, told until this goes.
+pub(crate) struct Watch {
+    relay: Relay,
+    id: u64,
+}
+
+impl Drop for Watch {
+    fn drop(&mut self) {
+        if let Ok(mut all) = self.relay.0.lock() {
+            all.watchers.retain(|(id, _)| *id != self.id);
+        }
+    }
+}
 
 /// Held for as long as the turn runs; its end is what joiners wait for.
 pub(crate) struct Relaying {
@@ -187,6 +216,14 @@ impl Relay {
         let Some(id) = id else {
             return (first, relaying);
         };
+        // Told outside the lock: a watcher joins the turn it is told of.
+        let watchers = self.0.lock().map_or_else(
+            |_| Vec::new(),
+            |all| all.watchers.iter().map(|(_, on)| on.clone()).collect(),
+        );
+        for on in watchers {
+            on(self, conversation);
+        }
         let relay = self.clone();
         let key = conversation.to_owned();
         let channel = Channel::new(move |body: InvokeResponseBody| {
@@ -211,13 +248,8 @@ impl Relay {
 
     fn pass(&self, conversation: &str, id: u64, frame: Frame) {
         let Ok(mut all) = self.0.lock() else { return };
-        let Some(turn) = all.turn(conversation, id) else {
-            return;
-        };
-        kept_frame(&mut turn.frames, frame.clone());
-        let _ = turn.first.send(frame.clone());
-        for one in &turn.joined {
-            let _ = one.channel.send(frame.clone());
+        if let Some(turn) = all.turn(conversation, id) {
+            turn.relayed(frame);
         }
     }
 
@@ -269,6 +301,36 @@ impl Relay {
                     _ => None,
                 })
             })
+    }
+
+    /// Hands the turn that has the process a frame from outside it — a
+    /// message steered into it — as if the turn had sent it. Whether one ran.
+    pub(crate) fn told(&self, conversation: &str, frame: Frame) -> bool {
+        let Ok(mut all) = self.0.lock() else {
+            return false;
+        };
+        let turn = all.by_conversation.get_mut(conversation).and_then(|turns| {
+            turns
+                .iter_mut()
+                .filter(|turn| turn.begun.is_some())
+                .min_by_key(|turn| turn.begun)
+        });
+        turn.map(|turn| turn.relayed(frame)).is_some()
+    }
+
+    /// Calls `on` with each conversation a turn enters, once it can be
+    /// joined, until the watch goes.
+    pub(crate) fn watch(&self, on: impl Fn(&Relay, &str) + Send + Sync + 'static) -> Watch {
+        let id = self.0.lock().map_or(0, |mut all| {
+            all.next += 1;
+            let id = all.next;
+            all.watchers.push((id, Arc::new(on)));
+            id
+        });
+        Watch {
+            relay: self.clone(),
+            id,
+        }
     }
 
     /// Whether a turn runs, or waits to, in this conversation.

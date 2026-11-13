@@ -119,6 +119,10 @@ pub(crate) fn serve(
     let (raw, raws) = std::sync::mpsc::sync_channel(crate::remote_panes::MOST_RAW_QUEUED);
     watching.raw = Some(raw);
     let mut talk = crate::remote_talk::Talk::default();
+    // A turn begun anywhere else in the conversation this device reads reaches it.
+    let watch = app
+        .state::<crate::chat_relay::Relay>()
+        .watch(talk.watching(out.clone()));
     send(
         &mut wire,
         &RemoteOut::Welcome {
@@ -142,6 +146,7 @@ pub(crate) fn serve(
             })
         },
     );
+    drop(watch);
     watching.close_all();
     crate::remote_hub::leave(&app, id);
     crate::remote::note(&root, &device, "disconnected");
@@ -487,7 +492,9 @@ fn answer(
                 return failed("that is not a conversation");
             }
             let read = crate::chat::chat_history_now(project.clone(), conversation.clone());
-            // A turn running in it reaches this device from where it is.
+            // A turn running in it reaches this device from where it is, and so
+            // does one begun later while it is read.
+            talk.view(&project, &conversation);
             talk.follow(app, out, &project, &conversation);
             Some(match read {
                 Ok(read) => RemoteOut::Chat {
