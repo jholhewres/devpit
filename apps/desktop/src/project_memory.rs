@@ -6,6 +6,7 @@
 //! already keeps; never written over after that. A project whose agent was
 //! never asked has no such folder, and nothing else reads one.
 
+use std::io::Read;
 use std::path::Path;
 
 pub(crate) const DIR: &str = ".devpit/project-agent";
@@ -13,6 +14,10 @@ pub(crate) const FILES: [&str; 3] = ["facts.md", "lessons.md", "decisions.md"];
 /// The entries of each file the agent wakes with; it reads the rest itself.
 pub(crate) const SHOWN: usize = 20;
 const SEP: &str = " · ";
+/// How much of a guide or an ADR is read for its heading.
+pub(crate) const HEAD_BYTES: usize = 16 * 1024;
+/// How much of a memory file the summary reads.
+const MEMORY_BYTES: u64 = 256 * 1024;
 
 /// The guides a first wake points at, when the project has them.
 const GUIDES: [&str; 4] = [
@@ -73,19 +78,19 @@ pub(crate) fn seed(root: &Path, day: &str) -> Result<bool, String> {
         let at = devpit_core::paths::resolve_new(root, folder).map_err(|err| err.to_string())?;
         std::fs::create_dir_all(&at).map_err(|err| err.to_string())?;
     }
-    let facts = GUIDES
-        .iter()
-        .filter(|guide| root.join(guide).is_file())
-        .map(|guide| {
-            line(
-                day,
-                guide,
-                &format!("A guide to read first: \"{}\".", heading(root, guide)),
-            )
-        });
-    let decisions = adrs(root)
-        .into_iter()
-        .map(|adr| line(day, &adr, &heading(root, &adr)));
+    let facts = GUIDES.iter().filter_map(|guide| {
+        let head = read_inside(root, guide, HEAD_BYTES as u64)?;
+        let title = heading(&head, guide);
+        Some(line(
+            day,
+            guide,
+            &format!("A guide to read first: \"{title}\"."),
+        ))
+    });
+    let decisions = adrs(root).into_iter().filter_map(|adr| {
+        let head = read_inside(root, &adr, HEAD_BYTES as u64)?;
+        Some(line(day, &adr, &heading(&head, &adr)))
+    });
     let files = [
         ("facts.md", "Facts", facts.collect::<Vec<_>>()),
         ("lessons.md", "Lessons", Vec::new()),
@@ -112,20 +117,35 @@ fn line(day: &str, source: &str, text: &str) -> String {
     )
 }
 
-/// A file's first heading, or its own name when it has none.
-fn heading(root: &Path, file: &str) -> String {
-    std::fs::read_to_string(root.join(file))
-        .ok()
-        .and_then(|text| {
-            text.lines()
-                .find_map(|line| line.strip_prefix("# ").map(|title| title.trim().to_owned()))
-        })
+/// A regular file of the project, resolved inside its root and read up to
+/// `limit` bytes. `None` for a link leading out, a device or a folder.
+fn read_inside(root: &Path, relative: &str, limit: u64) -> Option<String> {
+    let at = devpit_core::tree::resolve(root, relative).ok()?;
+    if !at.metadata().ok()?.is_file() {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(at)
+        .ok()?
+        .take(limit)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The first heading of `text`, or the file's own name when it has none.
+fn heading(text: &str, file: &str) -> String {
+    text.lines()
+        .find_map(|line| line.strip_prefix("# ").map(|title| title.trim().to_owned()))
         .filter(|title| !title.is_empty())
         .unwrap_or_else(|| file.to_owned())
 }
 
 fn adrs(root: &Path) -> Vec<String> {
-    let mut found: Vec<String> = std::fs::read_dir(root.join("docs/adr"))
+    let Ok(folder) = devpit_core::tree::resolve(root, "docs/adr") else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = std::fs::read_dir(folder)
         .map(|dir| {
             dir.filter_map(Result::ok)
                 .filter_map(|one| one.file_name().into_string().ok())
@@ -149,10 +169,7 @@ pub(crate) fn summary(root: &Path) -> Option<String> {
         "Your memory is kept in {DIR}/: these are its newest entries; read the files for the rest.\n"
     );
     for file in FILES {
-        let text = devpit_core::tree::resolve(root, &format!("{DIR}/{file}"))
-            .ok()
-            .and_then(|at| std::fs::read_to_string(at).ok())
-            .unwrap_or_default();
+        let text = read_inside(root, &format!("{DIR}/{file}"), MEMORY_BYTES).unwrap_or_default();
         let (mut kept, mut broken) = (Vec::new(), 0);
         for found in text.lines().filter_map(entry) {
             match found {
