@@ -62,6 +62,11 @@ export function took(ms: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 
+/* The note a compaction leaves in the thread: "Compacted at 212k tokens". */
+export function compactedAt(tokens: number): string {
+  return `Compacted at ${Math.round(tokens / 1000)}k tokens`
+}
+
 const VERBS: Readonly<Record<Outcome, readonly [string, string]>> = {
   done: ['Worked for', 'Worked'],
   stopped: ['Interrupted after', 'Interrupted'],

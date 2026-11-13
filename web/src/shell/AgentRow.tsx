@@ -1,5 +1,6 @@
 import { AgentGlyph } from './AgentGlyph'
 import type { Entry } from './catalogue'
+import { IdleCompact } from './IdleCompact'
 import { ProfileEditor } from './ProfileEditor'
 import type { Draft } from './profiles'
 import type { KnownAgent } from '../gen/bindings'
@@ -133,6 +134,7 @@ export function AgentRow({
           onRemove={entry.mine ? onRemove : undefined}
         />
       )}
+      {open && entry.base === 'claude' && <IdleCompact profileId={entry.id} />}
     </>
   )
 }

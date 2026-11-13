@@ -143,6 +143,7 @@ mod happening;
 mod heads_down;
 mod history;
 mod hub;
+mod idle_compact;
 mod in_flight;
 mod index;
 #[cfg(target_os = "linux")]

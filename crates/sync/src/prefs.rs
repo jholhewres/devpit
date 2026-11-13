@@ -44,6 +44,7 @@ pub const LOCAL: &[(&str, &str)] = &[
     (key::WORKTREES_HIDDEN, "this machine's worktrees"),
     (key::WORKTREES_DELETE_MERGED, "this machine's worktrees"),
     (key::WORKTREES_CLEANUP_LAST, "this machine's worktrees"),
+    (key::AGENTS_IDLE_COMPACT, "conversations this machine runs"),
     (
         key::AGENT_PROFILES,
         "config folders on this machine, and tokens",

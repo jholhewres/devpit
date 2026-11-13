@@ -43,6 +43,7 @@ struct Live {
 pub(crate) struct Residents(Mutex<HashMap<String, Live>>);
 
 /// What a turn needs to go through the conversation's resident process.
+#[derive(Clone)]
 pub(crate) struct Staying {
     pub app: AppHandle,
     pub project_id: String,

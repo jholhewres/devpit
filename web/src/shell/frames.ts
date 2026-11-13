@@ -37,8 +37,8 @@ export function appliedAll(messages: readonly Message[], frames: readonly Frame[
       case 'opened': {
         /* A rejoined turn repeats the message the transcript already holds. */
         if (current().some((one) => one.id === frame.message.id)) break
-        /* One steered into the turn sits before the answer still being written, where the transcript keeps it. */
-        const at = frame.message.role === 'user' && frame.message.turnId === null ? current().findLastIndex((one) => one.streaming) : -1
+        /* One steered into the turn, or a compaction's note, sits before the answer still being written, where the transcript keeps it. */
+        const at = frame.message.role !== 'assistant' && frame.message.turnId === null ? current().findLastIndex((one) => one.streaming) : -1
         if (at < 0) list().push(frame.message)
         else {
           settleAll()

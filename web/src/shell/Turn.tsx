@@ -14,7 +14,7 @@ import { TurnApps } from './TurnApps'
 import { TurnDelegations } from './TurnDelegations'
 import { TurnDrafts } from './TurnDrafts'
 import { TurnChanges } from './TurnChangesView'
-import { answerOf, millis, outcome, segments, statusOf, took, type Segment } from './turnFold'
+import { answerOf, compactedAt, millis, outcome, segments, statusOf, took, type Segment } from './turnFold'
 import { foldOf, useDisclosed } from './useDisclosed'
 
 /*
@@ -50,6 +50,8 @@ export const Turn = memo(function Turn({
   if (message.role === 'system' && receipt?.kind === 'receipt') return <Receipt part={receipt} />
   const rewound = message.parts.find((part) => part.kind === 'rewound')
   if (message.role === 'system' && rewound?.kind === 'rewound') return <Rewound part={rewound} />
+  const compacted = message.parts.find((part) => part.kind === 'compacted')
+  if (message.role === 'system' && compacted?.kind === 'compacted') return <div className="rwnd">{compactedAt(compacted.tokens)}</div>
 
   if (message.role === 'user') return <Said message={message} onResend={onResend} />
   return <Answer message={message} rewind={rewind} folder={folder ?? null} onOpen={onOpen} />

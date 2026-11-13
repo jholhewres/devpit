@@ -864,6 +864,10 @@ export const commands = {
 	chatQueueKeep: (projectId: string, conversationId: string, queue: ChatQueue) => typedError<ChatQueue, RpcError>(__TAURI_INVOKE("chat_queue_keep", { projectId, conversationId, queue })),
 	/**  `chat.receipt` — records an answered question in the conversation. */
 	chatReceipt: (projectId: string, conversationId: string, tool: string, input: string, allowed: boolean) => typedError<Message, RpcError>(__TAURI_INVOKE("chat_receipt", { projectId, conversationId, tool, input, allowed })),
+	/**  `agents.idle_compact_read` */
+	idleCompactRead: (profileId: string) => typedError<IdleCompact, RpcError>(__TAURI_INVOKE("idle_compact_read", { profileId })),
+	/**  `agents.idle_compact_write` */
+	idleCompactWrite: (profileId: string, rule: IdleCompact) => typedError<IdleCompact, RpcError>(__TAURI_INVOKE("idle_compact_write", { profileId, rule })),
 	/**
 	 *  `chat.slash_commands` — what the composer offers after `/` for a profile.
 	 * 
@@ -3726,6 +3730,19 @@ export type HubStatus = {
 	signedIn: boolean,
 };
 
+/**  A profile's rule: when, and past how many tokens of context. */
+export type IdleCompact = {
+	when: IdleWhen,
+	tokens: number,
+};
+
+/**  When an idle conversation is compacted. */
+export type IdleWhen = 
+/**  On the person's next turn, once the prompt cache has expired. */
+"return" | 
+/**  Just before the prompt cache expires. */
+"expiry" | "never";
+
 /**
  *  How this copy of devpit was installed, which decides what an update may do
  *  to it.
@@ -4374,6 +4391,11 @@ input: string; allowed: boolean } |
  *  left that one as it was.
  */
 { kind: "rewound"; from_conversation: string; turn: number } | 
+/**
+ *  The CLI's own `/compact` ran on this conversation while it sat idle,
+ *  when its context held this many tokens.
+ */
+{ kind: "compacted"; tokens: number } | 
 /**
  *  A line the driver did not recognise. Kept rather than dropped: losing
  *  output is worse than showing it plain.
