@@ -2,8 +2,8 @@ use devpit_rpc::Board;
 use serde_json::json;
 
 use super::{
-    context_in, first_message, hand_off_reason, handoff_percent, mark, next_card, past_share,
-    relays, relieved, replaced_id, still_allowed,
+    context_in, first_message, first_opening, hand_off_reason, handoff_percent, mark, next_card,
+    next_on_entering, past_share, relays, relieved, replaced_id, still_allowed,
 };
 
 fn column(id: &str, position: i32, role: &str) -> serde_json::Value {
@@ -26,6 +26,7 @@ fn board(cards: Vec<serde_json::Value>) -> Board {
         column("inbox", 0, "backlog"),
         column("doing", 1, "doing"),
         column("check", 2, "check"),
+        column("done", 3, "done"),
     ];
     serde_json::from_value(
         json!({ "projectId": "p", "columns": columns, "cards": cards, "steps": [] }),
@@ -51,6 +52,39 @@ fn the_next_card_is_the_epics_first_waiting_card_no_unfinished_card_holds() {
         next_card(&board, "done").map(|c| c.id.as_str()),
         Some("freed")
     );
+}
+
+/// With `unblock_on: done`, a finished card holds the next one until the
+/// person moves it to done: that move is when the next one opens.
+#[test]
+fn a_card_entering_done_opens_the_card_that_waited_on_it() {
+    let waiting = |done: bool| {
+        let mut waiting = card("next", "inbox", Some("epic"), 1);
+        waiting["blockedBy"] = json!([{ "id": "first", "title": "First", "done": done }]);
+        waiting
+    };
+    let landed = board(vec![card("first", "done", Some("epic"), 0), waiting(true)]);
+    assert_eq!(
+        next_on_entering(&landed, "first", Some("check")).map(|c| c.id.as_str()),
+        Some("next")
+    );
+    assert!(
+        next_on_entering(&landed, "first", Some("done")).is_none(),
+        "a move within done is no arrival"
+    );
+    let checked = board(vec![
+        card("first", "check", Some("epic"), 0),
+        waiting(false),
+    ]);
+    assert!(next_on_entering(&checked, "first", Some("doing")).is_none());
+}
+
+/// The next card may come up at the finish and again at done: it opens once.
+#[test]
+fn a_card_the_relay_opened_is_not_opened_again() {
+    assert!(first_opening("card_opened_once"));
+    assert!(!first_opening("card_opened_once"));
+    assert!(first_opening("card_another"));
 }
 
 #[test]

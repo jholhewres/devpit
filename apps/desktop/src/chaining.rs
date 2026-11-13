@@ -133,6 +133,7 @@ pub fn after(
             let at = store.cards_in_column(&to).unwrap_or(0);
             let _ = store.move_card(card_id, &to, at);
             let _ = store.note_on_card(card_id, &format!("{} passed", step.name));
+            crate::card_relay::moved(app, &project_id, card_id, Some(&card.column_id));
             notices::ring(
                 app,
                 Some(&project_id),

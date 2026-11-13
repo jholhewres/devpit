@@ -144,6 +144,7 @@ pub(crate) fn card_move_now(
         came_from.as_deref(),
         &column_id,
     );
+    crate::card_relay::moved(&app, &project_id, &card_id, came_from.as_deref());
 
     let started = match runs {
         None => None,

@@ -40,6 +40,43 @@ struct Relief {
 
 static RELIEVED: Mutex<Option<Relief>> = Mutex::new(None);
 
+/// Cards the relay opened in this run.
+static OPENED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Whether the relay may open `card_id`: once, since its turn can come both
+/// at the finish of the card before it and when that card enters done.
+pub(crate) fn first_opening(card_id: &str) -> bool {
+    let Ok(mut opened) = OPENED.lock() else {
+        return false;
+    };
+    if opened.iter().any(|id| id == card_id) {
+        return false;
+    }
+    opened.push(card_id.to_owned());
+    true
+}
+
+/// The card to open once `card_id` moved from the lane `from` to where
+/// `board` has it: the next card of its epic, when it entered done. With
+/// `unblock_on: done` that is when the cards waiting on it are released.
+pub(crate) fn next_on_entering<'a>(
+    board: &'a Board,
+    card_id: &str,
+    from: Option<&str>,
+) -> Option<&'a Card> {
+    let done = |lane: &str| {
+        board
+            .columns
+            .iter()
+            .any(|column| column.id == lane && column.role.as_deref() == Some("done"))
+    };
+    let card = board.cards.iter().find(|card| card.id == card_id)?;
+    if !done(&card.column_id) || from.is_some_and(done) {
+        return None;
+    }
+    next_card(board, card_id)
+}
+
 /// The next card of `finished`'s epic: the first, by position, that waits in
 /// a lane of waiting work and on no card not done.
 pub(crate) fn next_card<'a>(board: &'a Board, finished: &str) -> Option<&'a Card> {
@@ -298,7 +335,9 @@ pub(crate) fn finished(
             .flatten()
             .as_deref(),
     );
-    let next = next_card(board, card_id).filter(|_| on)?.clone();
+    let next = next_card(board, card_id)
+        .filter(|next| on && first_opening(&next.id))?
+        .clone();
     let profile = profile_for(&store, &board.project_id, config_dir);
     let answer = json!({
         "cardId": next.id,
@@ -314,6 +353,48 @@ pub(crate) fn finished(
     };
     open(app, board.clone(), next, how);
     Some(answer)
+}
+
+/// After a move: a card that entered done opens the next card of its epic in
+/// a session of its own, when the person turned that on.
+pub(crate) fn moved(app: &tauri::AppHandle, project_id: &str, card_id: &str, from: Option<&str>) {
+    let Ok(store) = crate::projects::store() else {
+        return;
+    };
+    let on = relays(
+        store
+            .preference(preference::SESSION_NEXT_CARD)
+            .ok()
+            .flatten()
+            .as_deref(),
+    );
+    if !on {
+        return;
+    }
+    let (app, project_id, card_id) = (app.clone(), project_id.to_owned(), card_id.to_owned());
+    let from = from.map(str::to_owned);
+    std::thread::spawn(move || {
+        let Ok(board) = crate::board::board_get_now(project_id.clone()) else {
+            return;
+        };
+        let Some(next) = next_on_entering(&board, &card_id, from.as_deref())
+            .filter(|next| first_opening(&next.id))
+            .cloned()
+        else {
+            return;
+        };
+        let Ok(store) = crate::projects::store() else {
+            return;
+        };
+        let how = Opening {
+            profile: profile_for(&store, &project_id, None),
+            before: Some(card_id),
+            one_per_session: true,
+            folder: None,
+            replaces: None,
+        };
+        open(&app, board, next, how);
+    });
 }
 
 /// After a handoff: a session that was told to hand off is relieved by a
