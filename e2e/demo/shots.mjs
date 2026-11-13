@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { By, until } from 'selenium-webdriver'
 
 import { missingBuild, missingTools, notTheRealHome, onPath, refusal, theShellFindsTheStub } from '../lib/preflight.mjs'
+import { endPtyd } from '../lib/home.mjs'
 import { openWindow, startDriver, stopDriver } from '../lib/session.mjs'
 import { stopFilming, still, thumbnails } from './capture.mjs'
 import { demoEnv, demoHome, keptInside } from './home.mjs'
@@ -133,6 +134,7 @@ async function run(phases) {
     stopDriver(driver)
     // The terminals' server, by the short root its socket was made under.
     spawnSync('tmux', ['-S', join(seeded.devpit, 'tmux.sock'), 'kill-server'], { stdio: 'ignore' })
+    endPtyd(seeded.devpit)
     rmSync(seeded.devpit, { force: true })
   }
 }
