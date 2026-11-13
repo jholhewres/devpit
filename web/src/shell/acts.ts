@@ -1,4 +1,5 @@
 import type { Part } from '../gen/bindings'
+import { took } from './turnFold'
 
 /*
  * What the agent did, as rows rather than as tool calls.
@@ -28,6 +29,10 @@ export interface Act {
   readonly done: boolean
   /* What a subagent did, for the `Agent` call that started it. */
   readonly children: readonly Act[]
+  /* How long a thought or a subagent took, when the stream timed it. */
+  readonly durationMs?: number | null
+  /* The MCP server a call went to. */
+  readonly server?: string | null
 }
 
 /* The verb on the row. Six letters at most, so the subject beside it starts
@@ -45,6 +50,18 @@ const LABELS: Readonly<Record<Kind, string>> = {
 }
 
 export const actionLabel = (kind: Kind): string => LABELS[kind]
+
+/* The verb a row leads with: a timed thought says how long it took. */
+export function rowLabel(act: Act): string {
+  if (act.kind === 'think' && act.durationMs != null) return `Thought for ${took(Math.max(act.durationMs, 1000))}`
+  return actionLabel(act.kind)
+}
+
+/* `mcp__figma__get_design_context` went to `figma`. */
+export function serverOf(name: string): string | null {
+  const [head, server, ...rest] = name.split('__')
+  return head === 'mcp' && server && rest.length > 0 ? server : null
+}
 
 /* One tool name, in whatever spelling. MCP namespaces it with `__`, some CLIs
    with `:` or `.`, and the same act is `run_command`, `runCommand` or `Bash`
@@ -150,8 +167,16 @@ export function acts(parts: readonly Part[], every: readonly Part[] = parts): re
   const rows = rowsOf(own, every)
   return rows.map((row) => {
     const inside = every.filter((part) => 'parent' in part && part.parent === row.id)
-    return inside.length ? { ...row, children: rowsOf(inside, every), done: row.done && finished(row.id, every) } : row
+    /* A subagent's call answers at once and the work goes on: its task says when it is over. */
+    const timed = row.kind === 'agent' ? { ...row, durationMs: ranFor(row.id, every), done: row.done && finished(row.id, every) } : row
+    return inside.length ? { ...timed, children: rowsOf(inside, every), done: row.done && finished(row.id, every) } : timed
   })
+}
+
+/* The CLI's own count for the task a call started, at its latest report. */
+function ranFor(callId: string, parts: readonly Part[]): number | null {
+  const timed = parts.findLast((part) => part.kind === 'task' && part.call_id === callId && part.duration_ms != null)
+  return timed?.kind === 'task' ? (timed.duration_ms ?? null) : null
 }
 
 /* A subagent is finished when its background task says so, not when its
@@ -176,7 +201,7 @@ function rowsOf(parts: readonly Part[], every: readonly Part[]): Act[] {
   parts.forEach((part) => {
     const at = every.indexOf(part)
     if (part.kind === 'thinking') {
-      rows.push({ id: `t${at}`, kind: 'think', name: 'Thinking', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true, children: [] })
+      rows.push({ id: `t${at}`, kind: 'think', name: 'Thinking', target: oneLine(part.text), input: '', output: part.text, failed: false, done: true, children: [], durationMs: part.duration_ms ?? null })
       return
     }
     if (part.kind === 'unknown') {
@@ -196,6 +221,7 @@ function rowsOf(parts: readonly Part[], every: readonly Part[]): Act[] {
       failed: answer?.failed ?? part.state === 'failed',
       done: answer !== undefined || part.state !== 'running',
       children: [],
+      server: serverOf(part.name),
     })
   })
   return rows
@@ -222,12 +248,25 @@ const FOLD_AT = 3
 export function grouped(rows: readonly Act[]): readonly Item[] {
   const items: Item[] = []
   let run: Act[] = []
+  /* Subagents started side by side, running or not: one row says how many are still at it. */
+  let team: Act[] = []
   const flush = (): void => {
     if (run.length >= FOLD_AT) items.push({ id: `g${run[0]!.id}`, kind: run[0]!.kind, rows: run })
     else items.push(...run)
     run = []
   }
+  const flushTeam = (): void => {
+    if (team.length >= 2) items.push({ id: `g${team[0]!.id}`, kind: 'agent', rows: team })
+    else items.push(...team)
+    team = []
+  }
   for (const row of rows) {
+    if (row.kind === 'agent') {
+      flush()
+      team.push(row)
+      continue
+    }
+    flushTeam()
     const joins =
       run.length > 0 &&
       row.done &&
@@ -244,6 +283,7 @@ export function grouped(rows: readonly Act[]): readonly Item[] {
     else items.push(row)
   }
   flush()
+  flushTeam()
   return items
 }
 
@@ -262,7 +302,9 @@ const GROUP_NOUNS: Readonly<Record<Kind, readonly [string, string]>> = {
 
 export function groupTarget(group: Group): string {
   const [one, many] = GROUP_NOUNS[group.kind]
-  return `${group.rows.length} ${group.rows.length === 1 ? one : many}`
+  const counted = `${group.rows.length} ${group.rows.length === 1 ? one : many}`
+  const working = group.kind === 'agent' ? group.rows.filter((row) => !row.done).length : 0
+  return working > 0 ? `${counted} · ${working} working` : counted
 }
 
 /* What a settled group of rows amounts to: "Ran 3 commands · 2 file edits". */
@@ -308,7 +350,9 @@ export function headline(rows: readonly Act[], live: boolean): string {
    thinking, or writing the answer. */
 export function doing(parts: readonly Part[]): string {
   const last = parts.filter((part) => !('parent' in part) || !part.parent).at(-1)
-  const open = acts(parts).filter((row) => !row.done).at(-1)
+  const opened = acts(parts).filter((row) => !row.done)
+  if (opened.length > 1 && opened.every((row) => row.kind === 'agent')) return `Waiting on ${opened.length} subagents`
+  const open = opened.at(-1)
   if (open) return open.target ? `${actionLabel(open.kind)} ${open.target}` : actionLabel(open.kind)
   if (last?.kind === 'thinking') return 'Thinking'
   if (last?.kind === 'text') return 'Writing'

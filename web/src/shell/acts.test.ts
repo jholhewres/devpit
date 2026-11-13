@@ -15,6 +15,8 @@ import {
   grouped,
   groupTarget,
   isGroup,
+  rowLabel,
+  serverOf,
   type Act,
   type Group,
 } from './acts'
@@ -212,6 +214,51 @@ describe('a run of the same act reads as one row', () => {
     const grep = (id: string): Act => ({ ...read(id), kind: 'find', name: 'Grep' })
     const glob = (id: string): Act => ({ ...read(id), kind: 'find', name: 'Glob' })
     expect(grouped([grep('a'), glob('b'), grep('c')]).some(isGroup)).toBe(false)
+  })
+})
+
+describe('a thought, timed', () => {
+  it('says how long it took, and only when the stream timed it', () => {
+    const [timed] = acts([{ kind: 'thinking', text: 'Weighing the cache', parent: null, duration_ms: 4200 }])
+    expect(rowLabel(timed!)).toBe('Thought for 4s')
+    expect(timed!.target).toBe('Weighing the cache')
+    const [untimed] = acts([{ kind: 'thinking', text: 'old', parent: null }])
+    expect(rowLabel(untimed!)).toBe('Think')
+  })
+})
+
+describe('an MCP call', () => {
+  it('names the server it went to', () => {
+    expect(serverOf('mcp__figma__get_design_context')).toBe('figma')
+    expect(serverOf('Bash')).toBeNull()
+    expect(acts([call('m', 'mcp__figma__get_design_context')])[0]!.server).toBe('figma')
+  })
+})
+
+describe('subagents side by side', () => {
+  const agent = (id: string, description: string): Part => call(id, 'Agent', JSON.stringify({ description }))
+  const task = (callId: string, status: string, ms: number | null = null): Part => ({
+    kind: 'task', task_id: `t-${callId}`, call_id: callId, task_kind: 'local_agent', description: null, status, summary: null, duration_ms: ms,
+  })
+
+  it('read as one row saying how many are still working', () => {
+    const rows = acts([agent('a', 'Read the docs'), agent('b', 'Run the tests'), result('a', 'ok'), result('b', 'ok'), task('a', 'running', 3000), task('b', 'completed', 22611)])
+    const items = grouped(rows)
+    expect(items).toHaveLength(1)
+    expect(groupTarget(items[0] as Group)).toBe('2 subagents · 1 working')
+  })
+
+  it('each keep the time the CLI counted', () => {
+    const rows = acts([agent('a', 'Read the docs'), result('a', 'ok'), task('a', 'running', 2425), task('a', 'completed', 22611)])
+    expect(rows[0]!.durationMs).toBe(22611)
+  })
+
+  it('leave the live line waiting on them', () => {
+    expect(doing([agent('a', 'one'), agent('b', 'two')].map((part) => ({ ...part, state: 'running' }) as Part))).toBe('Waiting on 2 subagents')
+  })
+
+  it('alone, still read as the one row they are', () => {
+    expect(grouped(acts([agent('a', 'Read the docs')])).filter(isGroup)).toHaveLength(0)
   })
 })
 

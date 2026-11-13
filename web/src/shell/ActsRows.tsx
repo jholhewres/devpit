@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 import { imagesOf, isCut, namedImages, textOf, WholeContext } from './cutOutput'
 import { ask, commands } from './live'
-import { acts, actionLabel, grouped, groupTarget, headline, isGroup, type Act, type Group, type Kind } from './acts'
+import { acts, actionLabel, grouped, groupTarget, headline, isGroup, rowLabel, type Act, type Group, type Kind } from './acts'
 import { shownRows, useActivity } from './activity'
 import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
 import { EditCard } from './EditCardView'
 import { Markdown } from './MarkdownView'
+import { took } from './turnFold'
 import { useDisclosed } from './useDisclosed'
 
 /*
@@ -82,6 +83,7 @@ function AgentRow({ act }: { act: Act }): React.JSX.Element {
         <Icon kind={act.kind} />
         <span className="arow__k">{actionLabel(act.kind)}</span>
         {act.target && <span className="arow__d">{act.target}</span>}
+        <Ran act={act} />
         {act.done ? <Chevron open={open} className="arow__v" /> : <span className="arow__live" aria-label="Running" />}
       </button>
       {open && (
@@ -140,8 +142,10 @@ function LeafRow({ act }: { act: Act }): React.JSX.Element {
         onClick={() => setOpen((was) => !was)}
       >
         <Icon kind={act.kind} />
-        <span className="arow__k">{actionLabel(act.kind)}</span>
+        <span className="arow__k">{rowLabel(act)}</span>
         {act.target && <span className="arow__d">{act.target}</span>}
+        {act.server && <span className="arow__s">{act.server}</span>}
+        <Ran act={act} />
         <State act={act} open={open} hasBody={parts.length > 0} />
       </button>
       {open && parts.length > 0 && (
@@ -161,6 +165,17 @@ function LeafRow({ act }: { act: Act }): React.JSX.Element {
         </div>
       )}
     </div>
+  )
+}
+
+/* A subagent's state and the CLI's count of how long it ran. */
+function Ran({ act }: { act: Act }): React.JSX.Element | null {
+  if (act.kind !== 'agent') return null
+  const state = act.failed ? 'Failed' : act.done ? 'Done' : 'Working'
+  return (
+    <span className="arow__t" data-state={state.toLowerCase()}>
+      {act.durationMs != null ? `${state} · ${took(act.durationMs)}` : state}
+    </span>
   )
 }
 
@@ -217,11 +232,11 @@ interface Piece {
 function sections(act: Act): readonly Piece[] {
   if (act.kind === 'think') return act.output.trim() ? [{ label: 'Thought', body: act.output }] : []
   const out: Piece[] = []
-  if (act.kind === 'run') {
-    const command = commandOf(act.input)
-    if (command) out.push({ label: 'Command', body: command })
-  } else if (act.input.trim() && act.input.trim() !== '{}') {
-    out.push({ label: 'Arguments', body: pretty(act.input) })
+  const command = act.kind === 'run' ? commandOf(act.input) : ''
+  if (command) out.push({ label: 'Command', body: command })
+  /* The whole input, unless the command said all of it. */
+  if (act.input.trim() && act.input.trim() !== '{}' && !(command && onlyCommand(act.input))) {
+    out.push({ label: 'Input', body: pretty(act.input) })
   }
   if (act.output.trim()) out.push({ label: 'Output', body: act.output })
   return out
@@ -233,6 +248,15 @@ function commandOf(input: string): string {
     return typeof value.command === 'string' ? value.command : pretty(input)
   } catch {
     return input
+  }
+}
+
+/* A command whose input holds nothing but it and the sentence the row already shows. */
+function onlyCommand(input: string): boolean {
+  try {
+    return Object.keys(JSON.parse(input) as object).every((key) => key === 'command' || key === 'description')
+  } catch {
+    return true
   }
 }
 
