@@ -264,27 +264,18 @@ const STOP: [&str; 21] = [
 /// its work: the whole message is a stop verb or a yes mark, then full names
 /// and nothing else — the session's, and others of `running` to stop several.
 /// Nothing is read into a sentence, and a part of a name is an ordinary word.
-/// Anything else is no, and the stop waits for the person's click.
+/// Names that read more than one way ask for no stop. Anything else is no,
+/// and the stop waits for the person's click.
 pub fn asks_to_stop(said: &str, session: &str, running: &[&str]) -> bool {
     let said = said.trim().to_lowercase();
-    let session = session.to_lowercase();
-    let only_names = |names: &[&str]| {
-        names.contains(&session.as_str())
-            && names.iter().all(|name| {
-                *name == session || running.iter().any(|one| one.to_lowercase() == *name)
-            })
-    };
-    let of_a_mark = |c: char| YES_MARKS.contains(&c) || dresses_a_mark(c);
-    let named = |names: &str| {
-        names == session
-            || only_names(
-                &names
-                    .split(|c: char| c.is_whitespace() || c == ',')
-                    .map(|name| name.trim_matches(of_a_mark))
-                    .filter(|name| !name.is_empty())
-                    .collect::<Vec<_>>(),
-            )
-    };
+    let session = spaced(&session.to_lowercase());
+    let mut known: Vec<String> = running
+        .iter()
+        .map(|one| spaced(&one.to_lowercase()))
+        .collect();
+    known.push(session.clone());
+    let named =
+        |names: &str| one_reading(names, &known).is_some_and(|read| read.contains(&session));
     if marked(&said).is_some() {
         // Punctuation only at the end of the names, as on the verb route:
         // `✅ !name` is not `✅ name`, and `name. ✅` is.
@@ -302,6 +293,53 @@ pub fn asks_to_stop(said: &str, session: &str, running: &[&str]) -> bool {
         return false;
     };
     STOP.contains(&verb) && named(names.trim())
+}
+
+/// `text` with its words one space apart.
+fn spaced(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The one way `names` reads as `known` names, each whole: a comma ends a
+/// name, a space may be inside one. None when it reads no way or more than
+/// one, as `fix login` does beside `fix`, `login` and `fix login`.
+fn one_reading(names: &str, known: &[String]) -> Option<Vec<String>> {
+    let of_a_mark = |c: char| YES_MARKS.contains(&c) || dresses_a_mark(c);
+    let longest = known.iter().map(|one| one.split(' ').count()).max()?;
+    let mut read = Vec::new();
+    for group in names.split(',') {
+        let words: Vec<&str> = group
+            .split_whitespace()
+            .map(|word| word.trim_matches(of_a_mark))
+            .filter(|word| !word.is_empty())
+            .collect();
+        let name = |from: usize, to: usize| words[from..to].join(" ");
+        let ends = |from: usize| {
+            (from + 1..=words.len().min(from + longest))
+                .filter(move |&to| known.contains(&name(from, to)))
+        };
+        // How many readings the words from each place on have; 2 is several.
+        let mut ways = vec![0usize; words.len() + 1];
+        ways[words.len()] = 1;
+        for from in (0..words.len()).rev() {
+            ways[from] = ends(from).map(|to| ways[to]).sum::<usize>().min(2);
+        }
+        if ways[0] != 1 {
+            return None;
+        }
+        let mut from = 0;
+        while from < words.len() {
+            let to = ends(from).find(|&to| ways[to] == 1)?;
+            read.push(name(from, to));
+            from = to;
+        }
+    }
+    Some(read)
+}
+
+/// Whether `said` carries a yes mark, which also answers a draft.
+pub fn by_mark(said: &str) -> bool {
+    marked(said).is_some()
 }
 
 /// Whether `said` is a yes mark or a send word alone, which names no session:
