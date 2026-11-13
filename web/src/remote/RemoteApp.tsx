@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { AgentHealth, Board, Conversations, LivePane, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion, RemoteTalks } from '../gen/bindings'
+import type { AgentHealth, Board, Conversations, LivePane, RemoteDraft, RemoteIn, RemoteOut, RemoteProject, RemoteQuestion, RemoteStop, RemoteTalks } from '../gen/bindings'
 import { Kind, unframe } from '../shell/paneSocket'
 import { launcherLink } from '../shell/remoteLauncher'
 import { connectRelay, CLOSED, deviceKey, forgetMachine, keepMachine, machinesKept, offerOpened, type RelayMachine, type RelayPairing } from './relay'
@@ -28,14 +28,8 @@ const RELAY_PAGE = import.meta.env.BASE_URL !== '/'
 
 type View = 'terminals' | 'board' | 'waiting' | 'chats' | 'secrets'
 
-export interface Welcome {
-  device: string
-  host: string
-  typing: boolean
-  answering: boolean
-  /** Absent from an older host, which sends only JSON. */
-  binary?: boolean
-}
+/* `binary` and `stops` are absent from an older host. */
+export type Welcome = Omit<Extract<RemoteOut, { t: 'welcome' }>, 't'>
 
 export function RemoteApp(): React.JSX.Element {
   const [token, setToken] = useState<string | null>(tokenKept)
@@ -55,6 +49,7 @@ export function RemoteApp(): React.JSX.Element {
   const [board, setBoard] = useState<Board | null>(null)
   const [questions, setQuestions] = useState<readonly RemoteQuestion[]>([])
   const [drafts, setDrafts] = useState<readonly RemoteDraft[]>([])
+  const [stops, setStops] = useState<readonly RemoteStop[]>([])
   const [health, setHealth] = useState<AgentHealth | null>(null)
   const [chats, setChats] = useState<Conversations | null>(null)
   const [talks, setTalks] = useState<RemoteTalks | null>(null)
@@ -82,6 +77,7 @@ export function RemoteApp(): React.JSX.Element {
           link.current?.send({ t: 'projects' })
           link.current?.send({ t: 'waiting' })
           link.current?.send({ t: 'drafts' })
+          if (message.stops) link.current?.send({ t: 'stops' })
           return
         case 'approving':
           setApproving(true)
@@ -113,6 +109,13 @@ export function RemoteApp(): React.JSX.Element {
           return
         case 'drafts':
           setDrafts(message.drafts)
+          return
+        case 'stops':
+          setStops(message.stops)
+          if (message.said) {
+            setFailed(message.said)
+            window.setTimeout(() => setFailed(null), 6000)
+          }
           return
         case 'agentHealth':
           setHealth(message.health)
@@ -172,9 +175,12 @@ export function RemoteApp(): React.JSX.Element {
     if (view === 'waiting') {
       send({ t: 'waiting' })
       send({ t: 'drafts' })
+      if (welcome?.stops) send({ t: 'stops' })
       send({ t: 'agentHealth' })
     }
-  }, [view, projectId, up, send])
+  }, [view, projectId, up, send, welcome?.stops])
+
+  const waitingOn = questions.length + drafts.length + stops.length
 
   if (offer) {
     const pair = (name: string): void => {
@@ -249,7 +255,7 @@ export function RemoteApp(): React.JSX.Element {
       <nav className="rm__tabs">
         {(['terminals', 'board', 'waiting', 'chats', 'secrets'] as const).map((one) => (
           <button key={one} className="rm__tab" data-on={view === one ? 'true' : undefined} onClick={() => setView(one)}>
-            {one === 'waiting' && questions.length + drafts.length > 0 ? `waiting ${questions.length + drafts.length}` : one}
+            {one === 'waiting' && waitingOn > 0 ? `waiting ${waitingOn}` : one}
           </button>
         ))}
       </nav>
@@ -268,8 +274,8 @@ export function RemoteApp(): React.JSX.Element {
             {pane && <RemoteTerminal key={pane} project={project.id} pane={pane} typing={welcome?.typing ?? false} binary={welcome?.binary ?? false} send={send} sendBytes={sendBytes} bytes={bytes} />}
           </>
         )}
-        {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} waiting={questions.length + drafts.length} onWaiting={() => setView('waiting')} send={send} />}
-        {view === 'waiting' && <RemoteWaiting questions={questions} drafts={drafts} health={health} answering={welcome?.answering ?? false} typing={welcome?.typing ?? false} send={send} />}
+        {view === 'board' && <RemoteBoard board={board} project={projectId} typing={welcome?.typing ?? false} waiting={waitingOn} onWaiting={() => setView('waiting')} send={send} />}
+        {view === 'waiting' && <RemoteWaiting questions={questions} drafts={drafts} stops={stops} health={health} answering={welcome?.answering ?? false} typing={welcome?.typing ?? false} send={send} />}
         {view === 'chats' && <RemoteChats project={projectId} chats={chats} talks={talks} drafts={drafts} typing={welcome?.typing ?? false} send={send} hears={talk} onTerminal={terminal} />}
         {view === 'secrets' && <RemoteSecret key={projectId} projects={projects} project={projectId} typing={welcome?.typing ?? false} send={send} />}
       </section>

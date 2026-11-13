@@ -2,7 +2,8 @@
 //! read in the orchestrator's log as `draft_sending` reads it, when another
 //! session already works the same card and relieves it, or on the person's
 //! click. A stop their words did not cover waits above the orchestrator's
-//! composer with every other one it asked for, so one click stops them all.
+//! composer and on devpit's Remote with every other one it asked for, so one
+//! click stops them all, on what each loses at that click.
 //!
 //! Held in memory, per orchestrator account: a stop asked is for now.
 
@@ -10,32 +11,52 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use devpit_agentcli::person::{From, Said};
-use devpit_rpc::{LiveSession, RpcError, StopAsked, StopsAsked, StopsConfirmed};
+use devpit_rpc::{LiveSession, RemoteStop, RpcError, StopAsked, StopsAsked, StopsConfirmed};
 use serde_json::{json, Value};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter as _};
 
-/// Said to the window when an orchestrator asks for a stop.
+use crate::stopping::Clicked;
+
+/// Said to the window, and to the Remote's viewers, when the stops waiting
+/// for a click change.
 pub(crate) const STOP_ASKED: &str = "orchestrator:stop-asked";
 
-/// Whether stopping `name` goes ahead now: on the person's word — the whole
+/// An orchestrator's stop of `name` (only `pid`), as devpit found things
+/// when it was asked.
+pub(crate) struct Request<'a> {
+    /// The person's last message to the orchestrator.
+    pub said: Option<&'a Said>,
+    pub name: &'a str,
+    pub pid: Option<i32>,
+    /// The sessions running, whose full names a message may list.
+    pub running: &'a [&'a str],
+    /// Another session runs on its card and relieves it.
+    pub swapped: bool,
+    /// What stopping it loses now, if anything.
+    pub losing: Option<String>,
+    pub force: bool,
+    /// A draft waits for it, which a ✅ beside its name answers.
+    pub drafted: bool,
+}
+
+/// Whether the stop goes ahead now: on the person's word — the whole
 /// message the request, beside other names of `running` to stop several — or
 /// a swap, and what it would lose only with `force`. Otherwise why: it waits
 /// for the person's click.
-pub(crate) fn allowed(
-    said: Option<&Said>,
-    name: &str,
-    running: &[&str],
-    swapped: bool,
-    losing: Option<&str>,
-    force: bool,
-) -> Result<(), String> {
-    let refused = match said {
-        _ if swapped => None,
+pub(crate) fn allowed(asked: &Request<'_>) -> Result<(), String> {
+    let name = asked.name;
+    let refused = match asked.said {
+        _ if asked.swapped => None,
         Some(said) if matches!(said.from, From::Channel(_)) => Some(format!(
             "the person last wrote from {}, where a stop goes only by its button",
             said.from.label()
         )),
-        Some(said) if devpit_agentcli::person::asks_to_stop(&said.text, name, running) => None,
+        Some(said) if asked.drafted && devpit_agentcli::person::by_mark(&said.text) => Some(
+            format!("the person's ✅ beside {name} answers the draft waiting for it, not a stop"),
+        ),
+        Some(said) if devpit_agentcli::person::asks_to_stop(&said.text, name, asked.running) => {
+            None
+        }
         Some(said) => Some(format!(
             "the person's last message («{}») is not only a request to stop {name}",
             crate::draft_sending::short(&said.text)
@@ -47,10 +68,25 @@ pub(crate) fn allowed(
     if let Some(why) = refused {
         return Err(why);
     }
-    match losing {
-        Some(losing) if !force => Err(format!("{name}: {losing}")),
+    match &asked.losing {
+        Some(losing) if !asked.force => Err(format!("{name}: {losing}")),
         _ => Ok(()),
     }
+}
+
+/// The orchestrator's stop: `Ok` when it goes ahead now, else held for the
+/// click of `profile`'s person, with what the orchestrator is answered.
+pub(crate) fn requested(profile: &str, asked: &Request<'_>) -> Result<(), Value> {
+    let why = match allowed(asked) {
+        Ok(()) => return Ok(()),
+        Err(why) => why,
+    };
+    let held = StopAsked {
+        name: asked.name.to_owned(),
+        pid: asked.pid,
+        losing: asked.losing.clone(),
+    };
+    Err(ask(profile, held, &why, asked.said.map(|said| said.from)))
 }
 
 type Asked = HashMap<String, Vec<StopAsked>>;
@@ -60,29 +96,33 @@ fn asked() -> &'static Mutex<Asked> {
     ASKED.get_or_init(Mutex::default)
 }
 
-/// Keeps the stop of `name` (only `pid`) waiting for the click of `profile`'s
-/// person, in place of one asked for it before; answers the orchestrator
-/// `why` nothing stopped yet.
-pub(crate) fn ask(
-    profile: &str,
-    name: &str,
-    pid: Option<i32>,
-    losing: Option<String>,
-    why: &str,
-) -> Value {
+/// Keeps `stop` waiting for the click of `profile`'s person, in place of one
+/// asked for the same name before.
+fn hold(profile: &str, stop: StopAsked) {
     if let Ok(mut held) = asked().lock() {
         let list = held.entry(profile.to_owned()).or_default();
-        list.retain(|one| one.name != name);
-        list.push(StopAsked {
-            name: name.to_owned(),
-            pid,
-            losing,
-        });
+        list.retain(|one| one.name != stop.name);
+        list.push(stop);
     }
+}
+
+/// Holds `stop` and answers the orchestrator `why` nothing stopped yet. The
+/// Claude app shows no devpit button, so a person last heard `from` there is
+/// told the one message that stops every stop waiting.
+pub(crate) fn ask(profile: &str, stop: StopAsked, why: &str, from: Option<From>) -> Value {
+    let name = stop.name.clone();
+    hold(profile, stop);
+    let waits = "It waits for the person's click above this chat's composer and on devpit's Remote, listed with every other stop you asked for and what each would lose; one click stops them all.";
+    let tell = if from == Some(From::RemoteControl) {
+        let names: Vec<String> = waiting(profile).into_iter().map(|one| one.name).collect();
+        format!("The person wrote from the Claude app, where that button does not show: tell them they can send `stop {}` alone instead, then call this again for each — with force for one that would lose work, once they have heard what.", names.join(" "))
+    } else {
+        "Tell them so; do not ask them to type it again.".to_owned()
+    };
     json!({
         "done": false,
         "asked": format!("stop {name}"),
-        "note": format!("Not stopped yet: {why}. It waits above this chat's composer, listed with every other stop you asked for and what each would lose, and one click of the person's stops them all. Tell them so; do not ask them to type it again."),
+        "note": format!("Not stopped yet: {why}. {waits} {tell}"),
     })
 }
 
@@ -93,6 +133,25 @@ pub(crate) fn waiting(profile: &str) -> Vec<StopAsked> {
         .ok()
         .and_then(|held| held.get(profile).cloned())
         .unwrap_or_default()
+}
+
+/// Every stop waiting, by the orchestrator account it waits for: what the
+/// Remote shows.
+pub(crate) fn all() -> Vec<RemoteStop> {
+    let Ok(held) = asked().lock() else {
+        return Vec::new();
+    };
+    let mut every: Vec<RemoteStop> = held
+        .iter()
+        .flat_map(|(profile, stops)| {
+            stops.iter().map(|stop| RemoteStop {
+                profile: profile.clone(),
+                stop: stop.clone(),
+            })
+        })
+        .collect();
+    every.sort_by(|a, b| a.profile.cmp(&b.profile));
+    every
 }
 
 /// The stops among `names` that wait, taken: what the person's click
@@ -120,6 +179,59 @@ pub(crate) fn forget(profile: &str, name: &str) {
     }
 }
 
+/// The person's click on `shown`, the stops as they were shown: each still
+/// waiting is stopped by `stop` on the loss the click showed for it. One
+/// whose loss changed since stops nothing and waits again, showing it.
+pub(crate) fn confirm(
+    profile: &str,
+    shown: &[StopAsked],
+    mut stop: impl FnMut(&StopAsked, Option<&str>) -> Result<Clicked, String>,
+) -> StopsConfirmed {
+    let names: Vec<String> = shown.iter().map(|one| one.name.clone()).collect();
+    let mut done = StopsConfirmed {
+        stopped: Vec::new(),
+        failed: Vec::new(),
+        changed: Vec::new(),
+    };
+    for held in take(profile, &names) {
+        let seen = shown
+            .iter()
+            .find(|one| one.name == held.name)
+            .and_then(|one| one.losing.as_deref());
+        match stop(&held, seen) {
+            Ok(Clicked::Stopped) => done.stopped.push(held.name),
+            Ok(Clicked::Changed(now)) => {
+                done.changed.push(format!("{}: {now}", held.name));
+                hold(
+                    profile,
+                    StopAsked {
+                        losing: Some(now),
+                        ..held
+                    },
+                );
+            }
+            Err(why) => done.failed.push(format!("{}: {why}", held.name)),
+        }
+    }
+    done
+}
+
+/// Stops `shown` as the person of `profile`, from the window or the Remote.
+pub(crate) fn confirm_now(app: &AppHandle, profile: &str, shown: &[StopAsked]) -> StopsConfirmed {
+    let done = confirm(profile, shown, |one, seen| {
+        crate::stopping::stop_as_seen(app, profile, &one.name, one.pid, seen)
+            .map_err(|err| err.message)
+    });
+    let _ = app.emit(STOP_ASKED, profile);
+    done
+}
+
+/// The person keeps `names` of `profile` running.
+pub(crate) fn drop_now(app: &AppHandle, profile: &str, names: &[String]) {
+    take(profile, names);
+    let _ = app.emit(STOP_ASKED, profile);
+}
+
 /// `orchestrator.stops_asked` — the stops waiting for the person's click.
 #[tauri::command]
 #[specta::specta]
@@ -129,38 +241,23 @@ pub fn orchestrator_stops_asked(profile_id: String) -> StopsAsked {
     }
 }
 
-/// `orchestrator.stops_confirm` — the person's click: each of `names` still
-/// waiting stops as theirs, with what it loses, which the click was shown.
+/// `orchestrator.stops_confirm` — the person's click on the stops as it
+/// showed them: each stops as theirs on the loss it showed, read again now.
 #[tauri::command]
 #[specta::specta]
 pub async fn orchestrator_stops_confirm(
     app: AppHandle,
     profile_id: String,
-    names: Vec<String>,
+    stops: Vec<StopAsked>,
 ) -> Result<StopsConfirmed, RpcError> {
-    crate::off_main::blocking(move || {
-        let mut done = StopsConfirmed {
-            stopped: Vec::new(),
-            failed: Vec::new(),
-        };
-        for one in take(&profile_id, &names) {
-            match crate::stopping::stop(&app, &profile_id, &one.name, one.pid, "person", true) {
-                Ok(_) => done.stopped.push(one.name),
-                Err(err) => done.failed.push(format!("{}: {}", one.name, err.message)),
-            }
-        }
-        Ok(done)
-    })
-    .await
+    crate::off_main::blocking(move || Ok(confirm_now(&app, &profile_id, &stops))).await
 }
 
-/// `orchestrator.stops_drop` — the person keeps them running.
+/// `orchestrator.stops_drop` — the person keeps `names` running.
 #[tauri::command]
 #[specta::specta]
-pub fn orchestrator_stops_drop(profile_id: String) {
-    if let Ok(mut held) = asked().lock() {
-        held.remove(&profile_id);
-    }
+pub fn orchestrator_stops_drop(app: AppHandle, profile_id: String, names: Vec<String>) {
+    drop_now(&app, &profile_id, &names);
 }
 
 /// Whether every session stopped as `name` (only `pid`, when given) has

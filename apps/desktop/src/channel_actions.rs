@@ -39,6 +39,21 @@ pub(crate) fn label(action: &Action) -> String {
         Action::Rotated { .. } => "Rotated".to_owned(),
         Action::ForgetRotation { .. } => "Forget".to_owned(),
         Action::StopSession { .. } => "Stop the session".to_owned(),
+        Action::All(each)
+            if each
+                .iter()
+                .all(|one| matches!(one, Action::StopSession { .. })) =>
+        {
+            format!("Stop all {}", each.len())
+        }
+        Action::All(each)
+            if each
+                .iter()
+                .all(|one| matches!(one, Action::SendDraft { .. })) =>
+        {
+            format!("Send all {}", each.len())
+        }
+        Action::All(each) => format!("All {}", each.len()),
         Action::MoveCard { .. } => "Move the card".to_owned(),
         Action::Answer { seen, choice, .. } => {
             let said = seen
@@ -97,15 +112,27 @@ pub(crate) fn act(action: &Action, channel: &str) -> String {
             profile,
             session,
             pid,
-            force,
+            losing,
         } => crate::telegram::app()
             .get()
             .ok_or_else(|| "devpit's window is not running.".to_owned())
             .and_then(|app| {
-                crate::stopping::stop(app, profile, session, *pid, "person", *force)
+                crate::stopping::stop_as_seen(app, profile, session, *pid, losing.as_deref())
                     .map_err(|err| err.message)
             })
-            .map(|_| format!("Stopped {session}.")),
+            .map(|clicked| match clicked {
+                crate::stopping::Clicked::Stopped => format!("Stopped {session}."),
+                crate::stopping::Clicked::Changed(now) => {
+                    format!(
+                        "Not stopped: {session} would lose more now — {now}. Ask again to see it."
+                    )
+                }
+            }),
+        Action::All(each) => Ok(each
+            .iter()
+            .map(|one| act(one, channel))
+            .collect::<Vec<_>>()
+            .join("\n")),
         Action::MoveCard {
             project,
             card_id,

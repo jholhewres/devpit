@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::{
-    Attachment, Board, Conversation, Conversations, Frame, LiveSession, Message, Transcript,
+    Attachment, Board, Conversation, Conversations, Frame, LiveSession, Message, StopAsked,
+    Transcript,
 };
 
 /// What a viewer asks.
@@ -86,6 +87,18 @@ pub enum RemoteIn {
     DraftSend {
         profile: String,
         name: String,
+    },
+    /// The stops orchestrators asked for, waiting on the person's click. Sent
+    /// only to a host whose welcome said `stops`.
+    Stops,
+    /// The person's click on the stops as the viewer showed them: each stops
+    /// on the loss it showed. Only a device allowed to type.
+    StopsConfirm {
+        stops: Vec<RemoteStop>,
+    },
+    /// The person keeps these running. Only a device allowed to type.
+    StopsDrop {
+        stops: Vec<RemoteStop>,
     },
     AgentHealth,
     /// A card in the project's first lane. Only a device allowed to type.
@@ -166,6 +179,10 @@ pub enum RemoteOut {
         /// The host reads and sends raw terminal bytes; absent from an older one.
         #[serde(default)]
         binary: bool,
+        /// The host shows the stops waiting on the person's click; absent
+        /// from an older one.
+        #[serde(default)]
+        stops: bool,
     },
     /// The device proved its pairing code and waits for the person at the
     /// machine to allow it. An older viewer passes it by.
@@ -204,6 +221,12 @@ pub enum RemoteOut {
     },
     Drafts {
         drafts: Vec<RemoteDraft>,
+    },
+    /// The stops waiting on the person's click, and what the last click on
+    /// them came to. An older viewer passes it by.
+    Stops {
+        stops: Vec<RemoteStop>,
+        said: Option<String>,
     },
     AgentHealth {
         health: crate::AgentHealth,
@@ -287,6 +310,15 @@ pub struct RemoteDraft {
     /// The session it is for.
     pub name: String,
     pub text: String,
+}
+
+/// A stop an orchestrator asked for, waiting on the person's click.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteStop {
+    /// The orchestrator's account.
+    pub profile: String,
+    pub stop: StopAsked,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq, Eq)]

@@ -90,6 +90,38 @@ fn a_raw_viewer_names_a_handle_and_an_old_welcome_says_no_raw_bytes() {
     assert!(matches!(old, RemoteOut::Welcome { binary: false, .. }));
 }
 
+/// The viewer asks for the stops only of a host whose welcome says it shows
+/// them; an older host's welcome reads as one that does not.
+#[test]
+fn an_old_welcome_says_no_stops_and_a_click_reads_by_account() {
+    let old: RemoteOut = serde_json::from_str(
+        r#"{"t":"welcome","device":"phone","host":"desk","typing":true,"answering":false,"binary":true}"#,
+    )
+    .unwrap();
+    assert!(matches!(old, RemoteOut::Welcome { stops: false, .. }));
+    let clicked: RemoteIn = serde_json::from_str(
+        r#"{"t":"stopsConfirm","stops":[
+            {"profile":"p1","stop":{"name":"a","pid":null,"losing":null}},
+            {"profile":"p2","stop":{"name":"b","pid":7,"losing":"it is working right now"}},
+            {"profile":"p1","stop":{"name":"c","pid":null,"losing":null}}]}"#,
+    )
+    .unwrap();
+    let RemoteIn::StopsConfirm { stops } = clicked else {
+        panic!("a click on the stops");
+    };
+    let grouped: Vec<(String, Vec<String>)> = by_profile(&stops)
+        .into_iter()
+        .map(|(profile, list)| (profile, list.into_iter().map(|one| one.name).collect()))
+        .collect();
+    assert_eq!(
+        grouped,
+        [
+            ("p1".to_owned(), vec!["a".to_owned(), "c".to_owned()]),
+            ("p2".to_owned(), vec!["b".to_owned()])
+        ]
+    );
+}
+
 fn device(typing: bool) -> crate::remote_devices::Device {
     crate::remote_devices::Device {
         id: "dev_raw".into(),

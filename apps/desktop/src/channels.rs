@@ -48,13 +48,16 @@ pub(crate) enum Action {
         choice: u32,
     },
     /// Stops a session, as the person: what an orchestrator asked for in a
-    /// turn from a channel, waiting for their press.
+    /// turn from a channel, waiting for their press. It stops on the loss
+    /// the message showed, read again at the press.
     StopSession {
         profile: String,
         session: String,
         pid: Option<i32>,
-        force: bool,
+        losing: Option<String>,
     },
+    /// Several stops, or several drafts, of one answer in one press.
+    All(Vec<Action>),
     /// Moves a card into a lane that runs a step, which starts work: the
     /// same, for a move.
     MoveCard {

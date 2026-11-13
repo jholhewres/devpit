@@ -157,6 +157,9 @@ pub(crate) fn listen(app: &tauri::AppHandle) {
             });
         }
     });
+    app.listen_any(crate::stop_asked::STOP_ASKED, |_| {
+        broadcast(&crate::remote_conn::stops_now(None));
+    });
     for name in ["island:settled", "permission:settled"] {
         app.listen_any(name, |event| {
             if let Ok(id) = serde_json::from_str::<String>(event.payload()) {

@@ -96,6 +96,7 @@ pub(crate) fn settles(action: &Action, told: &Told) -> bool {
             Some(About::Reminder { card_id: c, .. }),
         ) => card_id == c,
         (Action::Answer { target, .. }, _) => told.asking.as_deref() == Some(target.as_str()),
+        (Action::All(each), _) => each.iter().any(|one| settles(one, told)),
         _ => false,
     }
 }

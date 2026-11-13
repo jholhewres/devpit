@@ -6,8 +6,8 @@ use devpit_rpc::{Conversation, Message, Part, Privacy, Role, Transcript, TurnFro
 use serde_json::json;
 
 use super::{
-    final_words, gather, heard, offer, shaped, split, which, Desk, Heard, Line, LONGEST_MESSAGE,
-    NO_VOICE,
+    final_words, gather, heard, offer, shaped, split, together, which, Desk, Heard, Line,
+    LONGEST_MESSAGE, NO_VOICE,
 };
 use crate::channels::Action;
 use crate::remote_talk::MOST_VOICE;
@@ -239,16 +239,81 @@ async fn telling_a_session_to_go_on_drafts_it_with_a_button_whose_press_sends_it
     );
 }
 
+fn stop(session: &str, losing: Option<&str>) -> Action {
+    Action::StopSession {
+        profile: "prof_c15".to_owned(),
+        session: session.to_owned(),
+        pid: None,
+        losing: losing.map(str::to_owned),
+    }
+}
+
 #[test]
 fn outside_a_channels_turn_nothing_waits_for_a_press() {
-    let stop = Action::StopSession {
-        profile: "prof_c15c".to_owned(),
-        session: "api".to_owned(),
-        pid: None,
-        force: false,
-    };
     // The composer's turn: the orchestrator stops a session as it always has.
-    assert!(!offer("orchestrator-c15-c", stop));
+    assert!(!offer("orchestrator-c15-c", stop("api", None)));
+}
+
+/// N stops asked in one channel turn: a button each, and one that stops them
+/// all, under a message that says what each loses.
+#[tokio::test]
+async fn several_stops_asked_from_a_channel_go_in_one_press() {
+    let line = chat(Privacy::Titles);
+    let mut desk = machine("orchestrator-c15-d", "Stopping api, web and docs.");
+    let busy = "it is working right now";
+    desk.during = Box::new(move |project| {
+        for one in [
+            stop("api", None),
+            stop("web", Some(busy)),
+            stop("docs", None),
+        ] {
+            assert!(offer(project, one));
+        }
+    });
+    heard(&line, &desk, said_in(&message_from(42, "pare todas"))).await;
+
+    let said = line.said.lock().expect("said").clone();
+    let (asks, buttons) = said.last().expect("the buttons' message");
+    let each = vec![
+        stop("api", None),
+        stop("web", Some(busy)),
+        stop("docs", None),
+    ];
+    let mut every = each.clone();
+    every.push(Action::All(each));
+    assert_eq!(buttons, &every);
+    assert_eq!(crate::channel_actions::label(&every[3]), "Stop all 3");
+    assert!(
+        asks.contains(&format!("stop web, which loses work: {busy}")),
+        "{asks}"
+    );
+    assert!(!asks.contains("Stop all"), "{asks}");
+}
+
+#[test]
+fn several_drafts_go_in_one_press_and_a_lone_one_stays_alone() {
+    let send = |session: &str| Action::SendDraft {
+        profile: "prof_c15".to_owned(),
+        session: session.to_owned(),
+    };
+    let offered = together(vec![send("api"), stop("web", None), send("docs")]);
+    assert_eq!(
+        offered,
+        vec![
+            send("api"),
+            stop("web", None),
+            send("docs"),
+            Action::All(vec![send("api"), send("docs")])
+        ]
+    );
+    assert_eq!(crate::channel_actions::label(&offered[3]), "Send all 2");
+    assert_eq!(together(vec![send("api")]), vec![send("api")]);
+    // Pressed, it does each one, as each one's own button would.
+    let done = crate::channel_actions::act(&offered[3], "Telegram");
+    assert_eq!(
+        done,
+        "That draft is no longer waiting.\nThat draft is no longer waiting."
+    );
 }
 
 #[test]

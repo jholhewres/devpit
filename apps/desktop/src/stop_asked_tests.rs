@@ -1,6 +1,8 @@
 use devpit_agentcli::person::{From, Said};
+use devpit_rpc::StopAsked;
 
-use super::{allowed, ask, swapped, take, waiting};
+use super::{ask, confirm, requested, swapped, take, waiting, Request};
+use crate::stopping::{as_seen, Clicked};
 
 fn said(text: &str, from: From) -> Said {
     Said {
@@ -35,14 +37,35 @@ fn live(name: &str, pid: i32, card: Option<&str>) -> devpit_rpc::LiveSession {
 /// The sessions running, as the guard reads a message against them.
 const LIVE: [&str; 2] = ["fix-login", "review-x"];
 
-fn names(stops: &[devpit_rpc::StopAsked]) -> Vec<&str> {
+/// A stop of `name` asked on `said`, nothing else in the way.
+fn request<'a>(said: Option<&'a Said>, name: &'a str) -> Request<'a> {
+    Request {
+        said,
+        name,
+        pid: None,
+        running: &LIVE,
+        swapped: false,
+        losing: None,
+        force: false,
+        drafted: false,
+    }
+}
+
+fn names(stops: &[StopAsked]) -> Vec<&str> {
     stops.iter().map(|one| one.name.as_str()).collect()
+}
+
+fn stop(name: &str, losing: Option<&str>) -> StopAsked {
+    StopAsked {
+        name: name.to_owned(),
+        pid: None,
+        losing: losing.map(str::to_owned),
+    }
 }
 
 #[test]
 fn a_stop_nobody_asked_for_is_refused() {
-    let name = "fix-login";
-    let now = |said: Option<&Said>| allowed(said, name, &LIVE, false, None, false);
+    let now = |said: Option<&Said>| super::allowed(&request(said, "fix-login"));
     assert!(now(Some(&said("pare fix-login", From::Composer))).is_ok());
     assert!(now(Some(&said("stop review-x fix-login", From::Composer))).is_ok());
     let refused = now(Some(&said("como está a fix-login?", From::Composer)));
@@ -57,30 +80,56 @@ fn a_stop_nobody_asked_for_is_refused() {
 #[test]
 fn a_session_relieved_on_its_card_is_stopped_without_a_word() {
     let ok = said("ok", From::Composer);
-    assert!(allowed(Some(&ok), "fix-login", &LIVE, true, None, false).is_ok());
-    assert!(allowed(None, "fix-login", &LIVE, true, None, false).is_ok());
+    for said in [Some(&ok), None] {
+        let relieved = Request {
+            swapped: true,
+            ..request(said, "fix-login")
+        };
+        assert!(super::allowed(&relieved).is_ok());
+    }
 }
 
+/// The handler's own path: a stop the words do not cover is held, and the
+/// orchestrator is answered that nothing stopped.
 #[test]
 fn a_stop_the_words_do_not_cover_waits_for_the_persons_click() {
     let words = said("se sim pode encerrar as sessões", From::Composer);
-    let why = allowed(Some(&words), "fix-login", &LIVE, false, None, false)
-        .expect_err("not on these words");
-    let answer = ask("p-click", "fix-login", None, None, &why);
+    let answer =
+        requested("p-click", &request(Some(&words), "fix-login")).expect_err("not on these words");
     assert_eq!(answer["done"], false);
     assert!(answer["note"]
         .as_str()
         .is_some_and(|note| note.contains("click")));
     assert_eq!(names(&waiting("p-click")), ["fix-login"]);
     // Asked again, it is still one stop to click.
-    ask("p-click", "fix-login", None, None, &why);
+    let _ = requested("p-click", &request(Some(&words), "fix-login"));
     assert_eq!(names(&waiting("p-click")), ["fix-login"]);
+    // On the person's own words it goes ahead, and nothing more waits.
+    let word = said("stop review-x", From::Composer);
+    assert!(requested("p-click", &request(Some(&word), "review-x")).is_ok());
+    assert_eq!(names(&waiting("p-click")), ["fix-login"]);
+}
+
+/// The Claude app shows no devpit button: the orchestrator is told the one
+/// message that stops every stop waiting.
+#[test]
+fn from_the_claude_app_the_orchestrator_is_told_the_typed_form() {
+    let words = said("pode encerrar as duas", From::RemoteControl);
+    let _ = requested("p-typed", &request(Some(&words), "fix-login"));
+    let answer = requested("p-typed", &request(Some(&words), "review-x")).expect_err("held");
+    let note = answer["note"].as_str().unwrap_or_default();
+    assert!(note.contains("`stop fix-login review-x`"), "{note}");
+    let composer = said("pode encerrar", From::Composer);
+    let answer = requested("p-typed-2", &request(Some(&composer), "fix-login")).expect_err("held");
+    let note = answer["note"].as_str().unwrap_or_default();
+    assert!(note.contains("Remote"), "{note}");
+    assert!(!note.contains("`stop "), "{note}");
 }
 
 #[test]
 fn one_click_stops_every_session_asked_and_only_those() {
     for name in ["a", "b", "c"] {
-        ask("p-batch", name, None, None, "asked");
+        ask("p-batch", stop(name, None), "asked", None);
     }
     let clicked = ["a", "c", "never-asked"].map(str::to_owned);
     assert_eq!(names(&take("p-batch", &clicked)), ["a", "c"]);
@@ -92,15 +141,95 @@ fn one_click_stops_every_session_asked_and_only_those() {
 fn what_a_stop_would_lose_goes_inside_its_confirmation() {
     let word = said("stop fix-login", From::Composer);
     let losing = "its folder has 3 file(s) not committed";
-    let why = allowed(Some(&word), "fix-login", &LIVE, false, Some(losing), false)
-        .expect_err("not without the person seeing it");
+    let asked = Request {
+        losing: Some(losing.to_owned()),
+        ..request(Some(&word), "fix-login")
+    };
+    let why = super::allowed(&asked).expect_err("not without the person seeing it");
     assert!(why.contains(losing));
+    let forced = Request {
+        force: true,
+        ..request(Some(&word), "fix-login")
+    };
     assert!(
-        allowed(Some(&word), "fix-login", &LIVE, false, Some(losing), true).is_ok(),
+        super::allowed(&Request {
+            losing: Some(losing.to_owned()),
+            ..forced
+        })
+        .is_ok(),
         "forced on the person's word"
     );
-    ask("p-lose", "fix-login", None, Some(losing.to_owned()), &why);
+    let _ = requested("p-lose", &asked);
     assert_eq!(waiting("p-lose")[0].losing.as_deref(), Some(losing));
+}
+
+/// A ✅ beside a session with a draft waiting is the draft's yes: a stop
+/// asked on it waits for the click instead.
+#[test]
+fn a_yes_mark_for_a_draft_does_not_stop_its_session() {
+    let mark = said("✅ fix-login", From::Composer);
+    assert!(super::allowed(&request(Some(&mark), "fix-login")).is_ok());
+    let drafted = Request {
+        drafted: true,
+        ..request(Some(&mark), "fix-login")
+    };
+    assert!(super::allowed(&drafted).is_err_and(|why| why.contains("draft")));
+    let word = said("stop fix-login", From::Composer);
+    assert!(
+        super::allowed(&Request {
+            drafted: true,
+            ..request(Some(&word), "fix-login")
+        })
+        .is_ok(),
+        "the stop word still stops"
+    );
+}
+
+/// The loss is read again at the click: one the click did not show stops
+/// nothing, and waits again with what it would lose now.
+#[test]
+fn a_click_stops_only_on_the_loss_it_showed() {
+    let dirty = "its folder has 2 file(s) not committed";
+    assert_eq!(as_seen(None, None), Ok(()));
+    assert_eq!(as_seen(Some(dirty), Some(dirty.to_owned())), Ok(()));
+    assert_eq!(as_seen(Some(dirty), None), Ok(()), "less to lose");
+    assert_eq!(as_seen(None, Some(dirty.to_owned())), Err(dirty.to_owned()));
+    assert_eq!(
+        as_seen(Some("it is working right now"), Some(dirty.to_owned())),
+        Err(dirty.to_owned())
+    );
+
+    let busy = "it is working right now";
+    for one in [stop("a", None), stop("b", None), stop("c", Some(busy))] {
+        ask("p-fresh", one, "asked", None);
+    }
+    let shown = waiting("p-fresh");
+    // Asked again meanwhile, with more to lose than the click showed.
+    ask("p-fresh", stop("c", Some(dirty)), "asked", None);
+    let now = |name: &str| match name {
+        "b" => Some(dirty.to_owned()),
+        "c" => Some(dirty.to_owned()),
+        _ => None,
+    };
+    let mut seen = Vec::new();
+    let done = confirm("p-fresh", &shown, |one, shown| {
+        seen.push((one.name.clone(), shown.map(str::to_owned)));
+        Ok(match as_seen(shown, now(&one.name)) {
+            Ok(()) => Clicked::Stopped,
+            Err(now) => Clicked::Changed(now),
+        })
+    });
+    assert_eq!(done.stopped, ["a"]);
+    assert_eq!(done.changed, [format!("b: {dirty}"), format!("c: {dirty}")]);
+    assert!(done.failed.is_empty());
+    assert_eq!(
+        seen[2],
+        ("c".to_owned(), Some(busy.to_owned())),
+        "what the click showed"
+    );
+    let again = waiting("p-fresh");
+    assert_eq!(names(&again), ["b", "c"]);
+    assert!(again.iter().all(|one| one.losing.as_deref() == Some(dirty)));
 }
 
 #[test]
