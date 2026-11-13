@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { LivePane, Message, RemoteDraft, RemoteIn, RemoteOut } from '../gen/bindings'
 import { actionLabel, acts, doing, headline } from '../shell/acts'
 import { joined } from '../shell/frames'
+import { compactedAt } from '../shell/turnFold'
 import { RemoteComposer } from './RemoteComposer'
 import { after, asked, draftsOf, type Talking } from './talk'
 
@@ -125,6 +126,8 @@ function RemoteTurn({ message }: { message: Message }): React.JSX.Element {
     )
   const receipt = message.parts.find((part) => part.kind === 'receipt')
   if (receipt?.kind === 'receipt') return <p className="rm__dim">{`${receipt.allowed ? 'Allowed' : 'Refused'} ${receipt.tool}`}</p>
+  const compacted = message.parts.find((part) => part.kind === 'compacted')
+  if (compacted?.kind === 'compacted') return <p className="rm__dim">{compactedAt(compacted.tokens)}</p>
   const rows = acts(message.parts)
   const did = headline(rows, message.streaming)
   return (

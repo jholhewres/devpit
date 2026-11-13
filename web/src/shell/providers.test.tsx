@@ -44,6 +44,7 @@ vi.mock('./live', () => ({
     agentProfilesWaiting: () => ({ profiles: [] }),
     agentProfileRead: (command: string) => readBack(command),
     agentSignedIn: (dir: string) => (asked.push(dir), { state: signIn }),
+    idleCompactRead: () => ({ when: 'never', tokens: 200000 }),
   },
 }))
 

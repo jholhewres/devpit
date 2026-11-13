@@ -32,6 +32,9 @@ pub const WORKTREES_HIDDEN: &str = "worktrees.hidden";
 pub const WORKTREES_DELETE_MERGED: &str = "worktrees.delete_merged";
 /// What the last worktree cleanup did, as JSON.
 pub const WORKTREES_CLEANUP_LAST: &str = "worktrees.cleanup_last";
+/// When each profile's idle conversations are compacted, by profile id, as
+/// JSON. Absent is never.
+pub const AGENTS_IDLE_COMPACT: &str = "agents.idle_compact";
 /// The agent profiles the person declared, as JSON.
 pub const AGENT_PROFILES: &str = "agents.profiles";
 /// What sync keeps about each profile on this machine: values another

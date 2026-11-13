@@ -121,6 +121,7 @@ pub async fn chat_send(
         }
     }
     let guard = state.begin(&conversation_id, &steering)?;
+    let idle = crate::idle_compact::Idle::of(&profile_id, head.as_ref(), &file, &head_file);
 
     // Written before the turn runs: an interrupted first turn still leaves the
     // conversation tied to the account that opened it.
@@ -189,34 +190,40 @@ pub async fn chat_send(
         let hooks = crate::steps::hook_settings();
         let checkout = std::path::Path::new(&cwd);
         let mut before = crate::turn_changes::Before::default();
+        let turn = Say {
+            command: &path,
+            env: &env,
+            prompt: &prompt,
+            cwd: checkout,
+            model: model.as_deref(),
+            // What is left of the cap, not the cap: a resumed conversation
+            // may not spend its whole budget again.
+            budget_usd: left,
+            session_id: resuming.as_deref(),
+            fork_at: forking.as_deref(),
+            permission: mode.as_deref(),
+            settings: hooks.as_deref(),
+            mcp_config: mcp.as_deref(),
+            effort: thinking.as_deref(),
+            control: Some(&control),
+            on_session: Some(&hold),
+            add_dirs: &reach,
+            name: address.as_deref(),
+        };
+        let compacted =
+            crate::idle_compact::on_return(&idle, staying.clone(), &*driver, &turn, &sink);
         let said = crate::chat_resident::or_say(
             staying,
             driver.as_ref(),
-            &Say {
-                command: &path,
-                env: &env,
-                prompt: &prompt,
-                cwd: checkout,
-                model: model.as_deref(),
-                // What is left of the cap, not the cap: a resumed conversation
-                // may not spend its whole budget again.
-                budget_usd: left,
-                session_id: resuming.as_deref(),
-                fork_at: forking.as_deref(),
-                permission: mode.as_deref(),
-                settings: hooks.as_deref(),
-                mcp_config: mcp.as_deref(),
-                effort: thinking.as_deref(),
-                control: Some(&control),
-                on_session: Some(&hold),
-                add_dirs: &reach,
-                name: address.as_deref(),
-            },
+            &crate::idle_compact::resuming(&compacted, &turn),
             // Only once the turn has the process: a woken turn it waited for
             // is written first, and its changes are not this turn's.
             || {
                 before = crate::turn_changes::Before::start(checkout.to_owned());
                 let _ = append(&transcript, &asked);
+                if let Some(done) = &compacted {
+                    let _ = append(&transcript, &done.note);
+                }
                 begin();
                 beginning.store(true, std::sync::atomic::Ordering::SeqCst);
             },
@@ -294,6 +301,8 @@ pub async fn chat_send(
         session_id,
         anchor,
     );
+    let at = checkout_at.to_string_lossy();
+    crate::idle_compact::arm(&app, &project_id, &conversation_id, &profile_id, &at);
 
     // The end goes out before git reads what the turn changed. The answer is
     // written once it has, under the guard: a turn let in sooner would write

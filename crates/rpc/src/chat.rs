@@ -91,6 +91,9 @@ pub enum Part {
         from_conversation: String,
         turn: u32,
     },
+    /// The CLI's own `/compact` ran on this conversation while it sat idle,
+    /// when its context held this many tokens.
+    Compacted { tokens: u32 },
     /// A line the driver did not recognise. Kept rather than dropped: losing
     /// output is worse than showing it plain.
     Unknown { text: String },
