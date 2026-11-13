@@ -47,7 +47,7 @@ function Thread({ messages }: { messages: ChatMessages }): React.JSX.Element {
   const top = useRef<HTMLDivElement>(null)
   return (
     <div ref={box}>
-      <ChatThread messages={messages} box={box} top={top} older={false} stalled={false} onMore={nothing} sending error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={nothing} />
+      <ChatThread messages={messages} box={box} top={top} older={false} stalled={false} onMore={nothing} sending error={null} folder={null} rewindable={[]} onRewind={nothing} onEdit={nothing} onOpen={nothing} onRetry={nothing} onContinue={nothing} />
     </div>
   )
 }

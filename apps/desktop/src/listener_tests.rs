@@ -71,6 +71,19 @@ fn command_for(settings: &str, event: &str) -> String {
 /// Runs the real hook command for one event, the way the CLI does, and
 /// answers the post it made. `pane` is set only for an agent inside a pane.
 fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) -> Posted {
+    hooked(dir, event, payload, pane, "").0
+}
+
+/// [`posted_by_hook`], answering with `body`, and what the hook printed for
+/// the CLI to read.
+fn hooked(
+    dir: &Path,
+    event: &str,
+    payload: &str,
+    pane: Option<&str>,
+    body: &str,
+) -> (Posted, String) {
+    let body = body.to_owned();
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("bind");
     listener.set_nonblocking(true).expect("nonblocking");
     let endpoint = dir.join("hook-endpoint");
@@ -90,7 +103,7 @@ fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) ->
                 Ok((mut stream, _)) => {
                     stream.set_nonblocking(false).expect("blocking");
                     let posted = read_request(&mut stream, None);
-                    reply(&mut stream, "");
+                    reply(&mut stream, &body);
                     return posted;
                 }
                 Err(err) if err.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
@@ -106,7 +119,8 @@ fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) ->
     hook.arg("-c")
         .arg(&command)
         .env_remove("DEVPIT_PANE")
-        .stdin(Stdio::piped());
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped());
     if let Some(pane) = pane {
         hook.env("DEVPIT_PANE", pane);
     }
@@ -117,11 +131,41 @@ fn posted_by_hook(dir: &Path, event: &str, payload: &str, pane: Option<&str>) ->
         .expect("stdin")
         .write_all(payload.as_bytes())
         .expect("payload");
-    child.wait().expect("hook ran");
-    served
+    let printed = child.wait_with_output().expect("hook ran").stdout;
+    let posted = served
         .join()
         .expect("served")
-        .unwrap_or_else(|| panic!("the {event} hook never posted"))
+        .unwrap_or_else(|| panic!("the {event} hook never posted"));
+    (posted, String::from_utf8_lossy(&printed).into_owned())
+}
+
+/// What the person typed when refusing is what the CLI reads back from the
+/// hook it ran, and hands the agent.
+#[test]
+fn a_refusal_reaches_the_cli_with_the_persons_reason() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let asking = Asking::default();
+    let picks = Picks::default();
+    let hear = asking.opened("q1");
+    assert!(crate::asking_picks::refuse(
+        &asking,
+        &picks,
+        "q1",
+        " use rg, not grep "
+    ));
+    let input = r#"{"command":"grep -r x ."}"#;
+    let body = reply_for(&picks, "q1", input, asking.wait("q1", hear));
+    let payload = r#"{"hook_event_name":"PreToolUse","session_id":"s1","cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"grep -r x ."}}"#;
+
+    let (_, printed) = hooked(dir.path(), "PreToolUse", payload, None, &body);
+
+    let read: serde_json::Value = serde_json::from_str(&printed).expect("the CLI reads JSON");
+    let said = &read["hookSpecificOutput"];
+    assert_eq!(said["permissionDecision"], "deny");
+    assert_eq!(
+        said["permissionDecisionReason"],
+        "Refused in devpit: use rg, not grep"
+    );
 }
 
 /// Every way a hook reaches a card, each one fired through the real hook

@@ -75,7 +75,7 @@ pub use lifecycle::{
 pub use log::{commits_in, history, show, touched_since, upstream_of};
 pub use reviewed::{code_changed_between, lines_at, review_diff, Reviewed, UNCOMMITTED};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};
-pub use snapshot::{changed_between, snapshot, Changed};
+pub use snapshot::{changed_between, put_back, snapshot, Changed};
 pub use sourcing::{hidden_as, hidden_in, origin_of, shown, word_of};
 pub use standing::standing_at;
 pub use state::{plain_branch, repo_state, BranchState, RepoState};

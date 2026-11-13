@@ -206,7 +206,7 @@ impl Woken {
             stop_reason: Some("interrupted".to_owned()),
             is_error: true,
             context: None,
-            unheard: Vec::new(),
+            ..Default::default()
         };
         let _ = append(transcript, &self.written(&end));
         self.frames.send(Frame::Ended { end }).ok();

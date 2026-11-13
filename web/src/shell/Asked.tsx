@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import type { Question } from '../gen/bindings'
 import { allowKey, questionsOf, subjectOf, useFocused, type Chosen } from './choices'
 import { Choosing } from './Choosing'
@@ -27,7 +29,7 @@ export function Asked({
   onAnswer,
 }: {
   questions: readonly Question[]
-  onAnswer: (id: string, said: Said, chosen?: Chosen) => void
+  onAnswer: (id: string, said: Said, chosen?: Chosen, reason?: string) => void
 }): React.JSX.Element {
   return (
     <>
@@ -36,16 +38,22 @@ export function Asked({
         return asked ? (
           <Choosing key={question.id} asked={asked} onPick={(chosen) => onAnswer(question.id, 'allow', chosen)} onRefuse={() => onAnswer(question.id, 'deny')} />
         ) : (
-          <Allowing key={question.id} question={question} onAnswer={(said) => onAnswer(question.id, said)} />
+          <Allowing
+            key={question.id}
+            question={question}
+            onAnswer={(said, reason) => (reason?.trim() ? onAnswer(question.id, said, undefined, reason.trim()) : onAnswer(question.id, said))}
+          />
         )
       })}
     </>
   )
 }
 
-/* A request: what it is about on its first line, the tool's JSON folded away. */
-function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said: Said) => void }): React.JSX.Element {
+/* A request: what it is about on its first line, the tool's JSON folded away.
+   A refusal can say why, and the agent reads it in place of the tool's result. */
+function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said: Said, reason?: string) => void }): React.JSX.Element {
   const card = useFocused<HTMLElement>()
+  const [why, setWhy] = useState('')
   const plan = question.touch?.kind === 'plan' ? question.touch.plan : null
   const what = plan ? '' : subjectOf(question)
   const lines = what.split('\n').length
@@ -58,7 +66,7 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
         const said = allowKey(event.key, event.target === event.currentTarget)
         if (!said) return
         event.preventDefault()
-        onAnswer(said)
+        onAnswer(said, said === 'deny' ? why : undefined)
       }}
     >
       <div className="asking__t">
@@ -84,7 +92,19 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
         <pre className="asking__in">{question.input}</pre>
       </details>
       <div className="asking__row">
-        <button className="btn" onClick={() => onAnswer('deny')}>
+        <input
+          className="asking__why"
+          value={why}
+          placeholder={plan ? 'What to change — told to the agent' : 'Why not? — told to the agent'}
+          aria-label="Reason for refusing, told to the agent"
+          onChange={(event) => setWhy(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !why.trim()) return
+            event.preventDefault()
+            onAnswer('deny', why)
+          }}
+        />
+        <button className="btn" onClick={() => onAnswer('deny', why)}>
           {plan ? 'Keep planning' : 'Refuse'}
         </button>
         {!plan && (

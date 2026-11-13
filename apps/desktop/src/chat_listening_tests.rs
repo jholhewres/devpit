@@ -48,7 +48,7 @@ fn ended() -> Said {
             stop_reason: None,
             is_error: false,
             context: None,
-            unheard: Vec::new(),
+            ..Default::default()
         },
         session_id: None,
         init: None,

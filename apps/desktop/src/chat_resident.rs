@@ -375,7 +375,7 @@ fn stopped() -> Said {
             stop_reason: Some("cancelled".to_owned()),
             is_error: false,
             context: None,
-            unheard: Vec::new(),
+            ..Default::default()
         },
         session_id: None,
         init: None,

@@ -25,7 +25,7 @@ function thread(unheard: string[], onResend: (text: string) => void) {
   } as Message
   const messages = [said('u1', 'fix the board', 't1'), said('u2', 'and the lane too', null), answer]
   return render(
-    <ChatThread messages={chatMessages(messages)} box={{ current: null }} top={{ current: null }} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={nothing} onResend={onResend} />,
+    <ChatThread messages={chatMessages(messages)} box={{ current: null }} top={{ current: null }} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onEdit={nothing} onOpen={nothing} onRetry={nothing} onContinue={nothing} onResend={onResend} />,
   )
 }
 

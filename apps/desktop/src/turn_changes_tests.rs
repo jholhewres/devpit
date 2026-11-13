@@ -31,7 +31,11 @@ fn a_turn_that_edited_a_file_reports_it() {
     std::fs::write(dir.path().join("a.txt"), "one\ntwo\n").expect("edit");
     std::fs::write(dir.path().join("b.txt"), "new\n").expect("create");
 
-    let Some(Part::Changes { files }) = since(dir.path(), before.as_deref()) else {
+    let Some(Part::Changes {
+        files,
+        before: kept,
+    }) = since(dir.path(), before.as_deref())
+    else {
         panic!("expected a rollup");
     };
     assert_eq!(
@@ -49,6 +53,7 @@ fn a_turn_that_edited_a_file_reports_it() {
             },
         ]
     );
+    assert_eq!(kept, before, "the tree the turn found, to put back");
 }
 
 #[test]
@@ -110,7 +115,7 @@ fn a_turns_end_is_sent_before_what_it_changed_is_read() {
         stop_reason: Some("end_turn".to_owned()),
         is_error: false,
         context: None,
-        unheard: Vec::new(),
+        ..Default::default()
     };
     let collected = Mutex::new(Vec::new());
     let mut seen_by_git = Vec::new();
@@ -126,6 +131,7 @@ fn a_turns_end_is_sent_before_what_it_changed_is_read() {
                     added: 1,
                     removed: 0,
                 }],
+                before: None,
             })
         },
         &collected,

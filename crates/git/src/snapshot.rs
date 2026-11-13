@@ -103,6 +103,39 @@ pub fn changed_between(root: &Path, before: &str, after: &str) -> Result<Vec<Cha
         .collect())
 }
 
+/// Puts `paths` back as `tree` holds them, in the working tree only, so the
+/// person's index is left alone. A path the tree lacks was made since, and is
+/// removed. The caller has checked every path against `root`.
+pub fn put_back(root: &Path, tree: &str, paths: &[String]) -> Result<(), GitError> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut listing = vec!["ls-tree", "-r", "-z", "--name-only", tree, "--"];
+    listing.extend(paths.iter().map(String::as_str));
+    let listed = git(root, None, &listing)?;
+    let held: Vec<&str> = listed.split('\0').filter(|one| !one.is_empty()).collect();
+    let (kept, made): (Vec<&String>, Vec<&String>) =
+        paths.iter().partition(|one| held.contains(&one.as_str()));
+    if !kept.is_empty() {
+        let literal: Vec<String> = kept.iter().map(|one| format!(":(literal){one}")).collect();
+        let mut argv = vec!["restore", "--source", tree, "--worktree", "--"];
+        argv.extend(literal.iter().map(String::as_str));
+        git(root, None, &argv)?;
+    }
+    for path in made {
+        match std::fs::remove_file(root.join(path)) {
+            Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+                return Err(GitError::Failed {
+                    command: format!("rm {path}"),
+                    stderr: err.to_string(),
+                })
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[path = "snapshot_tests.rs"]
 mod tests;

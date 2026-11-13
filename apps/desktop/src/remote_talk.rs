@@ -380,7 +380,7 @@ fn refused(out: &Sender<RemoteOut>, project: String, conversation: String, why: 
             stop_reason: Some(why.clone()),
             is_error: true,
             context: None,
-            unheard: Vec::new(),
+            ..Default::default()
         },
     };
     let _ = out.send(RemoteOut::ChatFrame {

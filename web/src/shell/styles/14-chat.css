@@ -4,7 +4,7 @@
    cost every turn in it on each chunk of the answer being written. The size
    it last had is kept, so the scrollbar does not jump. */
 .turn { display: flex; flex-direction: column; gap: var(--space-2); content-visibility: auto; contain-intrinsic-size: auto 180px; }
-.said { display: flex; justify-content: flex-end; }
+.said { position: relative; display: flex; justify-content: flex-end; }
 .said__b { max-width: 85%; min-width: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-lg); background: var(--raised); font-size: var(--fs-lg); line-height: 1.4; color: var(--text); white-space: pre-wrap; word-break: break-word; }
 /* A reply is as wide as the thread; the prose cap belongs to documents. */
 .thread .md { max-width: none; }
@@ -13,9 +13,30 @@
 .reply p { margin: 0 0 11px; }
 .reply p:last-child { margin-bottom: 0; }
 
-.turn__foot { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.turn__foot { display: flex; align-items: center; gap: var(--space-2); min-height: 20px; margin-top: 2px; }
 .tfbtn { width: 20px; height: 20px; border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; color: var(--ghost); }
 .tfbtn:hover { background: var(--overlay); color: var(--text-2); }
+/* The quiet line under a turn: when, on what, how long, how much. */
+.tmeta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--ghost); }
+/* What can be done with a message, where the pointer or the keyboard is. */
+.hbar { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 120ms linear; }
+.turn:hover .hbar, .turn:focus-within .hbar, .said:hover .hbar, .said:focus-within .hbar { opacity: 1; }
+/* Under the bubble, in the gap before the next message: it takes no height. */
+.said__bar { position: absolute; top: 100%; right: 0; }
+.said__bar .tmeta { margin-right: var(--space-1); }
+/* An edit that waits on whether the files changed since go back too. */
+.efrom { flex: none; width: calc(100% - 2 * var(--space-3)); max-width: var(--chat-max); margin: 0 auto var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); border: 1px solid var(--border-strong); background: var(--raised); display: flex; flex-direction: column; gap: var(--space-2); }
+.efrom__t { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text); }
+.efrom__row { display: flex; gap: var(--space-2); justify-content: flex-end; }
+/* Over words selected in an answer. */
+.qbtn { position: fixed; z-index: 50; transform: translateX(-50%); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--raised); box-shadow: 0 4px 14px var(--shade); font-size: var(--fs-sm); font-weight: 500; color: var(--text); }
+.qbtn:hover { background: var(--overlay-strong); }
+/* A picture opens over the window, with where it can go from there. */
+.zoomin { display: block; max-width: 100%; padding: 0; cursor: zoom-in; }
+.zoom { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-6); background: var(--scrim); }
+.zoom__img { max-width: 100%; max-height: calc(100% - 56px); object-fit: contain; border-radius: var(--radius-sm); box-shadow: 0 10px 40px var(--shade-deep); }
+.zoom__bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--raised); }
+.zoom__name { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-2); }
 /* The note a forked conversation opens with, naming where it came from. */
 .rwnd { margin: 4px 0 10px; padding: 8px 12px; border-left: 2px solid var(--accent); font-size: var(--fs-sm); color: var(--text-2); }
 .rwnd__from { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
@@ -81,6 +102,8 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .asking__t { font-size: var(--fs-md); color: var(--text); }
 .asking__in { margin: 0; padding: 8px; border-radius: var(--radius-sm); background: var(--inset); font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.5; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
 .asking__row { display: flex; gap: 8px; justify-content: flex-end; }
+.asking__why { flex: 1; min-width: 0; padding: 5px 9px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--inset); font: inherit; font-size: var(--fs-sm); color: var(--text); }
+.asking__why:focus { outline: none; border-color: var(--border-strong); }
 .asking:focus { outline: none; }
 .asking:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
 .asking__what { display: inline-block; max-width: 100%; max-height: 180px; overflow: auto; vertical-align: top; font-family: var(--mono); font-size: var(--fs-sm); white-space: pre-wrap; word-break: break-all; }
@@ -351,10 +374,11 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 /* In the thread's window every row drawn is measured for its spacer, so none
    is skipped; the window, not the paint, is what keeps a long one cheap. */
 .trow > .turn { content-visibility: visible; }
-.thread__more { align-self: center; background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px 10px; font: inherit; font-size: var(--fs-sm); color: var(--text-3); }
-.thread__more:hover { color: var(--text); }
-.thread__go { align-self: flex-start; background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 12px; font: inherit; font-size: var(--fs-sm); color: var(--text-2); }
-.thread__go:hover { color: var(--text); border-color: var(--text-3); }
+/* Load earlier, Continue and Retry: the same quiet button as a turn's status line. */
+.thread__more, .thread__go { padding: 2px var(--space-2); border-radius: var(--radius-xs); font: inherit; font-size: var(--fs-sm); font-weight: 500; color: var(--text-3); }
+.thread__more:hover, .thread__go:hover { background: var(--overlay); color: var(--text); }
+.thread__more { align-self: center; }
+.thread__end { display: flex; gap: var(--space-1); align-self: flex-start; margin-left: calc(-1 * var(--space-2)); }
 
 /* A block of an answer still arriving fades in as it lands; the ones above it keep their nodes and do not. */
 .reply[data-fade] .md > * { animation: reply-in 180ms ease-out both; }

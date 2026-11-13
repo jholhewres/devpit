@@ -4,11 +4,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Question } from '../gen/bindings'
 import { useChat } from './useChat'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
 
 /* What the window hears about questions, so a test can say it. */
 const heard: { asked: ((question: Question) => void) | null; settled: ((id: string) => void) | null } = { asked: null, settled: null }
 const picked = vi.fn()
+const refused = vi.fn()
+const answered = vi.fn()
 
 vi.mock('./chat', async (actual) => ({
   ...(await actual<typeof import('./chat')>()),
@@ -21,6 +26,9 @@ vi.mock('./live', () => ({
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
     permissionAskFromNow: () => null,
     permissionPick: (id: string, chosen: string[][]) => (picked(id, chosen), null),
+    permissionRefuse: (id: string, reason: string) => (refused(id, reason), null),
+    permissionAnswer: (id: string, answer: string) => (answered(id, answer), null),
+    chatReceipt: () => null,
   },
 }))
 vi.mock('./window', () => ({
@@ -64,5 +72,23 @@ describe("a chat's questions", () => {
     act(() => result.current.answer('q2', 'allow', [['Green']]))
     expect(result.current.asked).toEqual([])
     await waitFor(() => expect(picked).toHaveBeenCalledWith('q2', [['Green']]))
+  })
+
+  it('send a refusal with what the person said, for the agent to read', async () => {
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.session).toBe('ses_1'))
+    act(() => heard.asked?.(bash))
+    act(() => result.current.answer('q1', 'deny', undefined, '  use rg instead  '))
+    await waitFor(() => expect(refused).toHaveBeenCalledWith('q1', 'use rg instead'))
+    expect(answered).not.toHaveBeenCalled()
+  })
+
+  it('send a refusal with nothing said as a plain refusal', async () => {
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.session).toBe('ses_1'))
+    act(() => heard.asked?.(bash))
+    act(() => result.current.answer('q1', 'deny', undefined, '   '))
+    await waitFor(() => expect(answered).toHaveBeenCalledWith('q1', 'deny'))
+    expect(refused).not.toHaveBeenCalled()
   })
 })

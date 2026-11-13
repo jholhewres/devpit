@@ -244,8 +244,8 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 
 /* How a settled turn went, above its answer; a button when the work is folded behind it. */
 .tstat { display: flex; align-items: center; gap: 6px; min-width: 0; height: 24px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-3); text-align: left; }
-button.tstat { width: fit-content; max-width: 100%; border-radius: var(--radius-xs); }
-button.tstat:hover { color: var(--text-2); }
+button.tstat { width: fit-content; max-width: 100%; margin-left: calc(-1 * var(--space-2)); padding: 0 var(--space-2); border-radius: var(--radius-xs); }
+button.tstat:hover { background: var(--overlay); color: var(--text); }
 .tstat__n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
 .tstat[data-how='failed'] { height: auto; flex-wrap: wrap; color: var(--danger); }
 .tstat__e { flex-basis: 100%; font-family: var(--mono); font-size: var(--fs-xs); font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); }
@@ -256,7 +256,8 @@ button.tstat:hover { color: var(--text-2); }
 .said__chip { display: inline-flex; align-items: center; gap: 5px; max-width: 220px; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 .said__k { font-family: var(--mono); font-size: var(--fs-2xs); text-transform: uppercase; color: var(--text-3); }
 .said__pic { display: block; width: 120px; height: 90px; border-radius: var(--radius-sm); background: var(--overlay); overflow: hidden; }
-.said__pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.said__pic .zoomin { width: 100%; height: 100%; }
+.said__img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .said__t[data-folded] { max-height: 16.8em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent); mask-image: linear-gradient(to bottom, #000 70%, transparent); }
 .said__more { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-3); }
 .said__more:hover { color: var(--text); }

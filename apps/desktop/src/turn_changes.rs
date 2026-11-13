@@ -30,7 +30,10 @@ pub(crate) fn since(checkout: &Path, before: Option<&str>) -> Option<Part> {
             removed: one.removed,
         })
         .collect();
-    (!files.is_empty()).then_some(Part::Changes { files })
+    (!files.is_empty()).then_some(Part::Changes {
+        files,
+        before: Some(before.to_owned()),
+    })
 }
 
 /// Adds the rollup to the answer being built and to the stream, when there is

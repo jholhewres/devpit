@@ -231,6 +231,12 @@ export const commands = {
 	 *  Answers its id, which the window opens as a chat tab.
 	 */
 	chatRewind: (projectId: string, conversationId: string, turnId: string) => typedError<string, RpcError>(__TAURI_INVOKE("chat_rewind", { projectId, conversationId, turnId })),
+	/**
+	 *  `chat.edit_from` — a new conversation from before a turn, with its prompt
+	 *  to edit. With `put_back`, the files that turn and the later ones changed go
+	 *  back first, as the turn found them.
+	 */
+	chatEditFrom: (projectId: string, conversationId: string, turnId: string, putBack: boolean) => typedError<string, RpcError>(__TAURI_INVOKE("chat_edit_from", { projectId, conversationId, turnId, putBack })),
 	runsList: (query: RunsQuery) => typedError<RunsPage, RpcError>(__TAURI_INVOKE("runs_list", { query })),
 	/**  `sessions.search` — hits in this project's conversations for a query. */
 	sessionsSearch: (projectId: string, query: string) => typedError<SessionHit[], RpcError>(__TAURI_INVOKE("sessions_search", { projectId, query })),
@@ -249,6 +255,9 @@ export const commands = {
 	context: Context | null,
 	/**  Messages steered into the turn that the agent never took in, by id. */
 	unheard: string[],
+	/**  The model the CLI said it ran on, and the effort it was asked for. */
+	model?: string | null,
+	effort?: string | null,
 } | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
 	/**
 	 *  `chat.force_stop` — ends the turn in flight however it is: what a stop
@@ -894,6 +903,11 @@ export const commands = {
 	 *  list per question, in the order asked.
 	 */
 	permissionPick: (id: string, chosen: string[][]) => typedError<null, RpcError>(__TAURI_INVOKE("permission_pick", { id, chosen })),
+	/**
+	 *  `permission.refuse` — a refusal with the person's reason, which the agent
+	 *  reads where it would have read the tool's result.
+	 */
+	permissionRefuse: (id: string, reason: string) => typedError<null, RpcError>(__TAURI_INVOKE("permission_refuse", { id, reason })),
 	/**
 	 *  `permission.ask_from_now` — whether this conversation stops to ask.
 	 * 
@@ -3455,6 +3469,16 @@ export type Ended = {
 	error?: string | null,
 	/**  As [`TurnEnd::unheard`]. Absent from a line written before it existed. */
 	unheard?: string[],
+	/**
+	 *  What the turn ran on and spent, for the line under it. Absent from a
+	 *  line written before it existed.
+	 */
+	model?: string | null,
+	effort?: string | null,
+	costUsd?: number | null,
+	durationMs?: number | null,
+	/**  How full the context was when it ended. */
+	tokens?: number | null,
 };
 
 /**  A session of the account that ran and ended, as devpit saw it. */
@@ -4411,8 +4435,8 @@ duration_ms?: number | null } |
 { kind: "receipt"; tool: string; 
 /**  The tool's input as the question showed it. */
 input: string; allowed: boolean } | 
-/**  What the turn changed in the checkout, measured before and after it. */
-{ kind: "changes"; files: ChangedFile[] } | 
+/**  What the turn changed in the checkout, and its tree before, to put back. */
+{ kind: "changes"; files: ChangedFile[]; before?: string | null } | 
 /**
  *  This conversation was forked from another at one of its turns, which
  *  left that one as it was.
@@ -6154,6 +6178,9 @@ export type TurnEnd = {
 	context: Context | null,
 	/**  Messages steered into the turn that the agent never took in, by id. */
 	unheard: string[],
+	/**  The model the CLI said it ran on, and the effort it was asked for. */
+	model?: string | null,
+	effort?: string | null,
 };
 
 /**  Where a turn the person sent came from, other than the composer. */

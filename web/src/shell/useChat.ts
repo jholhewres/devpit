@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
 import type { Chosen } from './choices'
-import { appended, appliedAll, ASKS, batched, failedOn, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { appended, appliedAll, ASKS, batched, failedOn, prepended, retaken, fixedTo, MODES, opening, rejoin, saidText, send, settled, steered, withFiles, type Opening } from './chat'
 import { chatMessages, type ChatMessages } from './chatMessages'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
@@ -70,9 +70,11 @@ export interface Chat {
   /** Turns a new conversation can go on from, forked at that turn. */
   readonly rewindable: readonly string[]
   rewind: (turnId: string) => void
+  /** A new conversation from before a turn, its message in the composer; `putBack` puts the files changed since back first. */
+  editFrom: (turnId: string, putBack: boolean) => void
   detach: (path: string) => void
-  /** `chosen` answers a question the agent put, one list of labels per question. */
-  answer: (id: string, said: Said, chosen?: Chosen) => void
+  /** `chosen` answers a question the agent put, one list of labels per question; `reason` goes to the agent with a refusal. */
+  answer: (id: string, said: Said, chosen?: Chosen, reason?: string) => void
   /** `back` gets the words of a send refused before it opened, to give back.
       `given` sends those files and skills instead of the composer's, and leaves the composer's be. */
   say: (prompt: string, back?: (prompt: string) => void, given?: Extras) => void
@@ -293,9 +295,10 @@ export function useChat(conversationId: string): Chat {
   useEffect(() => onPermissionSettled((id) => setAsked((was) => was.filter((one) => one.id !== id))), [])
 
   const answer = useCallback(
-    (id: string, said: Said, chosen?: Chosen) => {
+    (id: string, said: Said, chosen?: Chosen, reason?: string) => {
       const question = asked.find((one) => one.id === id)
       const allow = said !== 'deny'
+      const why = allow ? '' : (reason?.trim() ?? '')
       /* Taken off the list first: the question is answered either way, and a
          row that lingers invites a second click that has nothing to answer. */
       setAsked((was) => was.filter((one) => one.id !== id))
@@ -304,7 +307,9 @@ export function useChat(conversationId: string): Chat {
       const call =
         said === 'always' && question
           ? () => commands.permissionAlways(id, question.sessionId, question.tool, question.input)
-          : () => commands.permissionAnswer(id, allow ? 'allow' : 'deny')
+          : why
+            ? () => commands.permissionRefuse(id, why)
+            : () => commands.permissionAnswer(id, allow ? 'allow' : 'deny')
       void ask(call).then((answered) => {
         /* Kept in the thread only when the answer reached the agent: a receipt
            for a question that had already timed out would record a decision
@@ -484,6 +489,18 @@ export function useChat(conversationId: string): Chat {
     [project, conversationId, show],
   )
 
+  const editFrom = useCallback(
+    (turnId: string, putBack: boolean) => {
+      if (!project) return
+      const said = messages.get().find((one) => one.role === 'user' && one.turnId === turnId)
+      void ask(() => commands.chatEditFrom(project.id, conversationId, turnId, putBack)).then((forked) => {
+        if (forked.data) show('chat', { id: forked.data, draft: said ? saidText(said) : undefined })
+        else setError(forked.error)
+      })
+    },
+    [project, conversationId, show, messages],
+  )
+
   const stop = useCallback(() => {
     /* The turn's own end clears `sending`: the send button must not come back under a turn still going. */
     setStopped(true)
@@ -583,6 +600,7 @@ export function useChat(conversationId: string): Chat {
       took,
       rewindable,
       rewind,
+      editFrom,
       detach,
       answer,
       say,
@@ -592,6 +610,6 @@ export function useChat(conversationId: string): Chat {
       forceable,
       force,
     }),
-    [messages, card, offered, fixed, profileId, model, cost, context, permission, effort, folder, files, asked, sending, failed, error, pick, choosePermission, chooseEffort, attach, paste, keep, previews, skills, session, older, took, rewindable, rewind, detach, answer, say, steer, clearExtras, stop, forceable, force],
+    [messages, card, offered, fixed, profileId, model, cost, context, permission, effort, folder, files, asked, sending, failed, error, pick, choosePermission, chooseEffort, attach, paste, keep, previews, skills, session, older, took, rewindable, rewind, editFrom, detach, answer, say, steer, clearExtras, stop, forceable, force],
   )
 }

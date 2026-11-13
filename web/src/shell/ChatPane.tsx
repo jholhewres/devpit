@@ -4,7 +4,7 @@ import type { Context } from '../gen/bindings'
 
 import { ActivityContext, activityOf, keepActivity, seen, type Activity } from './activity'
 import { ActivityPick } from './ActivityPick'
-import { ASKS, CONTINUE, money } from './chat'
+import { ASKS, CONTINUE, money, putBackFrom } from './chat'
 import type { Extras } from './queueing'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
@@ -18,8 +18,10 @@ import { DocPeek } from './DocPeek'
 import { AppsScopeContext } from './mcpApps'
 import { WholeFrom } from './WholeFrom'
 import { DropTarget } from './DropTarget'
+import { EditFrom } from './EditFrom'
 import { PaneCorner } from './PaneCorner'
 import { PromptRail } from './PromptRail'
+import { Quoting } from './Quoting'
 import { useTaking } from './useTaking'
 import { useThread } from './useOlder'
 import { ChatBlank } from './ChatBlank'
@@ -75,6 +77,14 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   })
   /* A file an answer names opens beside the conversation, not over it. */
   const [peek, setPeek] = useState<string | null>(null)
+  /* An edit waiting on whether the files changed since go back too. */
+  const [editing, setEditing] = useState<{ turnId: string; files: number } | null>(null)
+  const { messages, editFrom } = chat
+  const edit = useCallback((turnId: string) => {
+    const files = putBackFrom(messages.get(), turnId)
+    if (files > 0) setEditing({ turnId, files })
+    else editFrom(turnId, false)
+  }, [messages, editFrom])
   /* Where a page an MCP tool came with is asked for: this conversation's account, in its folder. */
   const scope = useMemo(
     () => (chat.profileId && chat.folder ? { profileId: chat.profileId, cwd: chat.folder } : null),
@@ -113,7 +123,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <AppsScopeContext.Provider value={scope}>
             <ActivityContext.Provider value={seen(activity, finding)}>
             <WholeFrom conversationId={tab.id}>
-              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} onContinue={() => chat.say(CONTINUE)} onResend={(text) => (chat.sending ? void chat.steer(text, NONE) : chat.say(text, undefined, NONE))} reveal={reveal} />
+              <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onEdit={edit} onOpen={setPeek} onContinue={() => chat.say(CONTINUE)} onRetry={(text) => chat.say(text, undefined, NONE)} onResend={(text) => (chat.sending ? void chat.steer(text, NONE) : chat.say(text, undefined, NONE))} reveal={reveal} />
             </WholeFrom>
             </ActivityContext.Provider>
           </AppsScopeContext.Provider>
@@ -122,6 +132,8 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
 
       {!empty && <PromptRail where={where} said={`${asked}:${chat.sending}`} jump={jump} />}
       {finding && <ChatFind where={where} box={follow.box} jump={jump} onDone={() => setFinding(false)} />}
+      <Quoting box={follow.box} onQuote={(text) => composer.current?.add(text)} />
+      {editing && <EditFrom files={editing.files} onCancel={() => setEditing(null)} onPick={(putBack) => (chat.editFrom(editing.turnId, putBack), setEditing(null))} />}
 
       <Composer tab={tab} chat={chat} project={project ?? null} mine={mine} away={follow.away} toEnd={follow.toEnd} handle={composer} pasted={pasted} />
       {peek && <DocPeek path={peek} onOpen={setPeek} onClose={() => setPeek(null)} />}

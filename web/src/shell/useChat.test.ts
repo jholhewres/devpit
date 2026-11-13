@@ -51,6 +51,7 @@ const calls = {
   chatHead: vi.fn(),
   chatAfter: vi.fn(),
   chatRewind: vi.fn(),
+  chatEditFrom: vi.fn(),
   chatPaste: vi.fn(),
   chatSteer: vi.fn(),
   chatCancel: vi.fn(),
@@ -96,6 +97,7 @@ vi.mock('./live', () => ({
       calls.chatPaste(projectId, type, data), { name: 'pasted-1.txt', path: '/h/pasted/pasted-1.txt', kind: 'txt' }
     ),
     chatRewind: (projectId: string, id: string, turnId: string) => (calls.chatRewind(projectId, id, turnId), 'conv_fork'),
+    chatEditFrom: (projectId: string, id: string, turnId: string, putBack: boolean) => (calls.chatEditFrom(projectId, id, turnId, putBack), 'conv_edit'),
     chatCancel: (id: string) => (calls.chatCancel(id), null),
     chatForceStop: (id: string) => (calls.chatForceStop(id), true),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
@@ -323,6 +325,16 @@ describe("a chat's reads of the transcript", () => {
     act(() => result.current.rewind('turn_1'))
     await waitFor(() => expect(shell.show).toHaveBeenCalledWith('chat', { id: 'conv_fork' }))
     expect(calls.chatRewind).toHaveBeenCalledWith('p', 'conv_a', 'turn_1')
+  })
+
+  it('edit from a turn: a fork from before it opens with its message back in the composer', async () => {
+    const asked = { id: 'msg_q', turnId: 'turn_2', role: 'user', parts: [{ kind: 'text', text: '/review\nlook again', parent: null }], createdAt: 1, streaming: false } as Message
+    saved.messages = [message('msg_1'), asked, { ...message('msg_a'), turnId: 'turn_2' }]
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.messages.get()).toHaveLength(3))
+    act(() => result.current.editFrom('turn_2', true))
+    await waitFor(() => expect(shell.show).toHaveBeenCalledWith('chat', { id: 'conv_edit', draft: '/review\nlook again' }))
+    expect(calls.chatEditFrom).toHaveBeenCalledWith('p', 'conv_a', 'turn_2', true)
   })
 })
 

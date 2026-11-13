@@ -25,7 +25,7 @@ function Thread({ messages, onContinue }: { messages: readonly Message[]; onCont
   const nothing = (): void => {}
   return (
     <div ref={box}>
-      <ChatThread messages={chatMessages(messages)} box={box} top={top} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={onContinue} />
+      <ChatThread messages={chatMessages(messages)} box={box} top={top} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onEdit={nothing} onOpen={nothing} onRetry={nothing} onContinue={onContinue} />
     </div>
   )
 }

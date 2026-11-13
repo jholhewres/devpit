@@ -33,7 +33,8 @@ import { useSlash } from './useSlash'
 import { useStop } from './useStop'
 
 /* What the conversation above may do to what is being written. */
-export type ComposerHandle = { put: (text: string) => void }
+/** `put` replaces what is typed; `add` goes after it. */
+export type ComposerHandle = { put: (text: string) => void; add: (text: string) => void }
 
 /*
  * Where a message is written. Its own component, holding the text: a key
@@ -65,7 +66,14 @@ export const Composer = memo(function Composer({
   const slash = useSlash(chat.profileId, prompt, setPrompt, Boolean(project?.orchestrator))
   const field = useRef<HTMLTextAreaElement>(null)
   const mention = useMention(project?.id ?? null, prompt, field, setPrompt)
-  useImperativeHandle(handle, () => ({ put: (text) => (setPrompt(text), field.current?.focus()) }), [setPrompt])
+  useImperativeHandle(
+    handle,
+    () => ({
+      put: (text) => (setPrompt(text), field.current?.focus()),
+      add: (text) => (setPrompt((was) => (was.trim() ? `${was.trimEnd()}\n\n${text}` : text)), field.current?.focus()),
+    }),
+    [setPrompt],
+  )
 
   /* Typed while a turn runs, a message waits for it rather than being
      refused, and takes what was attached to it along. */

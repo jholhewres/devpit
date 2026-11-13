@@ -98,3 +98,28 @@ fn a_folder_that_is_not_a_repository_is_an_error_not_an_empty_answer() {
     let dir = tempfile::tempdir().expect("tempdir");
     assert!(snapshot(dir.path()).is_err());
 }
+
+#[test]
+fn put_back_undoes_a_turn_and_leaves_the_rest_alone() {
+    let dir = repo();
+    let before = snapshot(dir.path()).expect("before");
+    std::fs::write(dir.path().join("kept.txt"), "changed\n").expect("edit");
+    std::fs::write(dir.path().join("new.rs"), "fn main() {}\n").expect("create");
+    std::fs::remove_file(dir.path().join("gone.txt")).expect("delete");
+    std::fs::write(dir.path().join("mine.txt"), "the person's\n").expect("theirs");
+
+    let turn = ["kept.txt", "new.rs", "gone.txt"].map(str::to_owned);
+    put_back(dir.path(), &before, &turn).expect("put back");
+
+    let read = |name: &str| std::fs::read_to_string(dir.path().join(name)).ok();
+    assert_eq!(read("kept.txt").as_deref(), Some("one\ntwo\n"));
+    assert_eq!(read("gone.txt").as_deref(), Some("bye\n"));
+    assert_eq!(read("new.rs"), None, "made by the turn, so gone");
+    assert_eq!(
+        read("mine.txt").as_deref(),
+        Some("the person's\n"),
+        "not the turn's"
+    );
+    let staged = git(dir.path(), None, &["diff", "--cached", "--name-only"]).expect("index");
+    assert_eq!(staged, "", "the index is the person's");
+}

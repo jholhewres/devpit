@@ -76,7 +76,7 @@ fn a_turn_ending_after_a_woken_one_keeps_what_that_one_wrote() {
         stop_reason: None,
         is_error: false,
         context: None,
-        unheard: Vec::new(),
+        ..Default::default()
     };
     settle(&file, Some(began_with), "turn_1", &end, None, None);
 
@@ -133,4 +133,55 @@ fn a_failed_turn_keeps_what_it_said_before_failing() {
         2,
         "each failure ends its answer"
     );
+}
+
+/// The line under a turn reads these, live from the end frame and saved on
+/// the answer alike: what it ran on, how long, what it cost.
+#[test]
+fn a_turn_ends_naming_its_model_effort_time_and_cost() {
+    let head = opening(
+        None,
+        "claude",
+        Some("opus".to_owned()),
+        None,
+        None,
+        Some("high".to_owned()),
+        1.0,
+    );
+    let mut said = devpit_agentcli::talk::Said {
+        end: devpit_rpc::TurnEnd {
+            turn_id: "turn_1".to_owned(),
+            cost_usd: Some(0.12),
+            duration_ms: Some(81_500.0),
+            stop_reason: Some("end_turn".to_owned()),
+            context: Some(devpit_rpc::Context {
+                used: 45_000,
+                window: 200_000,
+            }),
+            ..Default::default()
+        },
+        session_id: None,
+        init: Some(devpit_rpc::SessionInit {
+            model: Some("claude-opus-4-5".to_owned()),
+            ..Default::default()
+        }),
+        anchor: None,
+    };
+    ran_on(&mut said, &head);
+    assert_eq!(
+        said.end.model.as_deref(),
+        Some("claude-opus-4-5"),
+        "the CLI's word over the one asked for"
+    );
+    let ended = devpit_rpc::Ended::of(&said.end, 9.0);
+    assert_eq!(ended.model.as_deref(), Some("claude-opus-4-5"));
+    assert_eq!(ended.effort.as_deref(), Some("high"));
+    assert_eq!(
+        (ended.cost_usd, ended.duration_ms, ended.tokens),
+        (Some(0.12), Some(81_500), Some(45_000))
+    );
+
+    said.init = None;
+    ran_on(&mut said, &head);
+    assert_eq!(said.end.model.as_deref(), Some("opus"));
 }

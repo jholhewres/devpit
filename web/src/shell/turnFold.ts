@@ -1,4 +1,4 @@
-import type { Ended, Message, Part } from '../gen/bindings'
+import type { Ended, Message, Part, TurnEnd } from '../gen/bindings'
 
 /*
  * A turn in the order it happened: the agent's prose, and the work between
@@ -84,6 +84,17 @@ export function statusOf(message: Pick<Message, 'createdAt' | 'ended'>): string 
 }
 
 /* How the live end frame reads, kept on the answer like a saved one. */
-export function endedNow(end: { stopReason: string | null; isError: boolean; unheard?: string[] }, error: string | null = null): Ended {
-  return { at: Date.now() / 1000, stopReason: end.stopReason, isError: end.isError, error, unheard: end.unheard ?? [] }
+export function endedNow(end: Pick<TurnEnd, 'stopReason' | 'isError'> & Partial<TurnEnd>, error: string | null = null): Ended {
+  return {
+    at: Date.now() / 1000,
+    stopReason: end.stopReason,
+    isError: end.isError,
+    error,
+    unheard: end.unheard ?? [],
+    model: end.model ?? null,
+    effort: end.effort ?? null,
+    costUsd: end.costUsd ?? null,
+    durationMs: end.durationMs == null ? null : Math.round(end.durationMs),
+    tokens: end.context?.used ?? null,
+  }
 }
