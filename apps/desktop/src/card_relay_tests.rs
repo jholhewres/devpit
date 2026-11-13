@@ -79,6 +79,26 @@ fn a_card_entering_done_opens_the_card_that_waited_on_it() {
     assert!(next_on_entering(&checked, "first", Some("doing")).is_none());
 }
 
+/// A card free all along was the finish's to open: entering done opens only
+/// a card that waited on this one, so the epic never runs two at once.
+#[test]
+fn entering_done_opens_only_a_card_that_waited_on_it() {
+    let mut waited = card("waited", "inbox", Some("epic"), 2);
+    waited["blockedBy"] = json!([{ "id": "first", "title": "First", "done": true }]);
+    let free = card("free", "inbox", Some("epic"), 1);
+    let landed = board(vec![
+        card("first", "done", Some("epic"), 0),
+        free.clone(),
+        waited,
+    ]);
+    assert_eq!(
+        next_on_entering(&landed, "first", Some("check")).map(|c| c.id.as_str()),
+        Some("waited")
+    );
+    let alone = board(vec![card("first", "done", Some("epic"), 0), free]);
+    assert!(next_on_entering(&alone, "first", Some("check")).is_none());
+}
+
 /// The next card may come up at the finish and again at done: it opens once.
 #[test]
 fn a_card_the_relay_opened_is_not_opened_again() {
