@@ -1,3 +1,4 @@
+import { ROWS } from './prefsRows'
 import type { PrefsPane } from './shape'
 
 /*
@@ -17,7 +18,7 @@ export interface NavItem {
   readonly id: PrefsPane
   readonly label: string
   /** What else this pane is about, for someone searching the word they know
-   *  rather than the word on the button. */
+   *  rather than the word on the button. Its rows' titles are searched too. */
   readonly about: string
   readonly icon: React.JSX.Element
 }
@@ -47,9 +48,25 @@ export const PREFS_NAV: readonly NavGroup[] = [
       {
         id: 'general',
         label: 'General',
-        about: 'updates privacy local automatic island pause quiet reminders focus login startup tray shortcut terminal stop open voice microphone whisper transcribe remote phone tailscale pair devices calendar ics google subscribe',
+        about: 'updates version privacy local automatic error reports login startup tray shortcut open apps display wayland x11',
         icon: (
           <svg {...stroke}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 7.26 19.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.09 13H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 7.26l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 2.74 1.51l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.91 11H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></svg>
+        ),
+      },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        about: 'island pause quiet meeting reminders focus banner notify',
+        icon: (
+          <svg {...stroke}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+        ),
+      },
+      {
+        id: 'remote',
+        label: 'Remote',
+        about: 'phone tablet tailscale relay pair devices mcp calendar ics google subscribe',
+        icon: (
+          <svg {...stroke}><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>
         ),
       },
       {
@@ -113,6 +130,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         ),
       },
       {
+        id: 'sessions',
+        label: 'Sessions',
+        about: 'terminal stop close relay next card epic handoff context',
+        icon: (
+          <svg {...stroke}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
+        ),
+      },
+      {
         id: 'skills',
         label: 'Skills',
         about: 'capabilities prompts omc installed',
@@ -126,6 +151,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         about: 'telegram bot notify notification phone away quiet hours silent message push email escalate escalation next channel',
         icon: (
           <svg {...stroke}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+        ),
+      },
+      {
+        id: 'voice',
+        label: 'Voice',
+        about: 'voice notes microphone whisper transcribe speech audio',
+        icon: (
+          <svg {...stroke}><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg>
         ),
       },
       {
@@ -196,6 +229,7 @@ export function matching(query: string, nav: readonly NavGroup[] = PREFS_NAV): r
         (item) =>
           item.label.toLowerCase().includes(wanted) ||
           item.about.includes(wanted) ||
+          (ROWS[item.id] ?? []).some((title) => title.toLowerCase().includes(wanted)) ||
           group.title.toLowerCase().includes(wanted),
       ),
     }))

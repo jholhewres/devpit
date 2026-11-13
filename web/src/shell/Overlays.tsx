@@ -47,7 +47,7 @@ export function Overlays({
   onRemovingClose: () => void
 }): React.JSX.Element {
   const shell = useShell()
-  const { palette, closePalette, closing, prefs, forgetProject, projects } = shell
+  const { palette, closePalette, closing, prefs, prefsRow, forgetProject, projects } = shell
   /* The palette is fetched once the window is idle, not at Ctrl+K: until it
      is there nothing takes the focus, and the keys typed after the shortcut
      went to the terminal. */
@@ -97,7 +97,7 @@ export function Overlays({
       {shell.managing && <ManagerPane />}
       {prefs && (
         <Suspense fallback={null}>
-          <Settings pane={prefs} onAddProject={onAdd} onRemove={onRemove} />
+          <Settings pane={prefs} row={prefsRow} onAddProject={onAdd} onRemove={onRemove} />
         </Suspense>
       )}
     </>

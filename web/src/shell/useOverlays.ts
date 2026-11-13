@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 
+import { landing } from './prefsRows'
 import type { PrefsPane } from './shape'
 
 /*
@@ -16,7 +17,8 @@ import type { PrefsPane } from './shape'
 
 export interface Overlays {
   readonly prefs: PrefsPane | null
-  openPrefs: (pane?: PrefsPane) => void
+  readonly prefsRow: string | null
+  openPrefs: (pane?: PrefsPane, row?: string) => void
   closePrefs: () => void
   readonly managing: boolean
   openManager: () => void
@@ -25,15 +27,19 @@ export interface Overlays {
 
 export function useOverlays(): Overlays {
   const [prefs, setPrefs] = useState<PrefsPane | null>(null)
+  const [prefsRow, setPrefsRow] = useState<string | null>(null)
   const [managing, setManaging] = useState(false)
 
   // Stable, so a component picking one of them re-renders for nothing else.
-  const openPrefs = useCallback((pane: PrefsPane = 'account') => setPrefs(pane), [])
+  const openPrefs = useCallback((pane: PrefsPane = 'account', row?: string) => {
+    setPrefs(landing(pane, row))
+    setPrefsRow(row ?? null)
+  }, [])
   const closePrefs = useCallback(() => setPrefs(null), [])
   const openManager = useCallback(() => setManaging(true), [])
   const closeManager = useCallback(() => setManaging(false), [])
   return useMemo(
-    () => ({ prefs, openPrefs, closePrefs, managing, openManager, closeManager }),
-    [prefs, managing, openPrefs, closePrefs, openManager, closeManager],
+    () => ({ prefs, prefsRow, openPrefs, closePrefs, managing, openManager, closeManager }),
+    [prefs, prefsRow, managing, openPrefs, closePrefs, openManager, closeManager],
   )
 }

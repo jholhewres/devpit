@@ -5,7 +5,7 @@ import { ask, commands } from './live'
 import { inOrder } from './inOrder'
 import { PlusLine } from './PlusLine'
 import { PrefsSide } from './PrefsSide'
-import { GeneralSettings } from './GeneralSettings'
+import { GeneralPanes } from './GeneralSettings'
 import { KeyboardSettings } from './KeyboardSettings'
 import { ProjectRows } from './ProjectRows'
 import { useShell, type PrefsPane } from './useShell'
@@ -27,10 +27,12 @@ import { onEvent } from './window'
 
 export function Settings({
   pane,
+  row,
   onAddProject,
   onRemove,
 }: {
   pane: PrefsPane
+  row: string | null
   onAddProject: () => void
   onRemove: (project: string) => void
 }): React.JSX.Element {
@@ -76,7 +78,7 @@ export function Settings({
 
   return (
     <div className="prefs" data-open="true">
-      <PrefsSide pane={pane} onBack={closePrefs} onSelect={openPrefs} />
+      <PrefsSide pane={pane} row={row} onBack={closePrefs} onSelect={openPrefs} />
       <div className="prefs__main">
           <section className="prefs__in" hidden={pane !== 'account'}>
             <h1 className="prefs__h">Account</h1>
@@ -116,9 +118,7 @@ export function Settings({
               repository and your code are never touched &mdash; devpit only forgets where it was.</p>
           </section>
 
-          <section className="prefs__in" hidden={pane !== 'general'}>
-            <GeneralSettings on={on} set={set} />
-          </section>
+          <GeneralPanes pane={pane} on={on} set={set} />
 
           <section className="prefs__in" hidden={pane !== 'providers'}>
             <h1 className="prefs__h">Providers</h1>
@@ -175,7 +175,7 @@ export function Settings({
           </section>
 
           <section className="prefs__in" hidden={pane !== 'keyboard'}>
-            <KeyboardSettings onGeneral={() => openPrefs('general')} />
+            <KeyboardSettings onGeneral={() => openPrefs('general', 'Shortcut')} />
           </section>
           <section className="prefs__in" hidden={pane !== 'channels'}>
             <ChannelsPane />

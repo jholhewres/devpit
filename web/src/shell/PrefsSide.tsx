@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { CommunityFoot } from './Community'
 import { matching } from './prefsNav'
@@ -24,17 +24,36 @@ export function rowFor(query: string, root: ParentNode = document): HTMLElement 
   return rows.find((row) => said(row, '.pref__t')) ?? rows.find((row) => (row.textContent ?? '').toLowerCase().includes(wanted)) ?? null
 }
 
+/* Frames to wait for a row whose pane is still reading what it draws. */
+const LANDING_FRAMES = 60
+
 export function PrefsSide({
   pane,
+  row = null,
   onBack,
   onSelect,
 }: {
   pane: PrefsPane
+  /** The row Settings was opened for, scrolled to once it is drawn. */
+  row?: string | null
   onBack: () => void
   onSelect: (pane: PrefsPane) => void
 }): React.JSX.Element {
   const [query, setQuery] = useState('')
   const groups = matching(query)
+
+  useEffect(() => {
+    if (!row) return
+    let frame = 0
+    let left = LANDING_FRAMES
+    const land = (): void => {
+      const found = rowFor(row)
+      if (found) found.scrollIntoView({ block: 'center' })
+      else if (left-- > 0) frame = requestAnimationFrame(land)
+    }
+    land()
+    return () => cancelAnimationFrame(frame)
+  }, [pane, row])
 
   return (
     <aside className="prefs__side">
@@ -66,7 +85,7 @@ export function PrefsSide({
                 aria-selected={pane === item.id}
                 onClick={() => {
                   onSelect(item.id)
-                  /* General is long; a search for "whisper" should land on Voice, not on the pane's top. */
+                  /* A long pane; a search for "tailscale" should land on its row, not on the pane's top. */
                   if (query.trim()) requestAnimationFrame(() => rowFor(query)?.scrollIntoView({ block: 'center' }))
                 }}
               >

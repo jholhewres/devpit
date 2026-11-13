@@ -24,9 +24,12 @@ export type PrefsPane =
   | 'account'
   | 'projects'
   | 'general'
+  | 'notifications'
+  | 'remote'
   | 'appearance'
   | 'keyboard'
   | 'providers'
+  | 'sessions'
   | 'skills'
   | 'storage'
   | 'worktrees'
@@ -35,6 +38,7 @@ export type PrefsPane =
   | 'decisions'
   | 'devflow'
   | 'channels'
+  | 'voice'
 
 /*
  * Three facts about the panes, because they came apart the moment tabs
@@ -124,7 +128,9 @@ export interface Shell {
   signOut: () => void
 
   readonly prefs: PrefsPane | null
-  openPrefs: (pane?: PrefsPane) => void
+  /** The row Settings scrolls to, when it was opened for one. */
+  readonly prefsRow: string | null
+  openPrefs: (pane?: PrefsPane, row?: string) => void
   /* The Manager shows every project's board, which puts it above any one of
      them — so it takes the window like Settings rather than sitting in a
      project's pane area. */
