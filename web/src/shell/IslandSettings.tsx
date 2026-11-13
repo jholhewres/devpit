@@ -43,7 +43,7 @@ export function IslandSettings({ on, onFlip }: { on: boolean; onFlip: () => void
           on={how.anyway}
           onFlip={anyway}
           title="Show the island anyway"
-          said="On GNOME on Wayland it can take focus from the window you are in, and stand in for devpit's own when you switch back. Sessions waiting on you still reach you as notifications."
+          said="Off on this desktop: here it can take focus from the window you are in, and stand in for devpit's own when you switch back. Sessions waiting on you still reach you as notifications."
         />
       )}
     </>

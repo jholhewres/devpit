@@ -35,13 +35,13 @@ describe('the island where it would be an ordinary window', () => {
   it('is not offered where the island never takes focus', async () => {
     drawn = 'above'
     render(<IslandSettings on onFlip={() => undefined} />)
-    await screen.findByRole('switch', { name: 'Island' })
+    await screen.findByText(/above every window/)
     await waitFor(() => expect(screen.queryByRole('switch', { name: 'Show the island anyway' })).toBeNull())
   })
 
   it('is not offered while the island is switched off', async () => {
     render(<IslandSettings on={false} onFlip={() => undefined} />)
-    await screen.findByRole('switch', { name: 'Island' })
+    await screen.findByText(/stays off unless you show it anyway/)
     await waitFor(() => expect(screen.queryByRole('switch', { name: 'Show the island anyway' })).toBeNull())
   })
 })

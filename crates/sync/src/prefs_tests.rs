@@ -49,6 +49,7 @@ fn what_belongs_to_one_machine_never_syncs() {
         key::WORKTREE_BASE,
         key::SIDEBAR_WIDTH,
         key::ISLAND_SCREEN,
+        key::ISLAND_ANYWAY,
         key::KEEP_IN_TRAY,
         key::TRANSCRIBE_MODEL,
         key::SYNC,
