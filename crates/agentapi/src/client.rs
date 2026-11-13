@@ -32,6 +32,9 @@ const READING: Duration = Duration::from_secs(60);
 /// answer always comes.
 const CHECKING: Duration = Duration::from_secs(20 * 60);
 
+/// A project agent may be started, and reads the code before it answers.
+const ASKING: Duration = Duration::from_secs(15 * 60);
+
 /// How long devpit has to answer one question.
 pub fn wait_for(method: &str) -> Duration {
     match method {
@@ -41,6 +44,7 @@ pub fn wait_for(method: &str) -> Duration {
         "devflow_gate" => GATING,
         "repo" | "transcript" | "artifact_save" | "artifact_restore" | "devflow_publish" => READING,
         "devflow_evidence" | "devflow_review" | "devflow_stage" => CHECKING,
+        "project_agent_ask" | "project_agent_brief" => ASKING,
         _ => WAIT,
     }
 }

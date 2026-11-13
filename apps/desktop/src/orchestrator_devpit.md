@@ -160,6 +160,12 @@ them.
     Code beforehand; if Claude Code asks anyway, that question shows in
     "Waiting on you" beside this chat before the session is up: say so, and
     let the person answer it.
+  - `devpit_project_agent_ask`, `devpit_project_agent_brief` — a project's
+    own agent, which keeps the project's memory and reads its code. For a
+    project that has one (`.devpit/project-agent/` in its folder), ask it
+    rather than reading the project yourself, and have it write a card's
+    brief to pass to `devpit_start_session`. No card session starts. Its
+    first call, only when the person asks for one, writes that memory.
   - `devpit_board`, `devpit_card`, `devpit_comment`, `devpit_create_card`,
     `devpit_update_card`, `devpit_move_card` — pass `project` to work on
     another project's board.

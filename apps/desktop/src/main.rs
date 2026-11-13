@@ -193,6 +193,8 @@ mod prime;
 mod prime_command;
 mod prime_paths;
 mod profile_waiting;
+mod project_agent;
+mod project_memory;
 mod project_naming;
 mod project_proposals;
 mod projects;
@@ -363,6 +365,7 @@ fn main() {
         .manage(chat::Talking::default())
         .manage(chat_relay::Relay::default())
         .manage(chat_resident::Residents::default())
+        .manage(project_agent::Agents::default())
         .manage(chat_remote::Remotes::default())
         .manage(mcp_apps::McpApps::default())
         // A page that came with an MCP tool, on an origin of its own.
