@@ -9,8 +9,18 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /** A port nothing listens on, so a sign-in attempt fails instead of leaving. */
@@ -27,7 +37,7 @@ export function seedHome(root, name = 'e2e-home') {
   const home = join(root, 'target', name)
   // Before the folder goes: deleting it takes the socket and leaves the server
   // running with no way to reach it — that is how a run left one behind.
-  endTmux(home)
+  endTerminals(home)
   rmSync(home, { recursive: true, force: true })
 
   for (const dir of [
@@ -159,9 +169,83 @@ export function seedEnv({ home, feed }) {
   }
 }
 
+/** Ends what a seeded home's terminals run on: its tmux server and its daemon. */
+export function endTerminals(home) {
+  endTmux(home)
+  endPtyd(join(home, '.devpit'))
+}
+
 /** Ends the tmux server on a home's devpit socket, if one is running there. */
 export function endTmux(home) {
   const socket = join(home, '.devpit', 'tmux.sock')
   if (!existsSync(socket)) return
   spawnSync('tmux', ['-S', socket, 'kill-server'], { stdio: 'ignore' })
+}
+
+/**
+ * Ends the devpit-ptyd daemon of a devpit home (its `DEVPIT_HOME`), and its socket.
+ *
+ * The app starts it in a session of its own so terminals outlive the window.
+ * Left behind, the next run on the same home connected to it and found the
+ * last run's panes, and every run added one more.
+ */
+export function endPtyd(devpit) {
+  // The kernel names the executable by its real path, and a demo's root is a link.
+  const copies = [devpit, existsSync(devpit) ? realpathSync(devpit) : devpit].map((dir) => join(dir, 'ptyd') + sep)
+  const daemons = ownProcesses().filter((pid) => copies.some((copy) => exeOf(pid)?.startsWith(copy)))
+  // The socket is the daemon's last argument: read before it goes.
+  const sockets = daemons.map((pid) => argsOf(pid).at(-1)).filter(Boolean)
+  for (const pid of daemons) signal(pid, 'SIGTERM')
+  for (let look = 0; look < 40 && daemons.some(alive); look += 1) pause(50)
+  for (const pid of daemons.filter(alive)) signal(pid, 'SIGKILL')
+  for (const socket of sockets) rmSync(socket, { force: true })
+}
+
+/** Every process this user runs, by pid; none where there is no `/proc`. */
+function ownProcesses() {
+  try {
+    return readdirSync('/proc')
+      .filter((name) => /^\d+$/.test(name))
+      .map(Number)
+  } catch {
+    return []
+  }
+}
+
+function exeOf(pid) {
+  try {
+    return readlinkSync(`/proc/${pid}/exe`)
+  } catch {
+    return null
+  }
+}
+
+function argsOf(pid) {
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function signal(pid, name) {
+  try {
+    process.kill(pid, name)
+  } catch {
+    // Already gone, or not ours.
+  }
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** A synchronous wait: `seedHome`, which ends the last run's daemon, is synchronous. */
+function pause(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }

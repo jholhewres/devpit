@@ -25,9 +25,9 @@ import { dirname, join, resolve } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
-import { seedEnv, seedHome, seedRepo } from './lib/home.mjs'
+import { endTerminals, seedEnv, seedHome, seedRepo } from './lib/home.mjs'
 import { invoke, seedBoard } from './lib/seed.mjs'
-import { insideTheSeededHome, openWindow, startDriver } from './lib/session.mjs'
+import { insideTheSeededHome, openWindow, startDriver, stopDriver } from './lib/session.mjs'
 import { panes, type } from './lib/tmux.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -132,7 +132,8 @@ async function main() {
     )
   } finally {
     await window?.quit().catch(() => {})
-    driver?.kill?.()
+    stopDriver(driver)
+    endTerminals(seeded.home)
   }
 }
 

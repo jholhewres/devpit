@@ -150,7 +150,10 @@ export function stopDriver(driver) {
   driver.screen?.xvfb.kill()
   if (driver.bus) {
     try {
-      process.kill(driver.bus.pid)
+      // The forked bus leads its own process group, and what it started on
+      // demand (the accessibility bus, gvfs, the portals) is in it: a signal
+      // to the bus alone left those behind, one set per run.
+      process.kill(-driver.bus.pid)
     } catch {
       // Already gone.
     }

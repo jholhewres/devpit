@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { By, until } from 'selenium-webdriver'
 
-import { seedEnv, seedHome } from '../lib/home.mjs'
+import { endTerminals, seedEnv, seedHome } from '../lib/home.mjs'
 import { invoke, seedBoard } from '../lib/seed.mjs'
 import { insideTheSeededHome, openWindow, startDriver, stopDriver } from '../lib/session.mjs'
 
@@ -51,6 +51,7 @@ async function seedOnce(name, port) {
     // Not `kill`: headless, the driver runs under an `xvfb-run` that survives
     // a signal to itself and leaves the port taken for the next run.
     stopDriver(driver)
+    endTerminals(seeded.home)
   }
 }
 
