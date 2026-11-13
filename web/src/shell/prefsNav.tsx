@@ -132,7 +132,7 @@ export const PREFS_NAV: readonly NavGroup[] = [
       {
         id: 'sessions',
         label: 'Sessions',
-        about: 'terminal stop close relay next card epic handoff context',
+        about: 'terminal stop close relay next card epic handoff context chat activity zen',
         icon: (
           <svg {...stroke}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
         ),

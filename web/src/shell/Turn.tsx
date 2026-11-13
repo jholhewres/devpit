@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from 'react'
 
 import { Acts } from './ActsRows'
+import { drawn, useActivity, type Activity } from './activity'
 import { acts, doing, tally, type Act } from './acts'
 import { joined } from './chat'
 import { CopyButton } from './CopyButton'
@@ -34,8 +35,11 @@ export const Turn = memo(function Turn({
   folder,
   onOpen,
   onResend,
+  steered = false,
 }: {
   message: Message
+  /** Somebody steered this turn: in Zen its earlier replies stay, as answers to them. */
+  steered?: boolean
   /** Present on a message steered in that its turn never took in. */
   onResend?: () => void
   /** Where a file the answer names opens; a tab when absent. */
@@ -52,7 +56,7 @@ export const Turn = memo(function Turn({
   if (message.role === 'system' && rewound?.kind === 'rewound') return <Rewound part={rewound} />
 
   if (message.role === 'user') return <Said message={message} onResend={onResend} />
-  return <Answer message={message} rewind={rewind} folder={folder ?? null} onOpen={onOpen} />
+  return <Answer message={message} rewind={rewind} folder={folder ?? null} onOpen={onOpen} steered={steered} />
 })
 
 function Answer({
@@ -60,13 +64,16 @@ function Answer({
   rewind,
   folder,
   onOpen,
+  steered,
 }: {
   message: Message
   rewind?: () => void
   folder: string | null
   onOpen?: (path: string) => void
+  steered: boolean
 }): React.JSX.Element {
   const [open, setOpen] = useDisclosed(foldOf(message.id, 'turn'), false)
+  const activity = useActivity()
   const live = message.streaming
   const every = joined(message.parts)
   const shown = segments(every)
@@ -81,10 +88,10 @@ function Answer({
 
   return (
     <article className="turn" data-ended={ended ? outcome(ended) : undefined}>
-      {!live && !failed && (hides || ended) && (
+      {!live && !failed && activity !== 'zen' && (hides || ended) && (
         <TurnStatus message={message} work={shown.flatMap(rows)} hides={hides} open={open} toggle={() => setOpen((was) => !was)} />
       )}
-      <Segments message={message} every={every} shown={shown} answer={answer} folded={hides && !open} lastWork={failed ? lastWork : -1} folder={folder} onOpen={onOpen} />
+      <Segments message={message} every={every} shown={shown} answer={answer} folded={hides && !open && activity !== 'zen'} lastWork={failed ? lastWork : -1} folder={folder} onOpen={onOpen} activity={activity} steered={steered} />
       <TurnDelegations parts={message.parts} />
       <TurnDrafts parts={message.parts} />
       <TurnApps parts={message.parts} messageId={message.id} />
@@ -106,6 +113,8 @@ function Segments({
   lastWork,
   folder,
   onOpen,
+  activity,
+  steered,
 }: {
   message: Message
   every: readonly Part[]
@@ -116,6 +125,8 @@ function Segments({
   lastWork: number
   folder: string | null
   onOpen?: (path: string) => void
+  activity: Activity
+  steered: boolean
 }): React.JSX.Element {
   const live = message.streaming
   const last = shown.length - 1
@@ -123,6 +134,7 @@ function Segments({
     <>
       {shown.map((one, at) => {
         if (folded && at !== answer && one.kind !== 'said') return null
+        if (!drawn(one, at, answer, activity, steered)) return null
         if (one.kind === 'prose')
           return <Reply key={one.at} source={one.text} live={live && at === last} folder={folder} onOpen={onOpen} />
         if (one.kind === 'said')
