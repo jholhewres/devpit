@@ -53,12 +53,16 @@ export function after(messages: readonly Message[], talking: Talking, heard: Rem
   }
 }
 
-/* What was read, and after it what is drawn here that it has not got yet: a
-   transcript only grows, and an answer's end is heard before git has read what
-   the turn changed and the answer is written down. */
+/* What was read, and after it what is drawn here past the last message it
+   holds, of a turn it holds: an answer's end is heard before git has read what
+   the turn changed and the answer is written down, while its prompt was written
+   when it began. What slid out of the messages the phone is sent, and a turn
+   that never began, fall away. */
 function written(read: readonly Message[], drawn: readonly Message[]): readonly Message[] {
   const known = new Set(read.map((one) => one.id))
-  const later = drawn.filter((one) => !known.has(one.id))
+  const turns = new Set(read.map((one) => one.turnId))
+  const last = drawn.findLastIndex((one) => known.has(one.id))
+  const later = drawn.slice(last + 1).filter((one) => one.turnId !== null && turns.has(one.turnId))
   return later.length === 0 ? read : [...read, ...later]
 }
 
