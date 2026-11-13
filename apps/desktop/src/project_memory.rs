@@ -1,10 +1,11 @@
 //! A project agent's memory: `.devpit/project-agent/` in the project's folder.
 //!
 //! Three Markdown files of dated entries, each naming where it came from, so
-//! a fact can be checked against its source and dropped when it goes stale.
-//! Written once, on the agent's first wake, from the guides the project
-//! already keeps; after that only the lessons the person approves are added.
-//! A project whose agent was never asked has no such folder.
+//! a fact can be re-checked when its files change and proposed for update or
+//! removal when it goes stale. Written once, on the agent's first wake, from
+//! the guides the project already keeps; after that only what the person
+//! approves changes them. A project whose agent was never asked has no such
+//! folder.
 
 use std::io::Read;
 use std::path::Path;
@@ -31,6 +32,34 @@ pub(crate) struct Entry {
     pub day: String,
     pub source: String,
     pub text: String,
+}
+
+impl Entry {
+    /// What its source lists, comma-separated: files, cards and pull requests.
+    fn parts(&self) -> impl Iterator<Item = &str> {
+        self.source
+            .split(',')
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+    }
+
+    /// The files it rests on: what its source lists that is not a card or a PR.
+    pub(crate) fn files(&self) -> Vec<&str> {
+        self.parts()
+            .filter(|part| !card(part) && !part.starts_with("PR #"))
+            .collect()
+    }
+
+    /// The cards it came from, as `#12`.
+    pub(crate) fn cards(&self) -> Vec<&str> {
+        self.parts().filter(|part| card(part)).collect()
+    }
+}
+
+fn card(part: &str) -> bool {
+    part.strip_prefix('#').is_some_and(|number| {
+        !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit())
+    })
 }
 
 /// A bullet as an entry, or why it is not one; `None` for any other line.
@@ -198,25 +227,57 @@ pub(crate) fn summary(root: &Path) -> Option<String> {
     Some(out)
 }
 
-/// Lessons proposed by a closed card, waiting for the person's decision.
+/// What closed cards and re-checks proposed, waiting for the person's decision.
 pub(crate) const PROPOSED: &str = "proposed.md";
 /// One line per closed card: its review rounds and repeated findings.
 const METRICS: &str = "metrics.jsonl";
+/// The default branch's commit the memory was last re-checked against.
+const CHECKED: &str = "checked";
+/// Between a stale entry's proposed text and the text it replaces.
+const REPLACES: &str = "⟸";
 /// Proposals and decisions write one at a time.
 static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// Keeps `lessons`, proposed by card `source`, until the person decides each.
+/// Keeps `proposed`, each from `source`, until the person decides each.
 pub(crate) fn propose(
     root: &Path,
     day: &str,
     source: &str,
-    lessons: &[String],
+    proposed: &[String],
 ) -> Result<(), String> {
-    let text: String = lessons.iter().map(|one| line(day, source, one)).collect();
+    let text: String = proposed.iter().map(|one| line(day, source, one)).collect();
     let _held = WRITING
         .lock()
         .map_err(|_| "the memory is busy".to_owned())?;
     append(root, PROPOSED, &text)
+}
+
+/// A proposal's text: the memory file it goes to, what it says and the stale
+/// entry it replaces. A lesson's is its text alone.
+pub(crate) fn aimed(file: &str, text: &str, replaces: Option<&str>) -> String {
+    let text = text.replace(REPLACES, " ");
+    match (file, replaces, text.trim()) {
+        ("lessons.md", None, text) => text.to_owned(),
+        (_, None, text) => format!("{file}: {text}"),
+        (_, Some(was), "") => format!("{file}: {REPLACES} {was}"),
+        (_, Some(was), text) => format!("{file}: {text} {REPLACES} {was}"),
+    }
+}
+
+/// A proposal's text read back as [`aimed`] wrote it.
+pub(crate) fn aim(said: &str) -> (&'static str, &str, Option<&str>) {
+    for file in FILES {
+        if let Some(rest) = said
+            .strip_prefix(file)
+            .and_then(|rest| rest.strip_prefix(": "))
+        {
+            return match rest.split_once(REPLACES) {
+                Some((text, was)) => (file, text.trim(), Some(was.trim())),
+                None => (file, rest.trim(), None),
+            };
+        }
+    }
+    ("lessons.md", said, None)
 }
 
 /// The proposals waiting for the person, oldest first.
@@ -231,32 +292,128 @@ pub(crate) fn lessons(root: &Path) -> Vec<Entry> {
     all.into_iter().skip(older).collect()
 }
 
-/// Settles the proposal of `source` saying `text`: approved as `kept` into
-/// lessons.md, dated `day`, or discarded with no trace when `kept` is `None`.
+/// The decisions that name the cards they came from.
+pub(crate) fn decided(root: &Path) -> Vec<Entry> {
+    entries(root, "decisions.md")
+        .into_iter()
+        .filter(|one| !one.cards().is_empty())
+        .collect()
+}
+
+/// Settles the proposal of `source` saying `text`, replacing `replaces` when it
+/// re-checked a stale entry. Approved as `kept`, dated `day`, it is added to its
+/// memory file, or takes the stale entry's place, which an empty `kept` removes.
+/// Discarded (`kept` is `None`), it leaves no trace and the memory as it was.
 pub(crate) fn decide(
     root: &Path,
     day: &str,
     source: &str,
     text: &str,
+    replaces: Option<&str>,
     kept: Option<&str>,
 ) -> Result<(), String> {
     let _held = WRITING
         .lock()
         .map_err(|_| "the memory is busy".to_owned())?;
-    let file = format!("{DIR}/{PROPOSED}");
-    let was = read_inside(root, &file, MEMORY_BYTES).unwrap_or_default();
+    let was = read_inside(root, &format!("{DIR}/{PROPOSED}"), MEMORY_BYTES).unwrap_or_default();
     let mut lines: Vec<&str> = was.lines().collect();
-    let at = lines
+    let (at, file) = lines
         .iter()
-        .position(|one| matches!(entry(one), Some(Ok(found)) if found.source == source && found.text == text))
+        .enumerate()
+        .find_map(|(at, one)| match entry(one) {
+            Some(Ok(found)) if found.source == source => {
+                let (file, said, stale) = aim(&found.text);
+                (said == text && stale == replaces).then_some((at, file))
+            }
+            _ => None,
+        })
         .ok_or("that proposal is no longer waiting")?;
     lines.remove(at);
-    if let Some(kept) = kept {
-        append(root, "lessons.md", &line(day, source, kept))?;
+    match (kept, replaces) {
+        (Some(kept), Some(stale)) => {
+            let now = (!kept.is_empty()).then(|| line(day, source, kept));
+            rewrite(
+                root,
+                file,
+                |one| matches!(entry(one), Some(Ok(found)) if found.source == source && found.text == stale),
+                now.as_deref(),
+            )?;
+        }
+        (Some(kept), None) if !kept.is_empty() => append(root, file, &line(day, source, kept))?,
+        _ => {}
     }
     let rest: String = lines.iter().map(|one| format!("{one}\n")).collect();
-    let at = devpit_core::paths::resolve_writable(root, &file).map_err(|err| err.to_string())?;
-    std::fs::write(at, rest).map_err(|err| err.to_string())
+    write(root, PROPOSED, &rest)
+}
+
+/// Replaces the first line of a memory file that `is` matches with `now`, or
+/// removes it when `now` is `None`.
+fn rewrite(
+    root: &Path,
+    file: &str,
+    is: impl Fn(&str) -> bool,
+    now: Option<&str>,
+) -> Result<(), String> {
+    let path = format!("{DIR}/{file}");
+    let at = devpit_core::paths::resolve_writable(root, &path).map_err(|err| err.to_string())?;
+    // Read whole or not at all: a capped read written back would cut the file.
+    if std::fs::metadata(&at).map_err(|err| err.to_string())?.len() > MEMORY_BYTES {
+        return Err(format!("{file} is too large to change here"));
+    }
+    let was = std::fs::read_to_string(&at).map_err(|err| err.to_string())?;
+    let found = was
+        .lines()
+        .position(&is)
+        .ok_or_else(|| format!("the entry it replaces is no longer in {file}: discard it"))?;
+    let text: String = was
+        .lines()
+        .enumerate()
+        .filter_map(|(at, one)| match (at == found, now) {
+            (false, _) => Some(format!("{one}\n")),
+            (true, Some(now)) => Some(now.to_owned()),
+            (true, None) => None,
+        })
+        .collect();
+    write(root, file, &text)
+}
+
+/// The entries resting on files the default branch changed since the memory
+/// was last re-checked, each with its memory file, and the commit it stands at.
+pub(crate) struct Flagged {
+    pub tip: String,
+    pub entries: Vec<(&'static str, Entry)>,
+}
+
+/// What a wake re-checks. `None` without memory or a default branch; nothing
+/// flagged the first time, which only notes where the default branch stands.
+pub(crate) fn flagged(root: &Path) -> Option<Flagged> {
+    if !root.join(DIR).is_dir() {
+        return None;
+    }
+    let tip = devpit_git::landing::default_tip(root)?;
+    let since = read_inside(root, &format!("{DIR}/{CHECKED}"), 128)
+        .and_then(|said| devpit_git::commit_of(root, said.trim()).ok());
+    let changed: Vec<String> = since
+        .and_then(|since| devpit_git::changed_between(root, &since, &tip).ok())
+        .into_iter()
+        .flatten()
+        .map(|one| one.path)
+        .collect();
+    let entries = FILES
+        .iter()
+        .flat_map(|file| entries(root, file).into_iter().map(move |one| (*file, one)))
+        .filter(|(_, one)| {
+            one.files()
+                .iter()
+                .any(|file| changed.iter().any(|path| path == file))
+        })
+        .collect();
+    Some(Flagged { tip, entries })
+}
+
+/// The memory is re-checked up to the default branch's commit `tip`.
+pub(crate) fn checked(root: &Path, tip: &str) -> Result<(), String> {
+    write(root, CHECKED, &format!("{tip}\n"))
 }
 
 /// Logs how many review rounds card `source` took and how many findings came back.
@@ -286,6 +443,13 @@ fn entries(root: &Path, file: &str) -> Vec<Entry> {
         .filter_map(entry)
         .filter_map(Result::ok)
         .collect()
+}
+
+/// Writes a file of the memory, resolved inside the project first.
+fn write(root: &Path, file: &str, text: &str) -> Result<(), String> {
+    let at = devpit_core::paths::resolve_new(root, &format!("{DIR}/{file}"))
+        .map_err(|err| err.to_string())?;
+    std::fs::write(at, text).map_err(|err| err.to_string())
 }
 
 /// Appends to a file of the memory, resolved inside the project first.

@@ -5,16 +5,20 @@ use std::time::Duration;
 use super::*;
 
 /// A CLI that logs how it was started and every line it reads, and answers
-/// each line with a turn of its own session.
+/// each line with a turn of its own session; a re-check, with `reply` when
+/// the test left one.
 const STAND_IN: &str = r#"#!/bin/sh
 log="$(dirname "$0")/said.log"
+reply="$(dirname "$0")/reply"
 printf 'argv %s\n' "$*" >> "$log"
 n=0
 while IFS= read -r line; do
   n=$((n+1))
   printf 'line %s\n' "$line" >> "$log"
+  text="answer $n"
+  case "$line" in *"<stale>"*) [ -f "$reply" ] && text="$(cat "$reply")";; esac
   printf '{"type":"system","subtype":"init","session_id":"s-1"}\n'
-  printf '{"type":"assistant","message":{"id":"m-%s","role":"assistant","content":[{"type":"text","text":"answer %s"}]},"session_id":"s-1"}\n' "$n" "$n"
+  printf '{"type":"assistant","message":{"id":"m-%s","role":"assistant","content":[{"type":"text","text":"%s"}]},"session_id":"s-1"}\n' "$n" "$text"
   printf '{"type":"result","subtype":"success","session_id":"s-1","total_cost_usd":0}\n'
 done
 "#;
@@ -210,4 +214,114 @@ fn the_answer_is_the_last_thing_said_after_the_tools() {
         parent: Some("t1".to_owned()),
     });
     assert_eq!(answer.text(), "Tests run with make test.");
+}
+
+/// A bench whose project is a git checkout on main with its guide committed.
+fn checkout() -> Bench {
+    use crate::devflow_review::tests::git;
+    let bench = bench();
+    git(&bench.root, &["init", "-q", "-b", "main"]);
+    git(&bench.root, &["config", "user.email", "t@example.com"]);
+    git(&bench.root, &["config", "user.name", "Test"]);
+    git(&bench.root, &["add", "-A"]);
+    git(&bench.root, &["commit", "-q", "-m", "start"]);
+    bench
+}
+
+/// A commit to main renaming the guide the seeded fact rests on.
+fn guide_renamed(bench: &Bench) {
+    use crate::devflow_review::tests::git;
+    std::fs::write(bench.root.join("AGENTS.md"), "# Working on devpit\n").expect("guide");
+    git(&bench.root, &["commit", "-q", "-am", "rename the guide"]);
+}
+
+fn idled_out(agents: &Agents) {
+    let gone = (0..60).any(|_| {
+        std::thread::sleep(Duration::from_millis(50));
+        !agents.awake("p1")
+    });
+    assert!(gone, "still awake after its idle time");
+}
+
+fn lines_read(bench: &Bench) -> Vec<String> {
+    log(&bench.log)
+        .lines()
+        .filter(|line| line.starts_with("line "))
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn a_fact_whose_file_changed_is_rechecked_on_wake_and_proposed_never_edited() {
+    let bench = checkout();
+    let agents = Agents::idling_after(Duration::from_millis(200));
+    asked(&agents, &bench, "first");
+    idled_out(&agents);
+    guide_renamed(&bench);
+    let now = "A guide to read first: Working on devpit.";
+    std::fs::write(
+        bench.log.with_file_name("reply"),
+        format!("1. update: {now}"),
+    )
+    .expect("reply");
+    let facts = bench.root.join(".devpit/project-agent/facts.md");
+    let before = std::fs::read_to_string(&facts).expect("facts");
+
+    let answer = asked(&agents, &bench, "second");
+    assert!(answer.woke);
+    assert_eq!(answer.proposed, 1);
+    assert_eq!(
+        answer.text, "answer 2",
+        "the question is answered after the re-check"
+    );
+    let lines = lines_read(&bench);
+    assert_eq!(lines.len(), 3, "{lines:?}");
+    assert!(lines[1].contains("<stale>"), "{}", lines[1]);
+    assert!(
+        lines[1].contains("1. [facts.md] AGENTS.md · A guide to read first"),
+        "{}",
+        lines[1]
+    );
+    assert!(
+        lines[2].contains("second") && !lines[2].contains("<stale>"),
+        "{}",
+        lines[2]
+    );
+
+    // Proposed, never edited: the fact stays until the person approves.
+    assert_eq!(std::fs::read_to_string(&facts).expect("facts"), before);
+    let waiting = crate::project_memory::proposals(&bench.root);
+    assert_eq!(waiting.len(), 1);
+    assert_eq!(waiting[0].source, "AGENTS.md");
+    assert_eq!(
+        crate::project_memory::aim(&waiting[0].text),
+        (
+            "facts.md",
+            now,
+            Some("A guide to read first: \"Working in this repository\".")
+        )
+    );
+}
+
+#[test]
+fn a_recheck_runs_when_the_agent_wakes_and_never_on_its_idle_timer() {
+    let bench = checkout();
+    let agents = Agents::idling_after(Duration::from_millis(300));
+    asked(&agents, &bench, "first");
+    guide_renamed(&bench);
+    let awake = asked(&agents, &bench, "second");
+    assert!(!awake.woke);
+    idled_out(&agents);
+    std::thread::sleep(Duration::from_millis(300));
+    let quiet = log(&bench.log);
+    assert!(
+        !quiet.contains("<stale>"),
+        "re-checked while awake or idling: {quiet}"
+    );
+
+    let woken = asked(&agents, &bench, "third");
+    assert!(woken.woke);
+    let lines = lines_read(&bench);
+    assert!(lines[2].contains("<stale>"), "{lines:?}");
+    assert!(lines[3].contains("third"), "{lines:?}");
 }

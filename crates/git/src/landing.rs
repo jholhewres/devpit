@@ -31,6 +31,14 @@ fn defaults(root: &Path) -> Vec<String> {
         .collect()
 }
 
+/// The commit the default branch stands at, when it has one here.
+pub fn default_tip(root: &Path) -> Option<String> {
+    let name = defaults(root).into_iter().next()?;
+    run(root, &["rev-parse", &format!("{name}^{{commit}}")])
+        .ok()
+        .map(|sha| sha.trim().to_owned())
+}
+
 /// Whether `branch` made commits since `began` and every one of them is in the
 /// default branch. A branch with none of its own has nothing to land.
 pub fn landed(root: &Path, branch: &str, began: &str) -> bool {

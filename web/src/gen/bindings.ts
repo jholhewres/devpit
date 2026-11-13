@@ -481,9 +481,10 @@ export const commands = {
 	lessonsProposed: () => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("lessons_proposed")),
 	/**
 	 *  `lesson.decide` — approves a proposal, as `kept` says it, or discards it
-	 *  when `kept` is absent.
+	 *  when `kept` is absent. `replaces` names the stale entry a re-check's
+	 *  proposal updates, or removes when `kept` is empty.
 	 */
-	lessonDecide: (projectId: string, source: string, text: string, kept: string | null) => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("lesson_decide", { projectId, source, text, kept })),
+	lessonDecide: (projectId: string, source: string, text: string, replaces: string | null, kept: string | null) => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("lesson_decide", { projectId, source, text, replaces, kept })),
 	/**  `devflow.screen` — a project's Devflow, read now. */
 	devflowScreen: (projectId: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_screen", { projectId })),
 	/**  `devflow.preview` — what a setup would write; nothing is written. */
@@ -4012,20 +4013,29 @@ title?: string } | { type: "split";
  */
 id?: string; direction: SplitDirection; ratio: number | null; first: LayoutNode; second: LayoutNode };
 
-/**  One lesson a closed card proposed. */
+/**
+ *  One proposal: a lesson or a decision a closed card left, or the update or
+ *  removal of a stale entry a re-check found.
+ */
 export type LessonProposal = {
 	projectId: string,
 	project: string,
 	/**  The day it was proposed, as YYYY-MM-DD. */
 	day: string,
-	/**  The card it came from, as `#12`. */
+	/**  The card it came from, as `#12`, or the stale entry's own source. */
 	source: string,
+	/**  The memory file it goes to: `lessons.md`, `decisions.md` or `facts.md`. */
+	file: string,
+	/**  What it says; empty when it removes the stale entry it replaces. */
 	text: string,
+	/**  The stale entry it updates or removes. */
+	replaces: string | null,
 };
 
 /**  A list, so tomorrow's field has somewhere to go. */
 export type LessonProposals = {
 	proposals: LessonProposal[],
+	decisions: MemoryDecision[],
 };
 
 /**  A devpit terminal, as a tab attaches to it. */
@@ -4139,6 +4149,17 @@ export type Membership = {
 	 *  telling them it expired is kinder than pretending they never signed in.
 	 */
 	expired: boolean,
+};
+
+/**  A decision of a project's memory, with the cards that made it. */
+export type MemoryDecision = {
+	projectId: string,
+	day: string,
+	/**  The cards it names, as `#12`. */
+	cards: string[],
+	/**  Its whole source: the cards and the files it rests on. */
+	source: string,
+	text: string,
 };
 
 /**
