@@ -57,8 +57,9 @@ pub(crate) fn first_opening(card_id: &str) -> bool {
 }
 
 /// The card to open once `card_id` moved from the lane `from` to where
-/// `board` has it: the next card of its epic, when it entered done. With
-/// `unblock_on: done` that is when the cards waiting on it are released.
+/// `board` has it: the next card of its epic that waited on it, when it
+/// entered done. With `unblock_on: done` that is when such a card is released;
+/// a card free all along was the finish's to open.
 pub(crate) fn next_on_entering<'a>(
     board: &'a Board,
     card_id: &str,
@@ -74,12 +75,23 @@ pub(crate) fn next_on_entering<'a>(
     if !done(&card.column_id) || from.is_some_and(done) {
         return None;
     }
-    next_card(board, card_id)
+    next_where(board, card_id, |next| {
+        next.blocked_by.iter().any(|by| by.id == card_id)
+    })
 }
 
 /// The next card of `finished`'s epic: the first, by position, that waits in
 /// a lane of waiting work and on no card not done.
 pub(crate) fn next_card<'a>(board: &'a Board, finished: &str) -> Option<&'a Card> {
+    next_where(board, finished, |_| true)
+}
+
+/// [`next_card`], among the cards `wanted` keeps.
+fn next_where<'a>(
+    board: &'a Board,
+    finished: &str,
+    wanted: impl Fn(&Card) -> bool,
+) -> Option<&'a Card> {
     let parent = board
         .cards
         .iter()
@@ -98,6 +110,7 @@ pub(crate) fn next_card<'a>(board: &'a Board, finished: &str) -> Option<&'a Card
         .filter(|card| card.id != finished && card.parent_id.as_deref() == Some(parent))
         .filter(|card| waiting.contains(&card.column_id.as_str()))
         .filter(|card| !card.blocked_by.iter().any(|by| by.holds()))
+        .filter(|card| wanted(card))
         .min_by_key(|card| card.position)
 }
 
