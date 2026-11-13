@@ -20,15 +20,16 @@ Held by `chatBatchRenders.test.tsx`, which counts what a batch draws through
 the real pane and the real chat.
 
 **No timer runs per frame on screen.** The backend sends text at most once
-every 50 ms (`apps/desktop/src/chat_pace.rs`). The window shows each batch as
+every 50 ms, or sooner when 4 KB of it is waiting (`apps/desktop/src/chat_pace.rs`). The window shows each batch as
 it lands; a new markdown block fades in, and with reduced motion it does not.
 Nothing types the text out on a timer. Held by `replyStreams.test.tsx`.
 
-**A frame a window is sent stays under 8 KB.** Tauri evaluates a channel frame
-under 8 KB of JSON as one script; a larger one costs the window a fetch. Text
-goes in frames of at most 4 KB (`MOST_HELD` in `chat_pace.rs`), a tool's
-output is cut to its head and tail and an image is named rather than carried
-(`crates/rpc/src/cut.rs`). Held by
+**Streamed text and tool output stay under 8 KB a frame.** Tauri evaluates a
+channel frame under 8 KB of JSON as one script; a larger one costs the window
+a fetch. Text goes in frames of at most 4 KB (`MOST_HELD` in `chat_pace.rs`),
+a tool's output is cut to its head and tail and an image is named rather than
+carried (`crates/rpc/src/cut.rs`). A tool call's input and a prompt go whole,
+on purpose: the edits a diff is drawn from are in the input. Held by
 `every_frame_a_streaming_answer_sends_a_window_fits_the_budget` in
 `chat_relay_tests.rs`, which `make test` runs.
 
@@ -36,13 +37,15 @@ output is cut to its head and tail and an image is named rather than carried
 listening and sends the Remote the whole frame. A window was sent the whole
 frame, read it back and cut it, every frame.
 
-**Git is off the turn's path.** The checkout's snapshot before a turn is taken
-on a thread of its own, so the agent starts without waiting on git; the end
-waits for it only if it is not done by then. The turn's end goes to the window
-before the snapshot after it, and the changed files arrive as one more part a
-moment later. An edit the agent makes before the first snapshot is done counts
-as the checkout's, not the turn's. Held by the tests in
-`turn_changes_tests.rs`.
+**Git is off the turn's start and end.** The checkout's snapshot before a turn
+is taken on a thread of its own, so the agent starts without waiting on git;
+the end waits for it only if it is not done by then. The turn's end goes to
+the window before the snapshot after it, and the changed files arrive as one
+more part a moment later. The answer is written down after that, so a reader
+that reads the transcript when it hears the end keeps the answer it already
+drew (the Remote does, in `web/src/remote/talk.ts`). An edit the agent makes
+before the first snapshot is done counts as the checkout's, not the turn's.
+Held by the tests in `turn_changes_tests.rs`.
 
 **The window's spacers are carried, not summed.** A long thread is drawn as a
 window over it (`useWindow.ts`); the spacers above and below are carried from
@@ -98,7 +101,8 @@ what one round differs from the next. The text moves less often by design:
 it moves when a batch lands, about every 50 ms, where a 33 ms timer used to
 type it out between batches.
 
-The first runs had frame gaps worse than before (p95 25 to 30 ms): a store's
+In the first runs, before the change below, frame gaps got worse (p95 25 to
+30 ms against the same build of `origin/main`): a store's
 update draws at once, and the batch was applied inside the animation frame,
 so the whole render landed in that frame. Applying it just after the frame is
 painted brought them back under the old ones.

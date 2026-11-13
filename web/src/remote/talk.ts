@@ -40,7 +40,8 @@ export function after(messages: readonly Message[], talking: Talking, heard: Rem
     case 'chat':
       if (talking.kind !== 'chat' || heard.conversation.id !== talking.conversation) return messages
       // A turn on its way is drawn from its frames; what was read meanwhile has none of it.
-      return messages.some((one) => one.streaming) ? messages : heard.conversation.messages
+      if (messages.some((one) => one.streaming)) return messages
+      return written(heard.conversation.messages, messages)
     case 'chatFrame':
       if (talking.kind !== 'chat' || heard.conversation !== talking.conversation) return messages
       return applied(messages, heard.frame)
@@ -50,6 +51,15 @@ export function after(messages: readonly Message[], talking: Talking, heard: Rem
     default:
       return messages
   }
+}
+
+/* What was read, and after it what is drawn here that it has not got yet: a
+   transcript only grows, and an answer's end is heard before git has read what
+   the turn changed and the answer is written down. */
+function written(read: readonly Message[], drawn: readonly Message[]): readonly Message[] {
+  const known = new Set(read.map((one) => one.id))
+  const later = drawn.filter((one) => !known.has(one.id))
+  return later.length === 0 ? read : [...read, ...later]
 }
 
 /** A piece's raw size: in base64 and its message it stays far under the
