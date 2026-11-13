@@ -245,11 +245,11 @@ pub(crate) fn handed_over() {
     }
 }
 
-/// [`handed_over`]: the record stays only when this copy's own start tried
-/// Wayland and is up on X11, the failure it records being this copy's.
+/// [`handed_over`]: a record stays while it can be this copy's own Wayland
+/// start, one that fell back to X11 or has not loaded its page yet.
 #[cfg(target_os = "linux")]
 pub(crate) fn hand_over_at(root: &Path, tried_wayland: bool, running: Option<DisplayBackend>) {
-    if !(tried_wayland && running == Some(DisplayBackend::X11)) {
+    if !tried_wayland || running == Some(DisplayBackend::Wayland) {
         started(root);
     }
 }
