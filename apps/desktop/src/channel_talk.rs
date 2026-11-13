@@ -27,7 +27,7 @@ pub(crate) const LONGEST_MESSAGE: usize = 4000;
 /// How much of an answer's first line `Privacy::Titles` lets out.
 const FIRST_LINE: usize = 200;
 
-pub(crate) const NO_VOICE: &str = "Voice notes need devpit's voice model: set one up in Settings → General → Voice messages, on the computer. Text works meanwhile.";
+pub(crate) const NO_VOICE: &str = "Voice notes need devpit's voice model: set one up in Settings → Voice, on the computer. Text works meanwhile.";
 
 /// What the paired chat said.
 #[derive(Debug, Clone, PartialEq, Eq)]
