@@ -238,7 +238,7 @@ stop_meter() {
   kill "$meter" 2>/dev/null || true
   wait "$meter" 2>/dev/null || true
   meter=''
-  printf '\r%s%s' "$wipe" "$show"
+  printf '\r%s%s' "$wipe" "$show" 2>/dev/null || true
 }
 
 # Redraws the download until it is stopped: a bar once the size is known, a
@@ -246,6 +246,11 @@ stop_meter() {
 meter() {
   i=0
   while :; do
+    # An async list ignores INT and QUIT, so it stops itself once the installer is gone.
+    if ! kill -0 "$$" 2>/dev/null; then
+      printf '\r%s%s' "$wipe" "$show"
+      exit 0
+    fi
     total=$(content_length "$1.head")
     have=$(size_of "$1")
     if [ -n "$total" ] && [ "$total" -gt 0 ]; then
@@ -545,7 +550,9 @@ main() {
   # than clean up and carry on: a trap that only tidies would leave Ctrl-C
   # tidying and then installing anyway.
   trap 'stop_meter; rm -rf "$work"' EXIT
+  trap 'exit 129' HUP
   trap 'exit 130' INT
+  trap 'exit 131' QUIT
   trap 'exit 143' TERM
 
   base="https://github.com/$REPO/releases/download/v$version"
