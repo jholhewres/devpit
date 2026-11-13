@@ -31,19 +31,20 @@ function tokensIn(selector: string): Set<string> {
 
 /* Sizes and faces are the same in every theme; only colour changes. */
 const NOT_A_COLOUR = new Set(['--sidebar-w', '--content-max', '--chat-max', '--files-w', '--ui', '--mono'])
+const notAColour = (token: string): boolean => NOT_A_COLOUR.has(token) || /^--(fs|radius|space)-/.test(token)
 
 describe('the palette', () => {
   const dark = tokensIn(':root {')
 
   it('has every dark token in the light theme too', () => {
     const light = tokensIn(":root[data-theme='light']")
-    const missing = [...dark].filter((token) => !NOT_A_COLOUR.has(token) && !light.has(token))
+    const missing = [...dark].filter((token) => !notAColour(token) && !light.has(token))
     expect(missing, 'a token with no light value paints one theme on the other').toEqual([])
   })
 
   it('has every dark token in the system theme too', () => {
     const system = tokensIn(":root[data-theme='system']")
-    const missing = [...dark].filter((token) => !NOT_A_COLOUR.has(token) && !system.has(token))
+    const missing = [...dark].filter((token) => !notAColour(token) && !system.has(token))
     expect(missing).toEqual([])
   })
 
