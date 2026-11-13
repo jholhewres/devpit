@@ -214,3 +214,67 @@ fn a_forced_stop_ends_the_tools_the_turn_started() {
     assert!(cli_ended, "the CLI outlived the forced stop");
     assert!(!tool_alive, "the tool outlived the forced stop");
 }
+
+/// Claude Code starts its Bash tool with `setsid`: a session, and a group, of
+/// its own, out of reach of the CLI's group. A forced stop reaches it all the same.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_forced_stop_ends_a_tool_started_in_a_session_of_its_own() {
+    use std::io::BufRead as _;
+    use std::os::unix::process::CommandExt as _;
+    let talking = Talking::default();
+    let steering = Steering::default();
+    let _guard = talking.begin("conv_1", &steering).expect("the turn");
+    let mut cli = std::process::Command::new("sh")
+        // The tool says its pid once it is in its own session, not before.
+        .args(["-c", "setsid sh -c 'echo $$; exec sleep 30' & wait"])
+        .stdout(std::process::Stdio::piped())
+        .process_group(0)
+        .spawn()
+        .expect("sh");
+    let mut said = String::new();
+    std::io::BufReader::new(cli.stdout.take().expect("stdout"))
+        .read_line(&mut said)
+        .expect("the tool's pid");
+    let tool: i32 = said.trim().parse().expect("a pid");
+    talking.on_start("conv_1", false)(cli.id());
+
+    assert!(talking.stop("conv_1", Signal::Kill));
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while devpit_pty::process::alive(tool) && std::time::Instant::now() < until {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let tool_alive = devpit_pty::process::alive(tool);
+    let _ = cli.kill();
+    let _ = cli.wait();
+    unsafe { libc::kill(tool, libc::SIGKILL) };
+    assert!(
+        !tool_alive,
+        "the tool in a session of its own outlived the forced stop"
+    );
+}
+
+/// The process that stays was ended by the forced stop already: the turn's
+/// record of it is not signalled again.
+#[cfg(unix)]
+#[test]
+fn a_forced_stop_spares_the_process_already_ended_there() {
+    use std::os::unix::process::CommandExt as _;
+    let talking = Talking::default();
+    let steering = Steering::default();
+    let _guard = talking.begin("conv_1", &steering).expect("the turn");
+    let mut child = std::process::Command::new("sleep")
+        .arg("30")
+        .process_group(0)
+        .spawn()
+        .expect("sleep");
+    talking.on_start("conv_1", true)(child.id());
+    assert!(talking.force("conv_1", Some(child.id())));
+    let signalled = ended_within(&mut child, std::time::Duration::from_millis(300));
+    let _ = child.kill();
+    let _ = child.wait();
+    assert!(
+        !signalled,
+        "the process ended elsewhere was signalled again"
+    );
+}

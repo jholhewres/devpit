@@ -145,13 +145,19 @@ pub fn stop_group(pgid: u32, grace: Duration) -> Stopped {
 /// started: what a stop that went unheeded asks for. Whether it was sent.
 #[cfg(unix)]
 pub fn end_group(pgid: u32) -> bool {
-    signal_group(pgid, KILL)
+    group_of(pgid).is_some() && signal_group(pgid, KILL)
+}
+
+/// The group `pgid` names, when it is one a turn can lead: never 0, this
+/// app's own group, nor 1, which `kill` reads as every process there is.
+fn group_of(pgid: u32) -> Option<i32> {
+    i32::try_from(pgid).ok().filter(|pgid| *pgid > 1)
 }
 
 /// No process groups here: the leader and the tree under it.
 #[cfg(not(unix))]
 pub fn end_group(pgid: u32) -> bool {
-    i32::try_from(pgid).is_ok_and(crate::process::terminate)
+    group_of(pgid).is_some_and(crate::process::terminate)
 }
 
 const TERM: i32 = 15;

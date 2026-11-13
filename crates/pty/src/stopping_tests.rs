@@ -107,3 +107,12 @@ fn without_a_pid_it_still_asks_and_says_it_cannot_tell() {
     assert_eq!(stop(None, GRACE, || asked = true), Stopped::Unknown);
     assert!(asked, "it skipped the kill because it had no pid");
 }
+
+/// `kill(-1)` is every process this user may signal, and `kill(0)` is this
+/// app's own group: neither is a turn's group, whatever number was kept.
+#[test]
+fn a_group_that_would_name_every_process_or_this_app_is_never_ended() {
+    assert_eq!(super::group_of(0), None);
+    assert_eq!(super::group_of(1), None);
+    assert_eq!(super::group_of(4242), Some(4242));
+}
