@@ -209,6 +209,22 @@ fn a_device_forgotten_while_its_pane_floods_loses_its_connection_at_once() {
         .expect("still connected while its pane floods");
 }
 
+/// Lets `device` go once `said` holds what `went_out` looks for, or after 5 s:
+/// a fixed clock let a loaded runner drop it before the first drain.
+fn forget_once<T: Send + 'static>(
+    device: &'static str,
+    said: std::sync::Arc<std::sync::Mutex<Vec<T>>>,
+    went_out: impl Fn(&[T]) -> bool + Send + 'static,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while std::time::Instant::now() < until && !went_out(&said.lock().unwrap()) {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        crate::remote_hub::drop_conns(device);
+    })
+}
+
 /// A pane's raw bytes leave in the R3 frame under the viewer's handle.
 #[test]
 fn raw_output_goes_out_as_a_frame_under_its_handle() {
@@ -222,10 +238,7 @@ fn raw_output_goes_out_as_a_frame_under_its_handle() {
     .unwrap();
     let wire = Quiet::default();
     let said = wire.said.clone();
-    let stop = std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(40));
-        crate::remote_hub::drop_conns(device);
-    });
+    let stop = forget_once(device, said.clone(), |said| !said.is_empty());
     let mut wire = wire;
     let mut watching = crate::remote_panes::Watching::new(id);
     converse(&mut wire, id, &mut watching, &heard, &raws, |_, _| None);
@@ -279,9 +292,8 @@ fn a_message_from_the_hub_goes_out_while_a_pane_floods() {
     .unwrap();
     let wire = SlowKept::default();
     let said = wire.said.clone();
-    let stop = std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        crate::remote_hub::drop_conns(device);
+    let stop = forget_once(device, said.clone(), |said| {
+        said.iter().any(|text| text.contains("the hub speaks"))
     });
     let mut wire = wire;
     let mut watching = crate::remote_panes::Watching::new(id);
