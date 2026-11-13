@@ -166,10 +166,11 @@ fn an_approved_lesson_is_kept_with_its_source_and_date_and_a_discarded_one_leave
         "2026-11-14",
         "#331",
         "Wait 3 s for the queue test.",
+        None,
         Some(edited),
     )
     .expect("approved");
-    decide(root, "2026-11-14", "#331", "Run make fmt.", None).expect("discarded");
+    decide(root, "2026-11-14", "#331", "Run make fmt.", None, None).expect("discarded");
 
     assert!(
         read(root, "lessons.md")
@@ -185,7 +186,7 @@ fn an_approved_lesson_is_kept_with_its_source_and_date_and_a_discarded_one_leave
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].text, edited);
     // Decided once: the same proposal is not there to decide again.
-    assert!(decide(root, "2026-11-14", "#331", "Run make fmt.", None).is_err());
+    assert!(decide(root, "2026-11-14", "#331", "Run make fmt.", None, None).is_err());
 }
 
 #[test]
@@ -204,4 +205,158 @@ fn review_rounds_and_repeated_findings_are_logged_per_card() {
         lines[0],
         serde_json::json!({ "day": "2026-11-13", "card": "#331", "reviewRounds": 3, "repeatedFindings": 2 })
     );
+}
+
+fn one(source: &str) -> Entry {
+    Entry {
+        day: "2026-11-13".to_owned(),
+        source: source.to_owned(),
+        text: "Something.".to_owned(),
+    }
+}
+
+#[test]
+fn an_entry_names_the_files_it_rests_on_and_the_cards_it_came_from() {
+    let linked = one("#12, docs/adr/0003-queue.md, PR #4, #15");
+    assert_eq!(linked.files(), ["docs/adr/0003-queue.md"]);
+    assert_eq!(linked.cards(), ["#12", "#15"]);
+    // An entry from before files were listed still rests on its source file.
+    assert_eq!(one("AGENTS.md").files(), ["AGENTS.md"]);
+    assert!(one("AGENTS.md").cards().is_empty());
+    assert!(one("#331").files().is_empty());
+}
+
+/// A project in git on main, its memory written and checked at its commit.
+fn checked_project() -> tempfile::TempDir {
+    use crate::devflow_review::tests::git;
+    let dir = project();
+    let root = dir.path();
+    git(root, &["init", "-q", "-b", "main"]);
+    git(root, &["config", "user.email", "t@example.com"]);
+    git(root, &["config", "user.name", "Test"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-q", "-m", "start"]);
+    seed(root, "2026-11-13").expect("seeded");
+    let first = flagged(root).expect("on a default branch");
+    assert!(
+        first.entries.is_empty(),
+        "the first check only notes where main stands"
+    );
+    checked(root, &first.tip).expect("checked");
+    dir
+}
+
+#[test]
+fn an_entry_whose_file_changed_on_the_default_branch_is_flagged() {
+    use crate::devflow_review::tests::git;
+    let dir = checked_project();
+    let root = dir.path();
+    let mut facts = read(root, "facts.md");
+    facts.push_str("- 2026-11-01 · #9 · An entry from before files were listed.\n");
+    std::fs::write(root.join(DIR).join("facts.md"), facts).expect("old entry");
+    std::fs::write(root.join("AGENTS.md"), "# Working on devpit\n").expect("changed");
+    git(root, &["commit", "-q", "-am", "rename the guide"]);
+
+    let found = flagged(root).expect("flagged");
+    let names: Vec<(&str, &str)> = found
+        .entries
+        .iter()
+        .map(|(file, one)| (*file, one.source.as_str()))
+        .collect();
+    assert_eq!(names, [("facts.md", "AGENTS.md")]);
+    checked(root, &found.tip).expect("checked");
+    assert!(flagged(root).expect("checked again").entries.is_empty());
+}
+
+#[test]
+fn a_stale_entry_is_a_proposal_and_its_file_changes_only_once_approved() {
+    let dir = checked_project();
+    let root = dir.path();
+    let was = "A guide to read first: \"Working in this repository\".";
+    let now = "A guide to read first: \"Working on devpit\".";
+    propose(
+        root,
+        "2026-11-14",
+        "AGENTS.md",
+        &[aimed("facts.md", now, Some(was))],
+    )
+    .expect("proposed");
+    let before = read(root, "facts.md");
+    assert!(before.contains(was), "{before}");
+
+    let waiting = proposals(root);
+    assert_eq!(aim(&waiting[0].text), ("facts.md", now, Some(was)));
+    decide(root, "2026-11-14", "AGENTS.md", now, Some(was), Some(now)).expect("approved");
+    let after = read(root, "facts.md");
+    assert!(
+        after.contains(&format!("- 2026-11-14 · AGENTS.md · {now}\n")),
+        "{after}"
+    );
+    assert!(!after.contains(was), "{after}");
+    assert_eq!(after.lines().count(), before.lines().count());
+
+    // A removal, proposed then approved, takes the entry away.
+    propose(
+        root,
+        "2026-11-15",
+        "AGENTS.md",
+        &[aimed("facts.md", "", Some(now))],
+    )
+    .expect("proposed");
+    decide(root, "2026-11-15", "AGENTS.md", "", Some(now), Some("")).expect("removed");
+    assert!(
+        !read(root, "facts.md").contains("AGENTS.md"),
+        "{}",
+        read(root, "facts.md")
+    );
+    assert!(proposals(root).is_empty());
+}
+
+#[test]
+fn a_discarded_stale_proposal_leaves_the_entry_as_it_was() {
+    let dir = checked_project();
+    let root = dir.path();
+    let was = "A guide to read first: \"Working in this repository\".";
+    let before = read(root, "facts.md");
+    propose(
+        root,
+        "2026-11-14",
+        "AGENTS.md",
+        &[aimed("facts.md", "", Some(was))],
+    )
+    .expect("proposed");
+    decide(root, "2026-11-14", "AGENTS.md", "", Some(was), None).expect("discarded");
+    assert_eq!(read(root, "facts.md"), before);
+    assert!(proposals(root).is_empty());
+}
+
+#[test]
+fn a_decision_a_card_made_names_the_card_once_approved() {
+    let dir = project();
+    let root = dir.path();
+    seed(root, "2026-11-13").expect("seeded");
+    let settled = "Proposals share one queue.";
+    propose(
+        root,
+        "2026-11-14",
+        "#332",
+        &[aimed("decisions.md", settled, None)],
+    )
+    .expect("proposed");
+    assert!(
+        decided(root).is_empty(),
+        "nothing is a decision before it is approved"
+    );
+    decide(root, "2026-11-14", "#332", settled, None, Some(settled)).expect("approved");
+    assert!(
+        read(root, "decisions.md").contains(&format!("- 2026-11-14 · #332 · {settled}\n")),
+        "{}",
+        read(root, "decisions.md")
+    );
+    assert!(!read(root, "lessons.md").contains(settled));
+    // The ADR seeded from the project names no card; this one names its own.
+    let made = decided(root);
+    assert_eq!(made.len(), 1);
+    assert_eq!(made[0].cards(), ["#332"]);
+    assert_eq!(made[0].text, settled);
 }

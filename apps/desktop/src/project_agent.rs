@@ -18,7 +18,7 @@ use devpit_agentcli::resident::{Heard, Resident};
 use devpit_agentcli::talk::Say;
 use devpit_rpc::{Part, Project};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// The methods answered here.
 pub(crate) const METHODS: [&str; 2] = ["project_agent_ask", "project_agent_brief"];
@@ -52,6 +52,8 @@ pub(crate) struct Answer {
     pub text: String,
     /// Whether this question started its process.
     pub woke: bool,
+    /// The stale entries that wake's re-check proposed to change.
+    pub proposed: usize,
 }
 
 /// Every project's agent, by project id.
@@ -128,25 +130,60 @@ impl Agents {
 
 impl Agent {
     fn answer(&mut self, wake: &Wake, question: &str) -> Result<Answer, String> {
-        let (live, prompt, woke) = match self.live.take().filter(|live| !live.gone()) {
-            Some(live) => (live, question.to_owned(), false),
+        let (live, prompt, woke, proposed) = match self.live.take().filter(|live| !live.gone()) {
+            Some(live) => (live, question.to_owned(), false, 0),
             None => {
-                crate::project_memory::seed(wake.root, &today())?;
+                let day = today();
+                crate::project_memory::seed(wake.root, &day)?;
                 let live = start(wake, self.session.as_deref())?;
-                (live, woken(wake, question), true)
+                match self.recheck(&live, wake, &day) {
+                    Ok(Some(proposed)) => (live, question.to_owned(), true, proposed),
+                    Ok(None) => (live, woken(wake, question), true, 0),
+                    Err(why) => {
+                        live.resident.close();
+                        return Err(why);
+                    }
+                }
             }
         };
         match live.turn(&prompt) {
             Ok((text, session)) => {
                 self.session = session.or(self.session.take());
                 self.live = Some(live);
-                Ok(Answer { text, woke })
+                Ok(Answer {
+                    text,
+                    woke,
+                    proposed,
+                })
             }
             Err(why) => {
                 live.resident.close();
                 Err(why)
             }
         }
+    }
+
+    /// On a wake, and only then: the entries resting on files the default
+    /// branch changed are re-checked in the wake's first turn, and each stale
+    /// one is proposed, never edited. `None` when nothing was flagged, so the
+    /// question goes in that first turn.
+    fn recheck(&mut self, live: &Live, wake: &Wake, day: &str) -> Result<Option<usize>, String> {
+        let Some(flagged) = crate::project_memory::flagged(wake.root) else {
+            return Ok(None);
+        };
+        let mut proposed = None;
+        if !flagged.entries.is_empty() {
+            let asked = crate::project_lessons::rechecking(&flagged.entries);
+            let (said, session) = live.turn(&woken(wake, &asked))?;
+            self.session = session.or(self.session.take());
+            let stale = crate::project_lessons::stale_in(&said, &flagged.entries);
+            for (source, text) in &stale {
+                crate::project_memory::propose(wake.root, day, source, std::slice::from_ref(text))?;
+            }
+            proposed = Some(stale.len());
+        }
+        crate::project_memory::checked(wake.root, &flagged.tip)?;
+        Ok(proposed)
     }
 }
 
@@ -344,6 +381,9 @@ pub(crate) fn respond(
         mcp_config: mcp.as_deref(),
     };
     let answer = app.state::<Agents>().ask(&project.id, &wake, &question)?;
+    if answer.proposed > 0 {
+        let _ = app.emit("lessons:proposed", &project.id);
+    }
     Ok(match card_id {
         Some(card_id) if method == "project_agent_brief" => {
             json!({ "project": project.name, "cardId": card_id, "brief": answer.text, "woke": answer.woke })

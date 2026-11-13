@@ -60,20 +60,37 @@ Each entry is one bullet with its date and its source:
 - 2026-11-13 · docs/adr/0001-sync-the-persons-workspace.md · 1. Sync the person's workspace
 ```
 
-The source is a file, a card (`#12`) or a pull request (`PR #3`). A bullet
-without a date as `YYYY-MM-DD` or without a source is not an entry: it is
-left out of what the agent is handed, and counted as left out.
+The source lists, comma-separated, the files the entry rests on, the cards
+it came from (`#12`) and pull requests (`PR #3`):
+`- 2026-11-14 · #12, docs/adr/0002-one-queue.md · Proposals share one queue.`
+An entry written before sources listed files still rests on its source when
+that is a file. A bullet without a date as `YYYY-MM-DD` or without a source is
+not an entry: it is left out of what the agent is handed, and counted as left
+out.
 
 The files are written on the agent's first wake, from the guides the project
 already has (`AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/architecture.md`)
-and its ADRs in `docs/adr/`. After that, devpit never writes over them; it
-only appends the lessons the person approves.
+and its ADRs in `docs/adr/`. After that, devpit changes them only as the
+person approves a proposal.
 
 The agent is woken with a summary: each file's newest entries, at most twenty
 each, and how many more there are. It reads the files themselves when it
 needs the rest.
 
-## Lessons from closed cards
+## Re-checked when their files change
+
+`checked` keeps the default branch's commit the memory was last re-checked
+against. Each time the agent wakes, and only then, devpit flags the entries
+of the three files that rest on a file the default branch changed since that
+commit. When any is flagged, the wake's first turn asks the agent to re-check
+each against its files as they are now and answer `keep`, `remove` or
+`update: <new text>`; the question follows in the next turn. Each stale entry
+becomes a proposal in `proposed.md` that names the entry it replaces, and its
+file is left as it is until the person decides. The commit is then noted as
+checked. No timer re-checks: an agent that idles out waits for its next
+question. The first wake of a memory kept from before only notes the commit.
+
+## Lessons and decisions from closed cards
 
 When a card lands in the done column, devpit:
 
@@ -84,12 +101,18 @@ When a card lands in the done column, devpit:
 2. Asks the project agent, under the profile of an orchestrator linked to the
    project, what the card teaches. It reads the card's comments (its handoff,
    its review and gate results, the person's corrections) and its last
-   review's findings, as data, and answers zero to three lessons.
+   review's findings, as data, and answers zero to three lessons; a choice
+   the card settled that later work should follow comes as a decision.
 3. Keeps them in `proposed.md`, each dated and with the card as its source.
 
-Each proposal waits under the top bar and on its card, with Approve, Edit
-and Discard. Approved, as it is or edited, it is appended to `lessons.md`
-with the card and the day. Discarded, it is removed and nothing keeps it.
+Each proposal, a re-check's included, waits under the top bar and on its
+card, with Approve, Edit and Discard. Approved, as it is or edited, a lesson
+is appended to `lessons.md` and a decision to `decisions.md`, with the card
+and the day; a re-check's takes the stale entry's place, or removes it.
+Discarded, it is removed and nothing keeps it.
+
+A decision names the cards that made it in its source, and a card shows the
+decisions that name it, each with its cards.
 
 The newest twenty approved lessons go into every brief the agent writes and
 into every Devflow review of the project, as items of the checklist the change
