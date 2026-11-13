@@ -39,7 +39,9 @@ pub fn commits_in(root: &Path, range: &str, limit: u32) -> Vec<Commit> {
 /// Every file a commit since `since` (seconds since the epoch, by commit
 /// time) touched, once each. Nothing, where git cannot say.
 pub fn touched_since(root: &Path, since: u64) -> Vec<String> {
-    let after = format!("--since=@{since}");
+    // With its zone, git's raw date: a bare `@0`, under nine digits, is read
+    // as an approximate date and means now.
+    let after = format!("--since=@{since} +0000");
     let Ok(raw) = run(root, &["log", &after, "--name-only", "--format=", "-z"]) else {
         return Vec::new();
     };
@@ -186,20 +188,36 @@ mod range_tests {
         assert_eq!(upstream_of(dir.path()), None);
     }
 
+    /// Commits what is staged as made at `at`, so which commits come after a
+    /// time does not hang on how fast the test runs.
+    fn commit_at(dir: &std::path::Path, message: &str, at: u64) {
+        for args in [vec!["add", "-A"], vec!["commit", "-q", "-m", message]] {
+            let out = devpit_pty::host_env::command("git")
+                .arg("-C")
+                .arg(dir)
+                .args(&args)
+                .env("GIT_COMMITTER_DATE", format!("@{at} +0000"))
+                .output()
+                .expect("run git");
+            assert!(out.status.success(), "git {args:?} failed");
+        }
+    }
+
     #[test]
     fn the_files_touched_since_a_time_are_those_of_the_commits_after_it() {
         let dir = tempfile::tempdir().expect("tempdir");
         repo(dir.path());
-        for (file, message) in [("a b.txt", "first"), ("c", "second"), ("a b.txt", "third")] {
+        let first = 1_700_000_000;
+        for (file, message, at) in [
+            ("a b.txt", "first", first),
+            ("c", "second", first + 60),
+            ("a b.txt", "third", first + 120),
+        ] {
             std::fs::write(dir.path().join(file), message).expect("write");
-            commit(dir.path(), message);
+            commit_at(dir.path(), message, at);
         }
         assert_eq!(super::touched_since(dir.path(), 0), ["a b.txt", "c"]);
-        let tomorrow = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("now")
-            .as_secs()
-            + 86_400;
-        assert!(super::touched_since(dir.path(), tomorrow).is_empty());
+        assert_eq!(super::touched_since(dir.path(), first + 120), ["a b.txt"]);
+        assert!(super::touched_since(dir.path(), first + 121).is_empty());
     }
 }
