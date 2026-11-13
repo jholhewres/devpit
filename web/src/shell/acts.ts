@@ -33,6 +33,8 @@ export interface Act {
   readonly durationMs?: number | null
   /* The MCP server a call went to. */
   readonly server?: string | null
+  /* The CLI's word for how a subagent's task ended. */
+  readonly endedAs?: string | null
 }
 
 /* The verb on the row. Six letters at most, so the subject beside it starts
@@ -167,10 +169,21 @@ export function acts(parts: readonly Part[], every: readonly Part[] = parts): re
   const rows = rowsOf(own, every)
   return rows.map((row) => {
     const inside = every.filter((part) => 'parent' in part && part.parent === row.id)
-    /* A subagent's call answers at once and the work goes on: its task says when it is over. */
-    const timed = row.kind === 'agent' ? { ...row, durationMs: ranFor(row.id, every), done: row.done && finished(row.id, every) } : row
-    return inside.length ? { ...timed, children: rowsOf(inside, every), done: row.done && finished(row.id, every) } : timed
+    const ending = endingOf(row.id, every)
+    const done = row.done && ending !== null
+    const agent =
+      row.kind === 'agent'
+        ? { ...row, done, durationMs: ranFor(row.id, every), endedAs: ending ?? null, failed: row.failed || (ending != null && ending !== 'completed') }
+        : row
+    return inside.length ? { ...agent, children: rowsOf(inside, every), done } : agent
   })
+}
+
+/* A subagent's state, in a word. */
+export function ranAs(act: Act): 'Working' | 'Done' | 'Failed' | 'Stopped' {
+  if (!act.done) return 'Working'
+  if (act.endedAs && act.endedAs !== 'completed' && act.endedAs !== 'failed') return 'Stopped'
+  return act.failed ? 'Failed' : 'Done'
 }
 
 /* The CLI's own count for the task a call started, at its latest report. */
@@ -179,13 +192,13 @@ function ranFor(callId: string, parts: readonly Part[]): number | null {
   return timed?.kind === 'task' ? (timed.duration_ms ?? null) : null
 }
 
-/* A subagent is finished when its background task says so, not when its
+/* How the task a call started ended: `undefined` when it started none, `null`
+   while it runs. A subagent is over when its task says so, not when its
    `Agent` call returns: the call answers at once and the work goes on. */
-function finished(callId: string, parts: readonly Part[]): boolean {
-  const tasks = parts.filter((part) => part.kind === 'task' && part.call_id === callId)
-  if (tasks.length === 0) return true
-  const last = tasks[tasks.length - 1]!
-  return last.kind === 'task' && last.status !== 'started' && last.status !== 'running'
+function endingOf(callId: string, parts: readonly Part[]): string | null | undefined {
+  const last = parts.findLast((part) => part.kind === 'task' && part.call_id === callId)
+  if (last?.kind !== 'task') return undefined
+  return last.status === 'started' || last.status === 'running' ? null : last.status
 }
 
 function rowsOf(parts: readonly Part[], every: readonly Part[]): Act[] {

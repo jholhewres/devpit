@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 import { imagesOf, isCut, namedImages, textOf, WholeContext } from './cutOutput'
 import { ask, commands } from './live'
-import { acts, actionLabel, grouped, groupTarget, headline, isGroup, rowLabel, type Act, type Group, type Kind } from './acts'
+import { acts, actionLabel, grouped, groupTarget, headline, isGroup, ranAs, rowLabel, type Act, type Group, type Kind } from './acts'
 import { shownRows, useActivity } from './activity'
 import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
@@ -171,7 +171,7 @@ function LeafRow({ act }: { act: Act }): React.JSX.Element {
 /* A subagent's state and the CLI's count of how long it ran. */
 function Ran({ act }: { act: Act }): React.JSX.Element | null {
   if (act.kind !== 'agent') return null
-  const state = act.failed ? 'Failed' : act.done ? 'Done' : 'Working'
+  const state = ranAs(act)
   return (
     <span className="arow__t" data-state={state.toLowerCase()}>
       {act.durationMs != null ? `${state} · ${took(act.durationMs)}` : state}

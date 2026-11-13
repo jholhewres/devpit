@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Part } from '../gen/bindings'
+import { acts } from './acts'
+import { shownRows } from './activity'
 import { Acts } from './ActsRows'
 
 afterEach(cleanup)
@@ -92,5 +94,14 @@ describe('subagents started together', () => {
     expect(screen.getByText('Read the docs')).toBeTruthy()
     expect(screen.getByText('Working · 3s')).toBeTruthy()
     expect(screen.getByText('Done · 23s')).toBeTruthy()
+  })
+
+  it('say a stopped or failed one did not succeed, and keep it when successful work is hidden', () => {
+    const parts = [...agent('a', 'Read the docs'), ...agent('b', 'Run the tests'), task('a', 'stopped', 5000), task('b', 'failed', 7000)]
+    render(<Acts parts={parts} live />)
+    fireEvent.click(screen.getByText('2 subagents'))
+    expect(screen.getByText('Stopped · 5s')).toBeTruthy()
+    expect(screen.getByText('Failed · 7s')).toBeTruthy()
+    expect(shownRows(acts(parts), 'failed').map((row) => row.id)).toEqual(['a', 'b'])
   })
 })
