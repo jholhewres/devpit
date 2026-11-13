@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Message, Part } from '../gen/bindings'
-import { elapsed, running, tasksOf } from './backgroundTasks'
+import { elapsed, running, taskLabel, tasksOf, wakeupOf } from './backgroundTasks'
 import { checklistOf, done } from './checklist'
 import { useMessagesPick, type ChatMessages } from './chatMessages'
 import { ask, commands } from './live'
 
 /*
  * What the turn has going on, above the composer where the hands are: work it
- * left running in the background, and the checklist it is working through.
+ * left running in the background behind one chip, and the checklist it is
+ * working through.
  *
  * Both read the newest answer only. A checklist from three turns ago is done
  * or abandoned, and either way it is not what the agent is doing now.
@@ -30,7 +31,12 @@ export function ComposerStatus({
   /* Read from the end, and only when the work changes: the clock below ticks
      every second and must not walk the thread, nor a streamed batch draw it. */
   const work = useMessagesPick(messages, workOf)
-  const { tasks, list } = useMemo(() => ({ tasks: tasksOf(work).filter(running), list: checklistOf(work) }), [work])
+  const { tasks, wakeup, list } = useMemo(
+    () => ({ tasks: tasksOf(work).filter(running), wakeup: wakeupOf(work), list: checklistOf(work) }),
+    [work],
+  )
+  const [open, setOpen] = useState(false)
+  const count = tasks.length + (wakeup ? 1 : 0)
 
   /* When each task was first seen here. The CLI sends no start time, and
      "running for" is the question a person glancing at the strip is asking. */
@@ -46,27 +52,46 @@ export function ComposerStatus({
     return () => window.clearInterval(timer)
   }, [tasks.length])
 
-  if (tasks.length === 0 && list.items.length === 0) return null
+  if (count === 0 && list.items.length === 0) return null
 
   return (
     <div className="bgt">
-      {tasks.map((task) => (
-        <div className="bgt__row" key={task.id}>
-          <span className="arow__live" aria-label="Running" />
-          <span className="bgt__k">{task.kind === 'local_agent' ? 'Subagent' : 'Command'}</span>
-          <span className="bgt__d" title={task.description}>
-            {task.description}
-          </span>
-          <span className="bgt__t">{elapsed(since.current.get(task.id) ?? now, now)}</span>
-          <button
-            className="chip"
-            aria-label={`Stop ${task.description}`}
-            onClick={() => void ask(() => commands.chatStopTask(conversationId, task.id))}
-          >
-            Stop
-          </button>
+      {count > 0 && (
+        <button className="chip bgt__chip" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+          {tasks.length > 0 && <span className="arow__live" aria-hidden="true" />}
+          {count} in background
+        </button>
+      )}
+      {open && count > 0 && (
+        <div className="bgp" role="region" aria-label="In the background">
+          {tasks.map((task) => (
+            <div className="bgt__row" key={task.id}>
+              <span className="arow__live" aria-label="Running" />
+              <span className="bgt__k">{taskLabel(task)}</span>
+              <span className="bgt__d" title={task.description}>
+                {task.description}
+              </span>
+              <span className="bgt__t">{elapsed(since.current.get(task.id) ?? now, now)}</span>
+              <button
+                className="chip"
+                aria-label={`Stop ${task.description}`}
+                onClick={() => void ask(() => commands.chatStopTask(conversationId, task.id))}
+              >
+                Stop
+              </button>
+            </div>
+          ))}
+          {wakeup && (
+            <div className="bgt__row">
+              <span className="bgt__k">Wakeup</span>
+              <span className="bgt__d" title={wakeup.reason}>
+                {wakeup.reason}
+              </span>
+              {wakeup.when && <span className="bgt__t">{wakeup.when}</span>}
+            </div>
+          )}
         </div>
-      ))}
+      )}
 
       {list.items.length > 0 && (
         <details className="ckl">

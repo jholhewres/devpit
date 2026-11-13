@@ -40,6 +40,38 @@ export function tasksOf(parts: readonly Part[]): readonly BackgroundTask[] {
   return [...byId.values()]
 }
 
+/* What a task is, in a word: the CLI's own word when it is not one of these. */
+export function taskLabel(task: BackgroundTask): string {
+  if (task.kind === 'local_agent') return 'Subagent'
+  if (task.kind === 'local_bash') return 'Shell'
+  return task.kind ? task.kind.replace(/^local_/, '').replace(/^./, (first) => first.toUpperCase()) : 'Task'
+}
+
+export interface Wakeup {
+  readonly id: string
+  readonly reason: string
+  /** When it fires, as the CLI said it: `15:47:00`, or `in 5m 0s`. */
+  readonly when: string
+}
+
+/* The wakeup a turn left set. Each `ScheduleWakeup` replaces the one before,
+   so it is the last call the CLI did not refuse. */
+export function wakeupOf(parts: readonly Part[]): Wakeup | null {
+  const refused = new Set(parts.flatMap((part) => (part.kind === 'tool_result' && part.is_error ? [part.call_id] : [])))
+  const call = parts.findLast((part) => part.kind === 'tool_call' && part.name === 'ScheduleWakeup' && !part.parent && !refused.has(part.id))
+  if (call?.kind !== 'tool_call') return null
+  const answer = parts.find((part) => part.kind === 'tool_result' && part.call_id === call.id)
+  const at = answer?.kind === 'tool_result' ? /scheduled for (\d{1,2}:\d{2}(?::\d{2})?)/.exec(answer.output)?.[1] : undefined
+  let input: { reason?: unknown; delaySeconds?: unknown } = {}
+  try {
+    input = JSON.parse(call.input) as typeof input
+  } catch {
+    // Not JSON: the row still says a wakeup is set.
+  }
+  const delay = typeof input.delaySeconds === 'number' ? `in ${elapsed(0, input.delaySeconds * 1000)}` : ''
+  return { id: call.id, reason: typeof input.reason === 'string' ? input.reason : '', when: at ?? delay }
+}
+
 /* How long something has been running, in the words the composer uses. */
 export function elapsed(since: number, now: number): string {
   const seconds = Math.max(0, Math.floor((now - since) / 1000))

@@ -69,13 +69,16 @@ button.pcorner__card:hover { color: var(--text); background: var(--overlay-stron
 .chat__dropt { font-size: var(--fs-md); color: var(--accent); }
 
 /* ── What the turn has going on, above the composer ──────────────────
-   Rows for work left running, then the checklist folded to its count:
-   the count is the glance, the items are for when it is asked for. */
+   A chip for work left running that opens to its rows, then the checklist
+   folded to its count: the count is the glance, the items are for when it is
+   asked for. */
 .bgt { display: flex; flex-direction: column; gap: 4px; margin: 0 0 6px; }
 .bgt__row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: var(--fs-sm); }
 .bgt__k { flex: none; color: var(--text-3); }
 .bgt__d { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-2); }
 .bgt__t { flex: none; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.bgt__chip { align-self: flex-start; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-pill); }
+.bgp { display: flex; flex-direction: column; gap: 4px; }
 .ckl { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 4px 8px; font-size: var(--fs-sm); }
 .ckl__h { color: var(--text-2); }
 .ckl__h:hover { color: var(--text); }
