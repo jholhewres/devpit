@@ -210,9 +210,10 @@ pub async fn chat_force_stop(
 ) -> Result<bool, RpcError> {
     let talking = state.inner().clone();
     crate::off_main::blocking(move || {
-        // A process that stays was the turn's: ended there, it is not signalled twice.
-        let resident = crate::chat_resident::force(&app, &conversation_id);
-        Ok(resident || talking.stop(&conversation_id, crate::chat_running::Signal::Kill))
+        // The process that stays, then the turn's own unless that was the one:
+        // a supervised turn runs apart from a process the conversation keeps.
+        let ended = crate::chat_resident::force(&app, &conversation_id);
+        Ok(talking.force(&conversation_id, ended) || ended.is_some())
     })
     .await
 }

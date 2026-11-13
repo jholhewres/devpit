@@ -150,6 +150,16 @@ impl Talking {
         }
     }
 
+    /// Force-stops this conversation's turn, unless its process is the one
+    /// `ended` already. Whether a turn was there.
+    pub(crate) fn force(&self, conversation: &str, ended: Option<u32>) -> bool {
+        let spared = self
+            .running
+            .lock()
+            .is_ok_and(|held| ended.is_some() && held.get(conversation) == Some(&ended));
+        spared || self.stop(conversation, Signal::Kill)
+    }
+
     /// The turn's process is gone: its pid is let go of, so no stop reaches a
     /// number the system may have given to another process.
     pub(crate) fn exited(&self, conversation: &str) {
@@ -168,10 +178,17 @@ fn signalled(pid: u32, signal: Signal) {
         Signal::Term => {
             let _ = i32::try_from(pid).is_ok_and(devpit_pty::process::terminate);
         }
-        Signal::Kill => {
-            devpit_pty::end_group(pid);
-        }
+        Signal::Kill => forced(pid),
     }
+}
+
+/// Ends a turn's process at once with everything it started: its group, and
+/// what left the group for a session of its own, as Claude Code's Bash tool does.
+pub(crate) fn forced(pid: u32) {
+    // Read first: once the CLI is gone, its children name init as their parent.
+    let tools = devpit_pty::session_members(&[pid]).unwrap_or_default();
+    devpit_pty::end_group(pid);
+    devpit_pty::stop_members(&tools, std::time::Duration::ZERO);
 }
 
 #[cfg(test)]

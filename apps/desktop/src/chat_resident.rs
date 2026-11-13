@@ -175,11 +175,13 @@ pub(crate) fn or_say(
         let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
         // A stop asked while this turn started: said, then interrupted at once,
         // so the turn ends the way any turn of this process does.
+        let mut stopped_first = false;
         let spoken = all
             .get(&staying.conversation_id)
             .filter(|live| Arc::ptr_eq(&live.ear, &ear))
             .is_some_and(|live| {
                 let goes_on = on_start(live.resident.pid());
+                stopped_first = !goes_on;
                 let said = live.resident.say(turn.prompt);
                 if said && !goes_on {
                     live.resident.interrupt();
@@ -194,7 +196,8 @@ pub(crate) fn or_say(
             }
             let live = start(&staying, turn, started_as(turn))?;
             live.ear.claim(&tell);
-            let goes_on = on_start(live.resident.pid());
+            // The first try took the stop asked, if there was one.
+            let goes_on = on_start(live.resident.pid()) && !stopped_first;
             let said = live.resident.say(turn.prompt);
             if said && !goes_on {
                 live.resident.interrupt();
@@ -280,9 +283,9 @@ pub(crate) fn unheard(app: &AppHandle, conversation_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Ends this conversation's process at once: a stop it did not heed. False
-/// when it has none.
-pub(crate) fn force(app: &AppHandle, conversation_id: &str) -> bool {
+/// Ends this conversation's process at once: a stop it did not heed. Its
+/// pid, or `None` when it has none.
+pub(crate) fn force(app: &AppHandle, conversation_id: &str) -> Option<u32> {
     let gone = app.try_state::<Residents>().and_then(|residents| {
         residents
             .0
@@ -290,12 +293,10 @@ pub(crate) fn force(app: &AppHandle, conversation_id: &str) -> bool {
             .ok()
             .and_then(|mut all| all.remove(conversation_id))
     });
-    let Some(live) = gone else {
-        return false;
-    };
+    let live = gone?;
     live.resident.close();
-    devpit_pty::end_group(live.resident.pid());
-    true
+    crate::chat_running::forced(live.resident.pid());
+    Some(live.resident.pid())
 }
 
 /// Stops a turn waiting for a woken one to finish; false when none waits.
