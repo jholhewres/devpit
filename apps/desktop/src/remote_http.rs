@@ -5,6 +5,8 @@
 use std::collections::HashMap;
 use std::io::{BufRead, Read, Write};
 use std::net::TcpStream;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 const MOST_LINE: usize = 8 * 1024;
@@ -128,6 +130,24 @@ impl Read for Deadline {
         self.stream.set_read_timeout(Some(left))?;
         self.stream.read(buf)
     }
+}
+
+/// A connection served; one fewer open once it is dropped.
+pub(crate) struct Opened(Arc<AtomicUsize>);
+
+impl Drop for Opened {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// One more connection, unless `most` are open already.
+pub(crate) fn open_one(open: &Arc<AtomicUsize>, most: usize) -> Option<Opened> {
+    open.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |now| {
+        (now < most).then_some(now + 1)
+    })
+    .ok()?;
+    Some(Opened(Arc::clone(open)))
 }
 
 fn line(reader: &mut impl BufRead, into: &mut String) -> Option<()> {

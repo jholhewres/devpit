@@ -11,11 +11,11 @@
 use std::io::BufReader;
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::remote_http::{kind_of, read, reply, Request};
+use crate::remote_http::{kind_of, open_one, read, reply, Deadline, Request};
 
 /// What is running, to stop it.
 struct Running {
@@ -25,6 +25,11 @@ struct Running {
 }
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
+
+/// How long a request may take to arrive, its small body and all.
+const REQUEST_WITHIN: Duration = Duration::from_secs(10);
+/// Connections served at once: each paired viewer keeps one socket open.
+const MOST_OPEN: usize = 256;
 
 /// Where the viewer is reached, when the host is up.
 pub(crate) fn address() -> Option<String> {
@@ -121,13 +126,36 @@ fn accept(
     loopback: bool,
     stop: Arc<AtomicBool>,
 ) {
+    let serving =
+        move |stream, peer| serve(app.clone(), stream, peer, root.clone(), &owner, loopback);
+    taking(listener, stop, MOST_OPEN, serving);
+}
+
+/// Accepts on `listener` until `stop`, each connection served on a thread of
+/// its own, up to `most` at once.
+fn taking(
+    listener: TcpListener,
+    stop: Arc<AtomicBool>,
+    most: usize,
+    serving: impl Fn(TcpStream, SocketAddr) + Clone + Send + 'static,
+) {
     let _ = listener.set_nonblocking(true);
+    let open = Arc::new(AtomicUsize::new(0));
     std::thread::spawn(move || {
         while !stop.load(Ordering::SeqCst) {
             match listener.accept() {
                 Ok((stream, peer)) => {
-                    let (app, root, owner) = (app.clone(), root.clone(), owner.clone());
-                    std::thread::spawn(move || serve(app, stream, peer, root, &owner, loopback));
+                    // Past the most, it is closed unserved.
+                    let Some(opened) = open_one(&open, most) else {
+                        continue;
+                    };
+                    let serving = serving.clone();
+                    let _ = std::thread::Builder::new()
+                        .name("devpit-remote".into())
+                        .spawn(move || {
+                            let _opened = opened;
+                            serving(stream, peer);
+                        });
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(Duration::from_millis(100))
@@ -147,6 +175,15 @@ fn caller(request: &Request, peer: SocketAddr, loopback: bool) -> Option<String>
     crate::remote_tailscale::whois(&peer.to_string())
 }
 
+/// The request on `stream`, whole within `within`: a timeout per read would
+/// let one sent a byte at a time hold its thread for good.
+fn request_of(stream: &TcpStream, within: Duration) -> Option<Request> {
+    read(BufReader::new(Deadline::new(
+        stream.try_clone().ok()?,
+        within,
+    )))
+}
+
 fn serve(
     app: tauri::AppHandle,
     mut stream: TcpStream,
@@ -156,11 +193,7 @@ fn serve(
     loopback: bool,
 ) {
     let _ = stream.set_nonblocking(false);
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
-    let Some(reader) = stream.try_clone().ok() else {
-        return;
-    };
-    let Some(request) = read(BufReader::new(reader)) else {
+    let Some(request) = request_of(&stream, REQUEST_WITHIN) else {
         reply(&mut stream, "400 Bad Request", "text/plain", b"");
         return;
     };

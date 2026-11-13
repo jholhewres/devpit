@@ -19,11 +19,11 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::remote_http::{read_body, read_head, reply, Deadline, Request};
+use crate::remote_http::{open_one, read_body, read_head, reply, Deadline, Request};
 
 /// The port and the name, owner-only in the home, so "open in Chrome" and a
 /// restart find them.
@@ -314,24 +314,6 @@ pub(crate) fn sign_in_url(place: &Place, code: &str) -> String {
     format!("http://{}/auth?c={code}", place.signed_in_host())
 }
 
-/// A connection served; one fewer open once it is dropped.
-pub(crate) struct Opened(Arc<AtomicUsize>);
-
-impl Drop for Opened {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
-    }
-}
-
-/// One more connection, unless `most` are open already.
-pub(crate) fn open_one(open: &Arc<AtomicUsize>, most: usize) -> Option<Opened> {
-    open.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |now| {
-        (now < most).then_some(now + 1)
-    })
-    .ok()?;
-    Some(Opened(Arc::clone(open)))
-}
-
 static PLACE: Mutex<Option<Place>> = Mutex::new(None);
 /// The desktop window's panes socket, ticket and all, for this run.
 static PANES_URL: Mutex<Option<String>> = Mutex::new(None);
@@ -474,6 +456,24 @@ pub(crate) fn link_opener(os: &str) -> (&'static str, &'static [&'static str]) {
         "windows" => ("cmd", &["/C", "start", ""]),
         _ => ("xdg-open", &[]),
     }
+}
+
+/// The browser that opens the app as an app: Chromium's `--app`, when one is
+/// installed, else whatever the desktop opens links with.
+pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
+    [
+        "chromium",
+        "chromium-browser",
+        "google-chrome",
+        "google-chrome-stable",
+    ]
+    .into_iter()
+    .find(|program| found(program))
+    .map_or((link_opener(std::env::consts::OS).0, false), |program| {
+        (program, true)
+    })
+}
+
 /// The page that sends a browser on to sign in with `code`.
 pub(crate) fn sign_in_page(place: &Place, code: &str) -> String {
     let url = sign_in_url(place, code);
@@ -493,24 +493,6 @@ pub(crate) fn hand_over(home: &Path, place: &Place, code: &str) -> std::io::Resu
     tauri::Url::from_file_path(&page)
         .map(String::from)
         .map_err(|()| std::io::Error::other("the home is not an absolute path"))
-}
-
-}
-
-/// The browser that opens the app as an app: Chromium's `--app`, when one is
-/// installed, else whatever the desktop opens links with.
-pub(crate) fn opener(found: impl Fn(&str) -> bool) -> (&'static str, bool) {
-    [
-        "chromium",
-        "chromium-browser",
-        "google-chrome",
-        "google-chrome-stable",
-    ]
-    .into_iter()
-    .find(|program| found(program))
-    .map_or((link_opener(std::env::consts::OS).0, false), |program| {
-        (program, true)
-    })
 }
 
 /// "Open in browser": signs this browser in and opens the app, off the
