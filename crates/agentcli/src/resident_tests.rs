@@ -37,6 +37,7 @@ fn turn(command: &str) -> Say<'_> {
         session_id: None,
         fork_at: None,
         permission: None,
+        disallowed: &[],
         settings: None,
         mcp_config: None,
         effort: None,

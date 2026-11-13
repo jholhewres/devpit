@@ -33,6 +33,8 @@ pub struct Say<'a> {
     pub fork_at: Option<&'a str>,
     /// What the agent may do without asking. The CLI's own word for it.
     pub permission: Option<&'a str>,
+    /// Tools and commands refused whatever the profile's settings allow.
+    pub disallowed: &'a [&'a str],
     /// devpit's hook settings. A supervised turn asks through the
     /// `PreToolUse` hook, and a turn without it has nobody to ask: the CLI,
     /// printing rather than talking, refuses every write instead.
@@ -77,11 +79,8 @@ pub(crate) fn own_group(command: &mut std::process::Command) -> &mut std::proces
     command
 }
 
-/// Runs one turn, handing every part to `on_part` as it is read.
-///
-/// `on_start` receives the child's pid, which is what cancelling needs: the
-/// turn has to be stoppable from another thread while this one is blocked on
-/// the pipe.
+/// Runs one turn, handing every part to `on_part` as it is read. `on_start`
+/// gets the child's pid, so the turn can be stopped from another thread.
 pub fn say(
     driver: &dyn Driver,
     turn: &Say<'_>,

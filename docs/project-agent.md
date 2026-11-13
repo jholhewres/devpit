@@ -30,7 +30,10 @@ instructions.
 The agent is a Claude Code process started in the project's folder, under
 the profile of the orchestrator that woke it, with devpit's MCP tools. It
 runs in the CLI's plan mode whatever the profile's own settings choose, so it
-reads and never writes.
+reads and never writes. Plan mode keeps the profile's Bash allow rules, so the
+process is also started with deny rules, which win over any allow rule:
+`Edit`, `Write`, `NotebookEdit`, and Bash's `rm`, `mv`, `git commit`,
+`git push` and any `>` redirect.
 
 - **Wakes when called.** The first question starts the process. Further
   questions go to the same process, one at a time.

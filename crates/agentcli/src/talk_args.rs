@@ -58,6 +58,10 @@ pub(crate) fn argv(turn: &Say<'_>) -> Vec<String> {
         argv.push("--permission-mode".to_owned());
         argv.push(mode.to_owned());
     }
+    // One `=` each, like the folders below: a rule can hold a space.
+    for tool in turn.disallowed {
+        argv.push(format!("--disallowedTools={tool}"));
+    }
     if let Some(effort) = turn.effort {
         argv.push("--effort".to_owned());
         argv.push(effort.to_owned());
