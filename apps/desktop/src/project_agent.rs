@@ -281,11 +281,11 @@ impl Said {
     }
 }
 
-/// What an agent under `profile` is started with: its command, its
-/// environment and devpit's MCP file.
-pub(crate) fn waking(
-    profile: &str,
-) -> Result<(String, Vec<(String, String)>, Option<String>), String> {
+/// An agent's command, its environment and devpit's MCP file.
+pub(crate) type Waking = (String, Vec<(String, String)>, Option<String>);
+
+/// What an agent under `profile` is started with.
+pub(crate) fn waking(profile: &str) -> Result<Waking, String> {
     let (found, command) = crate::chat_turn::spawnable(profile).map_err(|err| err.message)?;
     if found.driver != "claude" {
         return Err(format!(
