@@ -187,3 +187,22 @@ fn a_key_kept_or_forgotten_tells_the_client_to_list_again() {
     assert!(watch.settle(looked, Ok(with)).is_some());
     assert_eq!(watch.seat.decisions, Some(true));
 }
+
+/// The project agent answers the orchestrator: a project's session reads its
+/// own project and is not offered it.
+#[test]
+fn the_project_agent_is_offered_to_the_orchestrator_alone() {
+    let orchestrator = Seat {
+        orchestrator: Some(true),
+        decisions: Some(false),
+    };
+    for name in ["devpit_project_agent_ask", "devpit_project_agent_brief"] {
+        let tool = TOOLS
+            .iter()
+            .find(|tool| tool.name == name)
+            .unwrap_or_else(|| panic!("{name}"));
+        assert!(orchestrator.offers(tool), "{name}");
+        assert!(!PROJECT.offers(tool), "{name}");
+        assert!(tool.description.contains("project agent"), "{name}");
+    }
+}

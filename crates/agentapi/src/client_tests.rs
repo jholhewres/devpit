@@ -137,3 +137,15 @@ fn a_refusal_carries_what_devpit_said() {
     assert!(why.contains("500"), "{why}");
     assert!(why.contains("the store is locked"), "{why}");
 }
+
+/// A project agent reads code before it answers: waited for like a review,
+/// not like a lookup.
+#[test]
+fn the_project_agent_is_waited_for_while_it_reads() {
+    for method in ["project_agent_ask", "project_agent_brief"] {
+        assert!(
+            wait_for(method) >= std::time::Duration::from_secs(600),
+            "{method}"
+        );
+    }
+}
