@@ -260,6 +260,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         browser_menu::browser_menus,
         island::island_apply,
         island::island_drawn,
+        island::island_anyway_set,
         island::island_now,
         island::island_shape,
         island::island_open_pane,

@@ -1088,6 +1088,8 @@ export const commands = {
 	islandApply: () => typedError<null, RpcError>(__TAURI_INVOKE("island_apply")),
 	/**  `island.drawn` — how the island is drawn on this desktop. */
 	islandDrawn: () => __TAURI_INVOKE<IslandHow>("island_drawn"),
+	/**  `island.anyway_set` — the island where it is a plain window, on or off. */
+	islandAnywaySet: (on: boolean) => typedError<IslandHow, RpcError>(__TAURI_INVOKE("island_anyway_set", { on })),
 	/**  `island.now` — every session the island would draw, asked as it mounts. */
 	islandNow: () => typedError<IslandNow, RpcError>(__TAURI_INVOKE("island_now")),
 	/**  `island.shape` — what the island draws, so only that takes the mouse. */
@@ -3786,14 +3788,17 @@ export type IslandDrawn =
 /**  A Wayland layer anchored to the top (KDE, Hyprland, Sway). */
 "layer" | 
 /**
- *  A Wayland window that refuses focus, wherever the compositor puts it:
- *  GNOME, or no `libgtk-layer-shell`.
+ *  An ordinary Wayland window, wherever the compositor puts it: GNOME, or
+ *  no `libgtk-layer-shell`. GTK cannot keep it from taking focus or from
+ *  standing in for devpit's window, so it opens only when asked for.
  */
 "plain";
 
 /**  `island.drawn`'s answer. */
 export type IslandHow = {
 	drawn: IslandDrawn,
+	/**  Whether the person asked for the island where it is [`IslandDrawn::Plain`]. */
+	anyway: boolean,
 };
 
 /**

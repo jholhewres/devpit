@@ -86,3 +86,23 @@ fn the_watch_sleeps_while_the_island_is_hidden() {
     );
     assert_eq!(super::between_looks(false, true), None);
 }
+
+/// On GNOME on Wayland the island is an ordinary window: it takes focus and
+/// stands in for devpit's own in Alt-Tab, so it waits to be asked for there.
+#[test]
+fn a_plain_island_opens_only_when_asked_for() {
+    use devpit_rpc::IslandDrawn;
+    assert!(!opens(true, IslandDrawn::Plain, false));
+    assert!(opens(true, IslandDrawn::Plain, true));
+    assert!(!opens(false, IslandDrawn::Plain, true));
+}
+
+/// Where it never takes focus, wanting it is enough.
+#[test]
+fn an_island_that_cannot_take_focus_opens_when_wanted() {
+    use devpit_rpc::IslandDrawn;
+    for drawn in [IslandDrawn::Above, IslandDrawn::Layer] {
+        assert!(opens(true, drawn, false));
+        assert!(!opens(false, drawn, true));
+    }
+}

@@ -4,8 +4,10 @@
 //! compositor speaks the layer-shell protocol (KDE, Hyprland, Sway and most
 //! wlroots ones), the island becomes an overlay layer anchored to the top,
 //! over the panel and never taking the keyboard. GNOME does not speak it:
-//! there the island is an ordinary window that refuses focus, wherever the
-//! compositor puts it. `DEVPIT_ISLAND_LAYER=0` skips the layer everywhere.
+//! there the island is an ordinary window, wherever the compositor puts it,
+//! and GTK's hints against focus and for staying above do nothing on Wayland.
+//! It takes focus and stands in for devpit's window, so it opens there only
+//! when asked for. `DEVPIT_ISLAND_LAYER=0` skips the layer everywhere.
 //!
 //! `libgtk-layer-shell` is opened at run time rather than linked: a machine
 //! without it must still start devpit, and only the island is the poorer.

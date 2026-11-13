@@ -70,6 +70,10 @@ pub const TRAY_TOLD: &str = "general.tray_told";
 pub const ISLAND: &str = "island.enabled";
 /// The screen the island was last dragged to, by the name the system gives it.
 pub const ISLAND_SCREEN: &str = "island.screen";
+/// Whether the island opens where it is an ordinary window that can take
+/// focus (Wayland with no layers: GNOME). Off unless turned on; this
+/// machine's alone, like the display it is about.
+pub const ISLAND_ANYWAY: &str = "island.anyway";
 /// The display GTK opens on Linux: `wayland` or `x11`. Absent is automatic.
 /// This machine's alone: it is not among the synced keys.
 pub const DISPLAY_BACKEND: &str = "display.backend";
