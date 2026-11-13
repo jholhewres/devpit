@@ -13,6 +13,7 @@ fn turn(budget: Option<f64>) -> Say<'static> {
         session_id: None,
         fork_at: None,
         permission: None,
+        disallowed: &[],
         settings: None,
         mcp_config: None,
         effort: None,
@@ -87,6 +88,7 @@ fn the_next_turn_resumes_the_session_this_one_ended_in() {
         session_id: Some("old"),
         fork_at: None,
         permission: None,
+        disallowed: &[],
         settings: None,
         mcp_config: None,
         effort: None,
@@ -211,6 +213,7 @@ fn a_chat_turn_runs_under_its_profile_env() {
         session_id: None,
         fork_at: None,
         permission: None,
+        disallowed: &[],
         settings: None,
         mcp_config: None,
         effort: None,
@@ -300,6 +303,21 @@ fn every_folder_it_may_reach_is_its_own_flag() {
     assert!(said.contains(&"--add-dir=/work/api".to_owned()));
     assert!(said.contains(&"--add-dir=/work/web app".to_owned()));
     assert!(!argv(&turn(None)).iter().any(|a| a.starts_with("--add-dir")));
+}
+
+#[test]
+fn every_refused_tool_is_its_own_flag() {
+    let with = Say {
+        disallowed: &["Edit", "Bash(git push *)"],
+        ..turn(None)
+    };
+    let said = argv(&with);
+    // One word each: the flag takes several, and the rule has a space in it.
+    assert!(said.contains(&"--disallowedTools=Edit".to_owned()));
+    assert!(said.contains(&"--disallowedTools=Bash(git push *)".to_owned()));
+    assert!(!argv(&turn(None))
+        .iter()
+        .any(|a| a.starts_with("--disallowedTools")));
 }
 
 /// An orchestrator's sessions report to it by name. Unnamed, the CLI makes a

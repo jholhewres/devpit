@@ -27,6 +27,17 @@ const IDLE: Duration = Duration::from_secs(10 * 60);
 pub(crate) const NOT_STARTED: &str = "the project agent could not start";
 /// Read-only whatever mode the profile's own settings choose.
 const READ_ONLY: &str = "plan";
+/// Plan mode keeps the profile's Bash allow rules; a deny rule wins over them.
+const DENIED: [&str; 8] = [
+    "Edit",
+    "Write",
+    "NotebookEdit",
+    "Bash(rm *)",
+    "Bash(mv *)",
+    "Bash(git commit *)",
+    "Bash(git push *)",
+    "Bash(*>*)",
+];
 
 /// What an agent is started with.
 pub(crate) struct Wake<'a> {
@@ -182,6 +193,7 @@ fn start(wake: &Wake, session: Option<&str>) -> Result<Live, String> {
         session_id: session,
         fork_at: None,
         permission: Some(READ_ONLY),
+        disallowed: &DENIED,
         settings: None,
         mcp_config: wake.mcp_config,
         effort: None,

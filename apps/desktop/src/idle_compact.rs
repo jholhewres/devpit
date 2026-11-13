@@ -385,6 +385,7 @@ fn resumed(
         session_id: head.session_id.as_deref(),
         fork_at: None,
         permission: mode,
+        disallowed: &[],
         settings: hooks.as_deref(),
         mcp_config: mcp.as_deref(),
         effort: head.effort.as_deref(),

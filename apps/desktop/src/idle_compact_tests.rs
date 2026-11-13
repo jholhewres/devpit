@@ -46,6 +46,7 @@ fn turn<'a>(command: &'a str, cwd: &'a Path) -> Say<'a> {
         session_id: Some("s-1"),
         fork_at: None,
         permission: None,
+        disallowed: &[],
         settings: None,
         mcp_config: None,
         effort: None,

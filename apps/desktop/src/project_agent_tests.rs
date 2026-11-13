@@ -132,6 +132,35 @@ fn the_agent_idles_out_and_wakes_where_it_left_off_with_its_memory() {
 }
 
 #[test]
+fn the_agent_is_refused_every_write_whatever_the_profile_allows() {
+    let bench = bench();
+    let agents = Agents::idling_after(Duration::from_secs(60));
+    asked(&agents, &bench, "first");
+    let said = log(&bench.log);
+    let start = said
+        .lines()
+        .find(|line| line.starts_with("argv "))
+        .map(|line| format!("{line} "))
+        .expect("a start");
+    // Plan mode keeps the profile's Bash allow rules; a deny rule wins over them.
+    for rule in [
+        "Edit",
+        "Write",
+        "NotebookEdit",
+        "Bash(rm *)",
+        "Bash(mv *)",
+        "Bash(git commit *)",
+        "Bash(git push *)",
+        "Bash(*>*)",
+    ] {
+        assert!(
+            start.contains(&format!("--disallowedTools={rule} ")),
+            "{rule} is not refused: {start}"
+        );
+    }
+}
+
+#[test]
 fn a_brief_holds_the_card_as_data() {
     let prompt = brief_prompt(
         Some(330),
