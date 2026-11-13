@@ -251,6 +251,12 @@ export const commands = {
 	unheard: string[],
 } | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
 	/**
+	 *  `chat.force_stop` — ends the turn in flight however it is: what a stop
+	 *  that has not ended it after a while offers. A process that stays is ended
+	 *  too, and the next turn starts another.
+	 */
+	chatForceStop: (conversationId: string) => typedError<boolean, RpcError>(__TAURI_INVOKE("chat_force_stop", { conversationId })),
+	/**
 	 *  `chat.stop_task` — stops one background task of the turn in flight.
 	 * 
 	 *  Answers whether the request reached the turn. The task's ending arrives on

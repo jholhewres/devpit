@@ -70,6 +70,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         runs_list::runs_list,
         session_search::sessions_search,
         steering::chat_cancel,
+        steering::chat_force_stop,
         steering::chat_stop_task,
         steering::chat_steer,
         chat::chat_frames,

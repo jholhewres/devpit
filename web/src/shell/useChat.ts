@@ -79,7 +79,13 @@ export interface Chat {
   /** Takes the composer's files and skills off it: they went somewhere else. */
   clearExtras: () => void
   stop: () => void
+  /** A stop has not ended the turn after FORCE_AFTER_MS: it can be forced. */
+  readonly forceable: boolean
+  force: () => void
 }
+
+/* How long a stop is given before ending the turn by force is offered. */
+export const FORCE_AFTER_MS = 10_000
 
 /* What the composer can pick: something devpit can spawn, switched on, or
    the account this conversation already belongs to. */
@@ -123,6 +129,14 @@ export function useChat(conversationId: string): Chat {
   const [session, setSession] = useState<string | null>(null)
   const [card, setCard] = useState<ChatCard | null>(null)
   const [sending, setSending] = useState(false)
+  /* Stops asked of the turn in flight, and the one whose wait for it ran out. */
+  const [stopped, setStopped] = useState(0)
+  const [late, setLate] = useState(0)
+  const over = useCallback(() => {
+    setSending(false)
+    setStopped(0)
+    setLate(0)
+  }, [])
   const [failed, setFailed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /* This opening of the conversation; the one before it closed with it. */
@@ -152,7 +166,7 @@ export function useChat(conversationId: string): Chat {
           /* A woken turn can be over before this asks to join it — a short
              answer to a message. It was written down; read it from there. */
           if (!was && !woken) return
-          setSending(false)
+          over()
           /* Only what came after the join is read; the rest stays as drawn. */
           sent.current.clear()
           void Promise.all([
@@ -178,7 +192,7 @@ export function useChat(conversationId: string): Chat {
            then there is nobody left to tell. */
         .catch(() => undefined)
     },
-    [conversationId],
+    [conversationId, over],
   )
 
   useEffect(() => {
@@ -377,7 +391,7 @@ export function useChat(conversationId: string): Chat {
           flush()
           setMessages(settled)
           if (failed && answer) setMessages((was) => failedOn(was, answer!, failed!))
-          setSending(false)
+          over()
           /* A question the turn left behind has nobody waiting on it now. */
           setAsked([])
           /* The first turn settles the account for good. */
@@ -388,7 +402,7 @@ export function useChat(conversationId: string): Chat {
           }
         })
     },
-    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined, clearExtras],
+    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined, clearExtras, over],
   )
 
   /* A dropped file is resolved against the project root before it is shown:
@@ -465,10 +479,17 @@ export function useChat(conversationId: string): Chat {
   )
 
   const stop = useCallback(() => {
-    /* The turn's own end clears `sending`: a stop that reached no process yet
-       leaves the turn running, and the send button must not come back under it. */
+    /* The turn's own end clears `sending`: the send button must not come back under a turn still going. */
+    setStopped((was) => was + 1)
     void ask(() => commands.chatCancel(conversationId))
   }, [conversationId])
+  /* A stop not heeded — a hung tool, a process deaf to its signal — is offered a harder one. */
+  useEffect(() => {
+    if (!sending || stopped === 0) return
+    const timer = window.setTimeout(() => setLate(stopped), FORCE_AFTER_MS)
+    return () => window.clearTimeout(timer)
+  }, [sending, stopped])
+  const force = useCallback(() => void ask(() => commands.chatForceStop(conversationId)), [conversationId])
 
   const steer = useCallback(
     async (prompt: string, given?: Extras): Promise<boolean> => {
@@ -538,5 +559,7 @@ export function useChat(conversationId: string): Chat {
     steer,
     clearExtras,
     stop,
+    forceable: sending && stopped > 0 && late === stopped,
+    force,
   }
 }

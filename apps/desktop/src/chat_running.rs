@@ -23,6 +23,7 @@ use crate::steering::Steering;
 /// callback the turn already reports its process through.
 pub(crate) struct TurnGuard {
     running: Arc<Mutex<HashMap<String, Option<u32>>>>,
+    stopping: Arc<Mutex<HashMap<String, Signal>>>,
     steering: Steering,
     conversation_id: String,
 }
@@ -31,6 +32,9 @@ impl Drop for TurnGuard {
     fn drop(&mut self) {
         if let Ok(mut held) = self.running.lock() {
             held.remove(&self.conversation_id);
+            if let Ok(mut stopping) = self.stopping.lock() {
+                stopping.remove(&self.conversation_id);
+            }
         }
         self.steering.release(&self.conversation_id);
     }
@@ -61,10 +65,73 @@ impl Talking {
 
         Ok(TurnGuard {
             running: self.running.clone(),
+            stopping: self.stopping.clone(),
             steering: steering.clone(),
             conversation_id: conversation_id.to_owned(),
         })
     }
+}
+
+/// How a stop ends a turn's process.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Signal {
+    Term,
+    Kill,
+}
+
+impl Talking {
+    /// Stops this conversation's turn with `signal`: its process now, or —
+    /// claimed, its process not started yet — as soon as it starts. Whether a
+    /// turn was there to stop.
+    pub(crate) fn stop(&self, conversation: &str, signal: Signal) -> bool {
+        let Ok(held) = self.running.lock() else {
+            return false;
+        };
+        match held.get(conversation) {
+            None => false,
+            Some(Some(pid)) => {
+                signalled(*pid, signal);
+                true
+            }
+            Some(None) => {
+                if let Ok(mut stopping) = self.stopping.lock() {
+                    let asked = stopping.entry(conversation.to_owned()).or_insert(signal);
+                    if signal == Signal::Kill {
+                        *asked = signal;
+                    }
+                }
+                true
+            }
+        }
+    }
+
+    /// What the turn calls with its process once it starts: kept to be
+    /// stopped, and stopped at once when that was asked before.
+    pub(crate) fn on_start(&self, conversation: &str) -> impl Fn(u32) + Send + Sync + 'static {
+        let (running, stopping) = (self.running.clone(), self.stopping.clone());
+        let key = conversation.to_owned();
+        move |pid| {
+            let Ok(mut held) = running.lock() else {
+                return;
+            };
+            held.insert(key.clone(), Some(pid));
+            let asked = stopping.lock().ok().and_then(|mut all| all.remove(&key));
+            if let Some(signal) = asked {
+                signalled(pid, signal);
+            }
+        }
+    }
+}
+
+fn signalled(pid: u32, signal: Signal) {
+    let flag = match signal {
+        Signal::Term => "-TERM",
+        Signal::Kill => "-KILL",
+    };
+    let _ = std::process::Command::new("kill")
+        .arg(flag)
+        .arg(pid.to_string())
+        .status();
 }
 
 #[cfg(test)]
