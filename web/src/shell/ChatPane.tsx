@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+
+import type { Context } from '../gen/bindings'
 
 import { ASKS, CONTINUE, money } from './chat'
 import type { Extras } from './queueing'
 import { titleOf, type Tab } from './strip'
 import { ChatCardChip } from './ChatCardChip'
 import { ChatFind } from './ChatFind'
+import { useMessagesPick } from './chatMessages'
 import { ChatThread } from './ChatThread'
 import { Composer, type ComposerHandle } from './Composer'
 import { ContextMeter } from './ContextMeter'
@@ -21,7 +24,7 @@ import { ChatBlank } from './ChatBlank'
 import { RemoteToggle } from './RemoteToggle'
 import { SessionsChip } from './OrchestratorChat'
 import { SessionCost } from './SessionCost'
-import { useChat } from './useChat'
+import { useChat, type ChatCard } from './useChat'
 import { useJump, type Reveal } from './useJump'
 import { useShell } from './useShell'
 import { useShortcut } from './useShortcut'
@@ -52,9 +55,15 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   const where = useMemo(() => (project ? { projectId: project.id, conversationId: tab.id } : null), [project, tab.id])
   const reveal = useRef<Reveal | null>(null)
   const jump = useJump(where, chat, follow.hold, reveal)
+  /* What the pane reads of the messages: none of it moves with a streamed batch. */
+  const { count, said, asked } = useMessagesPick(chat.messages, (all) => ({
+    count: all.length,
+    said: all.find((one) => one.role === 'user'),
+    asked: all.reduce((sum, one) => sum + (one.role === 'user' ? 1 : 0), 0),
+  }))
   const [finding, setFinding] = useState(false)
   useShortcut('findChat', () => {
-    if (!mine || chat.messages.length === 0) return false
+    if (!mine || count === 0) return false
     setFinding(true)
   })
   /* A file an answer names opens beside the conversation, not over it. */
@@ -70,7 +79,6 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
   }, [tab.draft, tab.id, drafted])
 
   /* Named once after the first thing you said in it; a tab you renamed keeps your name. */
-  const said = chat.messages.find((one) => one.role === 'user')
   useEffect(() => {
     if (tab.title !== undefined || !said) return
     const name = titleOf(said.parts.map((part) => ('text' in part ? part.text : '')).join(''))
@@ -84,18 +92,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     wasSending.current = chat.sending
   }, [chat.sending, finished, tab.id])
 
-  const empty = chat.messages.length === 0 && !chat.error
+  const empty = count === 0 && !chat.error
 
   return (
     <>
-      <PaneCorner tabId={tab.id} what="chat">
-        <ChatCardChip card={chat.card} />
-        <ContextMeter context={chat.context} />
-        {chat.session ? <SessionCost sessionId={chat.session} className="pcorner__cost scost" /> : money(chat.cost) && <span className="pcorner__cost">{money(chat.cost)}</span>}
-        {chat.session && <CopySession id={chat.session} />}
-        {project?.orchestrator && <SessionsChip profileId={project.orchestrator} />}
-        {project && <RemoteToggle projectId={project.id} conversationId={tab.id} sending={chat.sending} supervised={ASKS(chat.permission)} />}
-      </PaneCorner>
+      <ChatCorner tabId={tab.id} card={chat.card} context={chat.context} session={chat.session} cost={chat.cost} orchestrator={project?.orchestrator ?? null} projectId={project?.id ?? null} sending={chat.sending} supervised={ASKS(chat.permission)} />
 
       <DropTarget mine={mine} onDrop={dropped} />
       <div className="scroll" ref={follow.box}>
@@ -110,7 +111,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
         )}
       </div>
 
-      {!empty && <PromptRail where={where} said={`${chat.messages.filter((one) => one.role === 'user').length}:${chat.sending}`} jump={jump} />}
+      {!empty && <PromptRail where={where} said={`${asked}:${chat.sending}`} jump={jump} />}
       {finding && <ChatFind where={where} box={follow.box} jump={jump} onDone={() => setFinding(false)} />}
 
       <Composer tab={tab} chat={chat} project={project ?? null} mine={mine} away={follow.away} toEnd={follow.toEnd} handle={composer} pasted={pasted} />
@@ -118,3 +119,37 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     </>
   )
 }
+
+/* The pane's corner, drawn again only when what it shows changed. */
+const ChatCorner = memo(function ChatCorner({
+  tabId,
+  card,
+  context,
+  session,
+  cost,
+  orchestrator,
+  projectId,
+  sending,
+  supervised,
+}: {
+  tabId: string
+  card: ChatCard | null
+  context: Context | null
+  session: string | null
+  cost: number
+  orchestrator: string | null
+  projectId: string | null
+  sending: boolean
+  supervised: boolean
+}): React.JSX.Element {
+  return (
+    <PaneCorner tabId={tabId} what="chat">
+      <ChatCardChip card={card} />
+      <ContextMeter context={context} />
+      {session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>}
+      {session && <CopySession id={session} />}
+      {orchestrator && <SessionsChip profileId={orchestrator} />}
+      {projectId && <RemoteToggle projectId={projectId} conversationId={tabId} sending={sending} supervised={supervised} />}
+    </PaneCorner>
+  )
+})

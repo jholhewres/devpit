@@ -1,18 +1,31 @@
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { Message } from '../gen/bindings'
 import { continuable, unanswered } from './chat'
+import { useMessage, useMessagesPick, type ChatMessages } from './chatMessages'
 import { Turn } from './Turn'
 import type { Reveal } from './useJump'
-import { GAP, useWindow } from './useWindow'
+import { estimate, GAP, useWindow } from './useWindow'
 
 /* A message's words, as the person sent them. */
-const textOf = (message: Message): string => message.parts.map((part) => ('text' in part ? part.text : '')).join('')
+const textOf = (message: Message | undefined): string => message?.parts.map((part) => ('text' in part ? part.text : '')).join('') ?? ''
+
+const idsOf = (all: readonly Message[]): string[] => all.map((one) => one.id)
+
+/* The messages a steer never reached the agent with, as the turns that ended say. */
+function lostOf(all: readonly Message[]): string[] {
+  const lost: string[] = []
+  for (const one of all) if (one.ended?.unheard?.length) lost.push(...one.ended.unheard)
+  return lost
+}
 
 /*
  * The conversation's messages, as a window over them: the rows near the view
  * are drawn, the rest are spacers of their height. A row is wrapped so it can
  * be measured whatever its turn draws.
+ *
+ * The thread reads only which messages there are; each row reads its own
+ * message, so a streamed batch draws the live turn and nothing else.
  */
 export function ChatThread({
   messages,
@@ -31,7 +44,7 @@ export function ChatThread({
   onResend,
   reveal,
 }: {
-  messages: readonly Message[]
+  messages: ChatMessages
   box: React.RefObject<HTMLDivElement | null>
   top: React.RefObject<HTMLDivElement | null>
   older: boolean
@@ -51,10 +64,21 @@ export function ChatThread({
   /** Where the thread hands up how to bring a message into view. */
   reveal?: React.RefObject<Reveal | null>
 }): React.JSX.Element {
-  const view = useWindow(messages, box)
-  const lost = useMemo(() => new Set(messages.flatMap((one) => one.ended?.unheard ?? [])), [messages])
+  const ids = useMessagesPick(messages, idsOf)
+  const lost = useMessagesPick(messages, lostOf)
+  const end = useMessagesPick(messages, (all) => ({ unanswered: unanswered(all, sending), continuable: continuable(all, sending) }))
+  const guess = useCallback((id: string) => estimate(messages.byId(id)), [messages])
+  const view = useWindow(ids, guess, box)
   /* Sent again from here: not offered twice. */
   const [resent, setResent] = useState<ReadonlySet<string>>(() => new Set())
+  const resend = useCallback(
+    (id: string) => {
+      setResent((was) => new Set(was).add(id))
+      onResend?.(textOf(messages.byId(id)))
+    },
+    [messages, onResend],
+  )
+  const offered = useMemo(() => new Set(onResend ? lost.filter((id) => !resent.has(id)) : []), [lost, resent, onResend])
   useLayoutEffect(() => {
     if (reveal) reveal.current = view.reveal
   }, [reveal, view.reveal])
@@ -64,25 +88,63 @@ export function ChatThread({
       {older && <div ref={top} className="thread__older" aria-hidden />}
       {older && stalled && <button className="thread__more" onClick={onMore}>Load earlier</button>}
       {view.before > 0 && <div className="thread__gap" style={{ height: view.before - GAP }} aria-hidden />}
-      {messages.slice(view.from, view.to).map((message) => (
-        <div className="trow" data-id={message.id} key={message.id}>
-          <Turn
-            message={message}
-            folder={folder}
-            onOpen={onOpen}
-            onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined}
-            onResend={
-              onResend && lost.has(message.id) && !resent.has(message.id)
-                ? () => (setResent((was) => new Set(was).add(message.id)), onResend(textOf(message)))
-                : undefined
-            }
-          />
-        </div>
+      {ids.slice(view.from, view.to).map((id) => (
+        <Row
+          key={id}
+          id={id}
+          messages={messages}
+          measure={view.measure}
+          folder={folder}
+          onOpen={onOpen}
+          rewindable={rewindable}
+          onRewind={onRewind}
+          onResend={offered.has(id) ? resend : undefined}
+        />
       ))}
       {view.after > 0 && <div className="thread__gap" style={{ height: view.after - GAP }} aria-hidden />}
-      {unanswered(messages, sending) && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
-      {continuable(messages, sending) && <button className="thread__go" onClick={onContinue}>Continue</button>}
+      {end.unanswered && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
+      {end.continuable && <button className="thread__go" onClick={onContinue}>Continue</button>}
       {error && <div className="exempty__t" role="alert">{error}</div>}
     </div>
   )
 }
+
+/* One message of the window, drawn again only when that message is replaced. */
+const Row = memo(function Row({
+  id,
+  messages,
+  measure,
+  folder,
+  onOpen,
+  rewindable,
+  onRewind,
+  onResend,
+}: {
+  id: string
+  messages: ChatMessages
+  measure: (id: string, row: HTMLElement) => void
+  folder: string | null
+  onOpen: (path: string) => void
+  rewindable: readonly string[]
+  onRewind: (turnId: string) => void
+  onResend?: (id: string) => void
+}): React.JSX.Element | null {
+  const message = useMessage(messages, id)
+  const row = useRef<HTMLDivElement>(null)
+  /* A turn that grew on its own: the window learns its height without drawing the thread. */
+  useLayoutEffect(() => {
+    if (row.current) measure(id, row.current)
+  })
+  if (!message) return null
+  return (
+    <div className="trow" data-id={id} ref={row}>
+      <Turn
+        message={message}
+        folder={folder}
+        onOpen={onOpen}
+        onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined}
+        onResend={onResend ? () => onResend(id) : undefined}
+      />
+    </div>
+  )
+})

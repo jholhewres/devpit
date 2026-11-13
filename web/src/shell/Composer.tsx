@@ -1,9 +1,10 @@
-import { useImperativeHandle, useRef } from 'react'
+import { memo, useImperativeHandle, useRef } from 'react'
 
 import type { Project } from '../gen/bindings'
 import { Asked } from './Asked'
 import { Chips } from './Chips'
 import { ready, withHeard } from './chat'
+import { useMessagesPick } from './chatMessages'
 import { ChatWhere } from './ChatWhere'
 import { ComposerFiles } from './ComposerFiles'
 import { ComposerStatus } from './ComposerStatus'
@@ -37,8 +38,10 @@ export type ComposerHandle = { put: (text: string) => void }
 /*
  * Where a message is written. Its own component, holding the text: a key
  * pressed here draws the composer again, never the conversation above it.
+ * Memoised, and it picks only the turn in flight from the messages: a
+ * streamed batch does not draw it.
  */
-export function Composer({
+export const Composer = memo(function Composer({
   tab,
   chat,
   project,
@@ -90,6 +93,7 @@ export function Composer({
     toEnd()
   }
   const recall = useRecall(chat.messages, prompt, setPrompt, chat.files.length > 0)
+  const streaming = useMessagesPick(chat.messages, (all) => all.find((one) => one.streaming)?.turnId ?? null)
 
   /* A stop holds the queue: it was meant for a turn that is no longer going
      to happen as planned, so nothing goes until the person says so. */
@@ -110,7 +114,7 @@ export function Composer({
      press that armed against a finished turn cannot stop the next one. */
   const showEsc = useStop(
     chat.sending && mine,
-    targetOf(tab.id, chat.messages.find((one) => one.streaming)?.turnId ?? null),
+    targetOf(tab.id, streaming),
     halt,
   )
 
@@ -169,4 +173,4 @@ export function Composer({
       </div>
     </div>
   )
-}
+})

@@ -127,8 +127,8 @@ describe("a chat's joined turns", () => {
       joins[0]!.onFrame(said('msg_from_a'))
       joins[1]!.onFrame(said('msg_from_b'))
     })
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_from_b'))
-    expect(result.current.messages.map((one) => one.id)).not.toContain('msg_from_a')
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_from_b'))
+    expect(result.current.messages.get().map((one) => one.id)).not.toContain('msg_from_a')
     expect(joins[0]!.leave).toHaveBeenCalled()
   })
 
@@ -172,36 +172,36 @@ describe("a chat's reads of the transcript", () => {
     saved.messages = [message('msg_1'), message('msg_2')]
     const { result } = renderHook(() => useChat('conv_a'))
     await waitFor(() => expect(joins).toHaveLength(1))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
-    const before = result.current.messages
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    const before = result.current.messages.get()
     act(() => joins[0]!.onFrame(said('msg_3')))
-    await waitFor(() => expect(result.current.messages).toHaveLength(3))
+    await waitFor(() => expect(result.current.messages.get()).toHaveLength(3))
 
     saved.after = [message('msg_3', 'as saved'), message('msg_4')]
     await act(async () => joins[0]!.ends(true))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_3', 'msg_4']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_3', 'msg_4']))
     expect(calls.chatAfter).toHaveBeenCalledWith('p', 'conv_a', 'msg_2', PAGE)
     expect(calls.chatHistory).toHaveBeenCalledTimes(1)
     // Not replaced: what was drawn before the join is the same objects.
-    expect(result.current.messages[0]).toBe(before[0])
-    expect(result.current.messages[1]).toBe(before[1])
-    expect(result.current.messages[2]!.parts).toEqual([{ kind: 'text', text: 'as saved', parent: null }])
+    expect(result.current.messages.get()[0]).toBe(before[0])
+    expect(result.current.messages.get()[1]).toBe(before[1])
+    expect(result.current.messages.get()[2]!.parts).toEqual([{ kind: 'text', text: 'as saved', parent: null }])
   })
 
   it('after a woken turn append from the last message drawn, not from the start', async () => {
     saved.messages = [message('msg_1'), message('msg_2')]
     const { result } = renderHook(() => useChat('conv_a'))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
-    const before = result.current.messages
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    const before = result.current.messages.get()
     act(() => woke.handler?.('conv_a'))
     await waitFor(() => expect(joins).toHaveLength(2))
 
     saved.after = [message('msg_3')]
     await act(async () => joins[1]!.ends(true))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_3']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_3']))
     expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_2', PAGE)
-    expect(result.current.messages[0]).toBe(before[0])
-    expect(result.current.messages[1]).toBe(before[1])
+    expect(result.current.messages.get()[0]).toBe(before[0])
+    expect(result.current.messages.get()[1]).toBe(before[1])
   })
 
   it('after a turn woken behind the chat’s own, read from before that turn: the woken one was saved first', async () => {
@@ -211,7 +211,7 @@ describe("a chat's reads of the transcript", () => {
     act(() => result.current.say('hello'))
     act(() => woke.handler?.('conv_a'))
     act(() => joins[0]!.onFrame(said('msg_mine')))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_mine'))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_mine'))
 
     saved.after = [message('msg_woken'), message('msg_mine')]
     await act(async () =>
@@ -220,20 +220,20 @@ describe("a chat's reads of the transcript", () => {
     await waitFor(() => expect(joins).toHaveLength(2))
     await act(async () => joins[1]!.ends(true))
     expect(calls.chatAfter).toHaveBeenLastCalledWith('p', 'conv_a', 'msg_1', PAGE)
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_woken'))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_woken'))
   })
 
   it('after a rejoin whose place was never saved, take the last page in place of what was drawn', async () => {
     saved.messages = [message('msg_1'), message('msg_2')]
     const { result } = renderHook(() => useChat('conv_a'))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
     act(() => joins[0]!.onFrame(said('never_saved')))
-    await waitFor(() => expect(result.current.messages).toHaveLength(3))
+    await waitFor(() => expect(result.current.messages.get()).toHaveLength(3))
 
     saved.found = false
     saved.after = [message('msg_2'), message('msg_3')]
     await act(async () => joins[0]!.ends(true))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_2', 'msg_3']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_2', 'msg_3']))
     expect(result.current.older).toBe(true)
   })
 
@@ -242,7 +242,7 @@ describe("a chat's reads of the transcript", () => {
     const { result } = renderHook(() => useChat('conv_a'))
     await waitFor(() => expect(result.current.profileId).toBe('claude'))
     act(() => joins[0]!.onFrame(said('never_saved')))
-    await waitFor(() => expect(result.current.messages).toHaveLength(3))
+    await waitFor(() => expect(result.current.messages.get()).toHaveLength(3))
 
     saved.found = false
     saved.after = [message('msg_1'), message('msg_2')]
@@ -252,10 +252,10 @@ describe("a chat's reads of the transcript", () => {
     // Sent while the read is still on its way.
     act(() => result.current.say('hello'))
     act(() => sending.onFrame(said('msg_sent')))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_sent'))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_sent'))
     await act(async () => release())
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).not.toContain('never_saved'))
-    expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_sent'])
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).not.toContain('never_saved'))
+    expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2', 'msg_sent'])
   })
 
   it('after a lost place, keep a message steered in while the last page was being read', async () => {
@@ -270,11 +270,11 @@ describe("a chat's reads of the transcript", () => {
     act(() => result.current.say('hello'))
     act(() => sending.onFrame(said('msg_sent')))
     await act(async () => void (await result.current.steer('more')))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_steered'))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_steered'))
     await act(async () => release())
     await waitFor(() => expect(calls.chatAfter).toHaveBeenCalled())
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_sent'))
-    expect(result.current.messages.map((one) => one.id)).toContain('msg_steered')
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_sent'))
+    expect(result.current.messages.get().map((one) => one.id)).toContain('msg_steered')
   })
 
   it('after a lost place, drop a message sent before the read began and never saved', async () => {
@@ -293,13 +293,13 @@ describe("a chat's reads of the transcript", () => {
     act(() => woke.handler?.('conv_a'))
     await waitFor(() => expect(joins).toHaveLength(2))
     await act(async () => joins[1]!.ends(true))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1']))
   })
 
   it('after a lost place, drop what streamed and was never saved, and an older page loaded meanwhile', async () => {
     saved.messages = [message('msg_1'), message('msg_2')]
     const { result } = renderHook(() => useChat('conv_a'))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
     saved.found = false
     saved.after = [message('msg_1'), message('msg_2')]
     let release: () => void = () => {}
@@ -311,7 +311,7 @@ describe("a chat's reads of the transcript", () => {
     })
     act(() => result.current.took([message('old_0')], true))
     await act(async () => release())
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toEqual(['msg_1', 'msg_2']))
   })
 
   it('leave rewind working: the head names the turns, and rewinding forks', async () => {
@@ -350,13 +350,13 @@ describe('a queued message steered into the turn in flight', () => {
     act(() => result.current.keep({ name: 'mine.ts', path: 'src/mine.ts', kind: 'ts' }))
     act(() => result.current.say('hello'))
     act(() => sending.onFrame(said('msg_answer')))
-    await waitFor(() => expect(result.current.messages.map((one) => one.id)).toContain('msg_answer'))
+    await waitFor(() => expect(result.current.messages.get().map((one) => one.id)).toContain('msg_answer'))
 
     const picture = { name: 'pasted-2.png', path: '/h/pasted/pasted-2.png', kind: 'png' }
     act(() => result.current.keep({ name: 'next.ts', path: 'src/next.ts', kind: 'ts' }))
     await act(async () => void (await result.current.steer('and this', { files: [picture], skills: [] })))
     expect(calls.chatSteer).toHaveBeenCalledWith('p', 'conv_a', '@/h/pasted/pasted-2.png\nand this')
-    const ids = result.current.messages.map((one) => one.id)
+    const ids = result.current.messages.get().map((one) => one.id)
     expect(ids.indexOf('msg_steered')).toBeLessThan(ids.indexOf('msg_answer'))
     expect(result.current.files.map((one) => one.path)).toEqual(['src/next.ts'])
   })

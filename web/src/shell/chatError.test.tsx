@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { Message } from '../gen/bindings'
+import { chatMessages } from './chatMessages'
 import { ChatPane } from './ChatPane'
 
 afterEach(cleanup)
@@ -9,10 +11,10 @@ const said = vi.fn()
 const taken = vi.fn()
 
 const chat = {
-  messages: [
+  messages: chatMessages([
     { id: 'm1', turnId: null, role: 'user', parts: [], createdAt: 0, streaming: false },
     { id: 'm2', turnId: null, role: 'assistant', parts: [], createdAt: 0, streaming: false },
-  ],
+  ] as Message[]),
   rewindable: [],
   files: [],
   skills: [],

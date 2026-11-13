@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Ask, Attachment, Context, Message, Profile, Question } from '../gen/bindings'
 import type { Said } from './Asked'
 import type { Chosen } from './choices'
 import { appended, appliedAll, ASKS, batched, failedOn, prepended, retaken, fixedTo, MODES, opening, rejoin, send, settled, steered, withFiles, type Opening } from './chat'
+import { chatMessages, type ChatMessages } from './chatMessages'
 import { conversationKey, remember, reopened, type Modes } from './chatModes'
 import { ask, commands } from './live'
 import { PAGE } from './useOlder'
@@ -24,7 +25,8 @@ export interface ChatCard {
 }
 
 export interface Chat {
-  readonly messages: readonly Message[]
+  /** Read by picking what is needed: a streamed batch then draws only its turn. */
+  readonly messages: ChatMessages
   readonly card: ChatCard | null
   readonly profiles: readonly Profile[]
   /** The profile this conversation belongs to, once it has spoken. */
@@ -94,20 +96,19 @@ const pickable = (all: readonly Profile[], belongs: string | null): Profile[] =>
 
 export function useChat(conversationId: string): Chat {
   const { project, show } = useShellPick((shell) => ({ project: shell.project, show: shell.show }))
-  const [messages, setMessages] = useState<readonly Message[]>([])
+  const [messages] = useState(() => chatMessages())
+  const setMessages = messages.set
   /* Whether messages older than the first one drawn are left in the transcript. */
   const [older, setOlder] = useState(false)
-  const took = useCallback((page: readonly Message[], more: boolean) => {
-    setMessages((was) => prepended(was, page))
-    setOlder(more)
-  }, [])
-  /* What is drawn, for a join to know the last message it need not read again. */
-  const shown = useRef<readonly Message[]>([])
+  const took = useCallback(
+    (page: readonly Message[], more: boolean) => {
+      setMessages((was) => prepended(was, page))
+      setOlder(more)
+    },
+    [setMessages],
+  )
   /* The messages this chat drew itself — a send's, a steer's, a receipt — which a page read meanwhile cannot hold. */
   const sent = useRef(new Set<string>())
-  useEffect(() => {
-    shown.current = messages
-  }, [messages])
   const [rewindable, setRewindable] = useState<readonly string[]>([])
   const [skills, setSkills] = useState<readonly string[]>([])
   const [profiles, setProfiles] = useState<readonly Profile[]>([])
@@ -151,13 +152,15 @@ export function useChat(conversationId: string): Chat {
   /* A turn still running when this chat opens — it was left, or the window
      reloaded — is joined where it is, instead of being said to have died. */
   const rejoined = useCallback(
-    (projectId: string, woken = false, before = shown.current.at(-1)?.id ?? null): void => {
+    (projectId: string, woken = false, before = messages.get().at(-1)?.id ?? null): void => {
       const now = opened.current
       const { push, flush } = batched((frames) => setMessages((was) => appliedAll(was, frames)))
+      /* Said once: set again on every frame, it drew the pane again for nothing. */
+      let told = false
       const joined = now.join(
         rejoin(conversationId, (frame) => {
           if (!now.open()) return
-          setSending(true)
+          if (!told) setSending((told = true))
           if (frame.type === 'session') setSession(frame.session_id)
           else push(frame)
         }),
@@ -195,7 +198,7 @@ export function useChat(conversationId: string): Chat {
            then there is nobody left to tell. */
         .catch(() => undefined)
     },
-    [conversationId, over],
+    [conversationId, over, messages, setMessages],
   )
 
   useEffect(() => {
@@ -236,7 +239,7 @@ export function useChat(conversationId: string): Chat {
       setError(past.error ?? found.error)
     })()
     return now.close
-  }, [project, conversationId, rejoined])
+  }, [project, conversationId, rejoined, setMessages])
 
   /* Reopened, a conversation goes back to the mode it ran in; a new one to the
      last pick on its profile, instead of the most careful mode every time. */
@@ -312,7 +315,7 @@ export function useChat(conversationId: string): Chat {
         )
       })
     },
-    [asked, project, conversationId],
+    [asked, project, conversationId, setMessages],
   )
 
   /* Picked for one message, like the attachments: a skill left on would
@@ -343,7 +346,7 @@ export function useChat(conversationId: string): Chat {
       }
       const now = opened.current
       /* A turn woken while this one waits is saved before it: read from here. */
-      const drawn = shown.current.at(-1)?.id ?? null
+      const drawn = messages.get().at(-1)?.id ?? null
       const { push, flush } = batched((frames) => setMessages((was) => appliedAll(was, frames)))
       let heard = false
       let answer: string | null = null
@@ -405,7 +408,7 @@ export function useChat(conversationId: string): Chat {
           }
         })
     },
-    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined, clearExtras, over],
+    [project, conversationId, profileId, model, permission, effort, files, skills, rejoined, clearExtras, over, messages, setMessages],
   )
 
   /* A dropped file is resolved against the project root before it is shown:
@@ -511,62 +514,84 @@ export function useChat(conversationId: string): Chat {
       }
       return said.data !== null
     },
-    [project, conversationId, files, skills, clearExtras],
+    [project, conversationId, files, skills, clearExtras, setMessages],
   )
 
-  return {
-    messages,
-    card,
-    /* In an orchestrator the one account it belongs to is the only choice. */
-    profiles: project?.orchestrator ? profiles.filter((one) => one.id === project.orchestrator) : profiles,
-    fixed,
-    profileId,
-    model,
-    cost,
-    context,
-    permission,
-    effort,
-    folder,
-    files,
-    asked,
-    sending,
-    failed,
-    error,
-    /* Another account is another installation, whose skills are not these:
-       a pill picked on one would name nothing on the other. */
-    pick: (next: string) => {
+  /* Another account is another installation, whose skills are not these:
+     a pill picked on one would name nothing on the other. */
+  const pick = useCallback(
+    (next: string) => {
       if (next !== profileId) setSkills([])
       setProfileId(next)
     },
-    setModel,
-    setPermission: (mode: string) => {
+    [profileId],
+  )
+  const choosePermission = useCallback(
+    (mode: string) => {
       setPermission(mode)
       remember(conversationKey(conversationId), { permission: mode })
       if (profileId) remember(profileId, { permission: mode })
     },
-    setEffort: (next: string) => {
+    [conversationId, profileId],
+  )
+  const chooseEffort = useCallback(
+    (next: string) => {
       setEffort(next)
       remember(conversationKey(conversationId), { effort: next })
       if (profileId) remember(profileId, { effort: next })
     },
-    attach,
-    paste,
-    keep,
-    previews,
-    skills,
-    setSkills,
-    session,
-    older,
-    took,
-    rewindable,
-    rewind,
-    detach,
-    answer,
-    say,
-    steer,
-    clearExtras,
-    stop,
-    forceable: sending && stopped && late && !forced,
-    force,
-  }
+    [conversationId, profileId],
+  )
+  /* In an orchestrator the one account it belongs to is the only choice. */
+  const offered = useMemo(
+    () => (project?.orchestrator ? profiles.filter((one) => one.id === project.orchestrator) : profiles),
+    [project?.orchestrator, profiles],
+  )
+  const forceable = sending && stopped && late && !forced
+
+  /* One object while nothing in it changed: the composer is memoised on it. */
+  return useMemo(
+    () => ({
+      messages,
+      card,
+      profiles: offered,
+      fixed,
+      profileId,
+      model,
+      cost,
+      context,
+      permission,
+      effort,
+      folder,
+      files,
+      asked,
+      sending,
+      failed,
+      error,
+      pick,
+      setModel,
+      setPermission: choosePermission,
+      setEffort: chooseEffort,
+      attach,
+      paste,
+      keep,
+      previews,
+      skills,
+      setSkills,
+      session,
+      older,
+      took,
+      rewindable,
+      rewind,
+      detach,
+      answer,
+      say,
+      steer,
+      clearExtras,
+      stop,
+      forceable,
+      force,
+    }),
+    [messages, card, offered, fixed, profileId, model, cost, context, permission, effort, folder, files, asked, sending, failed, error, pick, choosePermission, chooseEffort, attach, paste, keep, previews, skills, session, older, took, rewindable, rewind, detach, answer, say, steer, clearExtras, stop, forceable, force],
+  )
 }

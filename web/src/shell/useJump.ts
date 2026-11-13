@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 
 import type { Message } from '../gen/bindings'
+import type { ChatMessages } from './chatMessages'
 import { pagesUntil } from './chatSearch'
 import { ask, commands } from './live'
 import type { Windowed } from './useWindow'
@@ -14,7 +15,7 @@ export type Reveal = Windowed['reveal']
    drawn when it is not there yet; whether it got there. */
 export function useJump(
   where: { projectId: string; conversationId: string } | null,
-  chat: { messages: readonly Message[]; older: boolean; took: (page: readonly Message[], older: boolean) => void },
+  chat: { messages: ChatMessages; older: boolean; took: (page: readonly Message[], older: boolean) => void },
   hold: () => void,
   reveal: React.RefObject<Reveal | null>,
 ): (id: string, then?: (row: HTMLElement) => void) => Promise<boolean> {
@@ -23,8 +24,9 @@ export function useJump(
   return useCallback(
     async (id, then) => {
       const now = latest.current
-      if (!now.messages.some((one) => one.id === id)) {
-        const first = now.messages[0]?.id
+      const drawn = now.messages.get()
+      if (!drawn.some((one) => one.id === id)) {
+        const first = drawn[0]?.id
         if (!where || !first || !now.older) return false
         const got = await pagesUntil(id, first, async (before) => {
           const page = await ask(() => commands.chatHistory(where.projectId, where.conversationId, JUMP_PAGE, before))

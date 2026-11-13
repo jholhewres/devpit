@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react'
+import { createContext, useContext } from 'react'
 
+import { usePicked, type Store } from './picked'
 import type { Shell } from './shape'
 import { useShell } from './useShell'
 
@@ -15,10 +16,9 @@ import { useShell } from './useShell'
  * again only when what `pick` returns changes — compared field by field, so a
  * pick that builds `{ show, project }` is stable while both are.
  */
-export interface ShellStore {
-  get(): Shell
-  subscribe(listener: () => void): () => void
-}
+export type ShellStore = Store<Shell>
+
+export { shallowEqual } from './picked'
 
 export const ShellStoreContext = createContext<ShellStore | null>(null)
 
@@ -40,14 +40,6 @@ export function createShellStore(first: Shell): ShellStore & { put(next: Shell):
   }
 }
 
-export function shallowEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
-  const left = Object.keys(a)
-  if (left.length !== Object.keys(b).length) return false
-  return left.every((key) => Object.is((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
-}
-
 export function useShellPick<T>(pick: (shell: Shell) => T): T {
   const store = useContext(ShellStoreContext)
   /* No store is a tree without the provider — a test that stands the shell
@@ -55,22 +47,6 @@ export function useShellPick<T>(pick: (shell: Shell) => T): T {
      so the hooks below run in the same order on every render of it. */
   if (!store) return pick(useShell())
   return usePicked(store, pick)
-}
-
-function usePicked<T>(store: ShellStore, pick: (shell: Shell) => T): T {
-  /* The latest `pick`, read on every snapshot: one written inline over a prop
-     — a pane's id — is a new closure each render, and the snapshot has to
-     pick with the prop as it is now. */
-  const picking = useRef(pick)
-  picking.current = pick
-  const last = useRef<{ value: T } | null>(null)
-  const snapshot = useCallback(() => {
-    const next = picking.current(store.get())
-    if (last.current && shallowEqual(last.current.value, next)) return last.current.value
-    last.current = { value: next }
-    return next
-  }, [store])
-  return useSyncExternalStore(store.subscribe, snapshot, snapshot)
 }
 
 /* What the window's frame reads: a slice, not the whole shell — it draws

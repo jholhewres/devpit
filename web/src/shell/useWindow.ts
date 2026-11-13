@@ -18,18 +18,42 @@ export const MOST = 60
 /* Rows a conversation opens with, before anything is measured. */
 export const FIRST = 16
 
-/* Kept per message: the spacers sum every row on each streamed frame, and only the growing one is new. */
-const guessed = new WeakMap<Message, number>()
-
 /* A row's height before it was ever drawn, by what it holds. */
-export function estimate(message: Message): number {
-  const known = guessed.get(message)
-  if (known !== undefined) return known
+export function estimate(message: Message | undefined): number {
+  if (!message) return GAP
   const text = message.parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)
   const acts = message.parts.filter((part) => part.kind !== 'text').length
-  const height = message.role === 'user' ? 48 + 22 * Math.ceil(text / 90) + GAP : 64 + 28 * Math.min(acts, 6) + 22 * Math.ceil(text / 110) + GAP
-  guessed.set(message, height)
-  return height
+  return message.role === 'user' ? 48 + 22 * Math.ceil(text / 90) + GAP : 64 + 28 * Math.min(acts, 6) + 22 * Math.ceil(text / 110) + GAP
+}
+
+/* The two spacers, carried from the draw before. */
+export type Spacers = {
+  readonly ids: readonly string[]
+  readonly from: number
+  readonly to: number
+  /** Height of the rows above `from`, and from `to` on. */
+  readonly before: number
+  readonly after: number
+}
+
+const extends_ = (ids: readonly string[], was: readonly string[]): boolean =>
+  ids === was || (was.length <= ids.length && was.every((id, at) => ids[at] === id))
+
+/* The spacers for rows `from`..`to` of `ids`, from the last ones: a window
+   that moved adds and takes off only the rows that crossed its edges, and
+   messages added at the end only themselves. Anything else is summed again.
+   It holds because a row out of view is never measured: its height is the
+   one it left with. */
+export function spacers(was: Spacers | null, ids: readonly string[], from: number, to: number, height: (at: number) => number): Spacers {
+  const sum = (start: number, end: number): number => {
+    let total = 0
+    for (let at = start; at < end; at += 1) total += height(at)
+    return total
+  }
+  if (!was || !extends_(ids, was.ids)) return { ids, from, to, before: sum(0, from), after: sum(to, ids.length) }
+  const before = was.before + (from >= was.from ? sum(was.from, from) : -sum(from, was.from))
+  const after = was.after + sum(was.ids.length, ids.length) + (to >= was.to ? -sum(was.to, to) : sum(to, was.to))
+  return { ids, from, to, before, after }
 }
 
 /* The rows that cover `over` past each edge of the view, `top` being where it starts. */
@@ -56,27 +80,34 @@ export type Windowed = {
   readonly after: number
   /** Draws the message `id`, once it is among the messages, and brings it into view. */
   readonly reveal: (id: string, then?: (row: HTMLElement) => void) => void
+  /** A row drawn again on its own says how tall it is now. */
+  readonly measure: (id: string, row: HTMLElement) => void
 }
 
 /* The rows drawn to show message `at`: a couple above it, and enough below. */
-export function spanAround(messages: readonly Message[], at: number): Span {
+export function spanAround(ids: readonly string[], at: number): Span {
   const from = Math.max(0, at - 2)
   const count = Math.max(FIRST, at - from + 1)
-  const tail = from + count >= messages.length
-  return { tail, first: tail ? null : (messages[from]?.id ?? null), count }
+  const tail = from + count >= ids.length
+  return { tail, first: tail ? null : (ids[from] ?? null), count }
 }
 
-export function rangeOf(messages: readonly Message[], span: Span): { from: number; to: number } {
-  const at = span.tail || span.first === null ? -1 : messages.findIndex((one) => one.id === span.first)
-  if (at < 0) return { from: Math.max(0, messages.length - span.count), to: messages.length }
-  return { from: at, to: Math.min(messages.length, at + span.count) }
+export function rangeOf(ids: readonly string[], span: Span): { from: number; to: number } {
+  const at = span.tail || span.first === null ? -1 : ids.indexOf(span.first)
+  if (at < 0) return { from: Math.max(0, ids.length - span.count), to: ids.length }
+  return { from: at, to: Math.min(ids.length, at + span.count) }
 }
 
-export function useWindow(messages: readonly Message[], box: React.RefObject<HTMLElement | null>): Windowed {
+/* `ids` are the messages in order; `guess` is a row's height before it is drawn. */
+export function useWindow(ids: readonly string[], guess: (id: string) => number, box: React.RefObject<HTMLElement | null>): Windowed {
   const sizes = useRef(new Map<string, number>())
+  /* Guessed once: a spacer carries a row's height while it is out of view, and it must not move there. */
+  const guesses = useRef(new Map<string, number>())
+  const guessing = useRef(guess)
+  guessing.current = guess
   const [span, setSpan] = useState<Span>({ tail: true, first: null, count: FIRST })
-  const latest = useRef({ messages, span })
-  latest.current = { messages, span }
+  const latest = useRef({ ids, span })
+  latest.current = { ids, span }
   /* A row on screen and where it sat, kept across a move that draws rows above it. */
   const anchor = useRef<{ id: string; at: number } | null>(null)
   /* A message asked to be shown, waiting for its page or its draw. */
@@ -87,18 +118,26 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
     nudge((n) => n + 1)
   }, [])
 
-  const height = useCallback((one: Message) => sizes.current.get(one.id) ?? estimate(one), [])
-  const { from, to } = rangeOf(messages, span)
-  let before = 0
-  for (let at = 0; at < from; at += 1) before += height(messages[at]!)
-  let after = 0
-  for (let at = to; at < messages.length; at += 1) after += height(messages[at]!)
+  const height = useCallback((id: string) => {
+    const measured = sizes.current.get(id)
+    if (measured !== undefined) return measured
+    let guessed = guesses.current.get(id)
+    if (guessed === undefined) guesses.current.set(id, (guessed = guessing.current(id)))
+    return guessed
+  }, [])
+  const { from, to } = rangeOf(ids, span)
+  const kept = useRef<Spacers | null>(null)
+  kept.current = spacers(kept.current, ids, from, to, (at) => height(ids[at]!))
+  const { before, after } = kept.current
+  const measure = useCallback((id: string, row: HTMLElement) => {
+    if (row.offsetHeight > 0) sizes.current.set(id, row.offsetHeight + GAP)
+  }, [])
 
   const look = useCallback(() => {
     const scroll = box.current
     /* Not laid out (a hidden tab): nothing to measure the view against. */
     if (!scroll || scroll.clientHeight === 0) return
-    const { messages: list, span: now } = latest.current
+    const { ids: list, span: now } = latest.current
     const heights = list.map(height)
     const drawn = rangeOf(list, now)
     const need = spanAt(heights, scroll.scrollTop, scroll.clientHeight, OVER / 2)
@@ -110,20 +149,18 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
       anchor.current = row?.dataset.id ? { id: row.dataset.id, at: row.getBoundingClientRect().top - top } : null
     }
     const tail = next.to >= list.length
-    setSpan({ tail, first: tail ? null : (list[next.from]?.id ?? null), count: next.to - next.from })
+    setSpan({ tail, first: tail ? null : (list[next.from] ?? null), count: next.to - next.from })
   }, [box, height])
 
   /* Measured after every draw, and the row read before a move put back where it was. */
   useLayoutEffect(() => {
     const scroll = box.current
     if (!scroll) return
-    for (const row of Array.from(scroll.querySelectorAll<HTMLElement>('.trow'))) {
-      if (row.dataset.id && row.offsetHeight > 0) sizes.current.set(row.dataset.id, row.offsetHeight + GAP)
-    }
+    for (const row of Array.from(scroll.querySelectorAll<HTMLElement>('.trow'))) if (row.dataset.id) measure(row.dataset.id, row)
     const want = wanted.current
     if (want) {
       const row = Array.from(scroll.querySelectorAll<HTMLElement>('.trow')).find((one) => one.dataset.id === want.id)
-      const at = latest.current.messages.findIndex((one) => one.id === want.id)
+      const at = latest.current.ids.indexOf(want.id)
       if (row) {
         wanted.current = null
         anchor.current = null
@@ -134,7 +171,7 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
       // Drawn on the next render; a page still on its way is waited for, a few moves at most.
       if (at >= 0 && want.moved < 3) {
         want.moved += 1
-        setSpan(spanAround(latest.current.messages, at))
+        setSpan(spanAround(latest.current.ids, at))
         return
       }
       if (at >= 0) wanted.current = null
@@ -154,7 +191,7 @@ export function useWindow(messages: readonly Message[], box: React.RefObject<HTM
   }, [box, look])
 
   /* A page above, or a reply growing, can leave the view short of rows. */
-  useEffect(look, [messages.length, look])
+  useEffect(look, [ids.length, look])
 
-  return { from, to, before, after, reveal }
+  return { from, to, before, after, reveal, measure }
 }

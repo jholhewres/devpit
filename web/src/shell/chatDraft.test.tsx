@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { chatMessages } from './chatMessages'
 import { ChatPane } from './ChatPane'
 import { drafted, type Strip } from './strip'
 
@@ -10,7 +11,7 @@ const said = vi.fn()
 const taken = vi.fn()
 
 const chat = {
-  messages: [],
+  messages: chatMessages(),
   rewindable: [],
   files: [],
   skills: [],

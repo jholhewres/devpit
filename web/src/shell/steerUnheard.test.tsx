@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../gen/bindings'
+import { chatMessages } from './chatMessages'
 import { ChatThread } from './ChatThread'
 
 vi.mock('./shellStore', () => ({ useShellPick: () => () => undefined }))
@@ -24,7 +25,7 @@ function thread(unheard: string[], onResend: (text: string) => void) {
   } as Message
   const messages = [said('u1', 'fix the board', 't1'), said('u2', 'and the lane too', null), answer]
   return render(
-    <ChatThread messages={messages} box={{ current: null }} top={{ current: null }} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={nothing} onResend={onResend} />,
+    <ChatThread messages={chatMessages(messages)} box={{ current: null }} top={{ current: null }} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={nothing} onResend={onResend} />,
   )
 }
 

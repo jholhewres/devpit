@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../gen/bindings'
+import { chatMessages } from './chatMessages'
 import { ChatPane } from './ChatPane'
 
 afterEach(cleanup)
@@ -21,7 +22,7 @@ const messages = Array.from(
 
 const nothing = vi.fn()
 const chat = {
-  messages, rewindable: [], files: [], skills: [], previews: {}, asked: [], error: null, sending: false,
+  messages: chatMessages(messages), rewindable: [], files: [], skills: [], previews: {}, asked: [], error: null, sending: false,
   profileId: 'prof_1', profiles: [], cost: 0, session: null, card: null, older: false, folder: null,
   say: nothing, stop: nothing, answer: nothing, detach: nothing, attach: nothing, paste: nothing, setSkills: nothing, rewind: nothing, took: nothing,
 }

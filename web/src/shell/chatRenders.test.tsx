@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Frame, Message } from '../gen/bindings'
+import { chatMessages, type ChatMessages } from './chatMessages'
 import { ChatThread } from './ChatThread'
 import { appliedAll } from './frames'
 
@@ -41,7 +42,7 @@ const live = {
 
 const nothing = (): void => {}
 
-function Thread({ messages }: { messages: readonly Message[] }): React.JSX.Element {
+function Thread({ messages }: { messages: ChatMessages }): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   const top = useRef<HTMLDivElement>(null)
   return (
@@ -63,16 +64,15 @@ afterEach(() => {
 
 describe('an answer streaming into a long thread', () => {
   it('draws no finished turn, and no closed block of its own, again for 500 frames of text', () => {
-    let messages: readonly Message[] = [...Array.from({ length: 199 }, (_, at) => message(at)), live]
-    const view = render(<Thread messages={messages} />)
+    const messages = chatMessages([...Array.from({ length: 199 }, (_, at) => message(at)), live])
+    render(<Thread messages={messages} />)
     expect(drawn.get('m197')).toBe(1)
     drawn.clear()
     read.length = 0
 
     for (let at = 0; at < 500; at += 1) {
       const frame = { type: 'part', message_id: 'live', part: { kind: 'text', text: ' word', parent: null } } as Frame
-      messages = appliedAll(messages, [frame])
-      act(() => view.rerender(<Thread messages={messages} />))
+      act(() => messages.set((was) => appliedAll(was, [frame])))
     }
 
     expect(drawn.get('live')).toBeGreaterThan(400)

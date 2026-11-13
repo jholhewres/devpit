@@ -11,30 +11,33 @@ export function useTaking(chat: { paste: (file: Blob) => void; attach: (paths: r
   pasted: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
   dropped: (dropped: { paths: readonly string[]; files: readonly File[] }) => void
 } {
+  const { paste: keep, attach } = chat
   /* A picture pasted into the composer is an attachment. WebKitGTK leaves it
      out of the paste event, so a paste with neither a picture nor text asks
      the system clipboard itself — which is where a screenshot tool put it. */
-  const pasted = (event: React.ClipboardEvent<HTMLTextAreaElement>): void => {
-    const picture = pastedPicture(event.clipboardData)
-    if (picture) {
+  const pasted = useCallback(
+    (event: React.ClipboardEvent<HTMLTextAreaElement>): void => {
+      const picture = pastedPicture(event.clipboardData)
+      if (picture) {
+        event.preventDefault()
+        return keep(picture)
+      }
+      const text = event.clipboardData?.getData('text/plain') ?? ''
+      /* Kept as a file and attached, never put in the field: the field would
+         lay out every line of it before the paste returned. */
+      if (pastedAsFile(text)) {
+        event.preventDefault()
+        return keep(new Blob([text], { type: 'text/plain' }))
+      }
+      if (text) return
       event.preventDefault()
-      return chat.paste(picture)
-    }
-    const text = event.clipboardData?.getData('text/plain') ?? ''
-    /* Kept as a file and attached, never put in the field: the field would
-       lay out every line of it before the paste returned. */
-    if (pastedAsFile(text)) {
-      event.preventDefault()
-      return chat.paste(new Blob([text], { type: 'text/plain' }))
-    }
-    if (text) return
-    event.preventDefault()
-    void clipboardPng().then((png) => png && chat.paste(png))
-  }
+      void clipboardPng().then((png) => png && keep(png))
+    },
+    [keep],
+  )
   /* Pictures dropped in are kept like a pasted one, wherever they came from,
      when the chat can keep them; other files are attached by path, and only
      from inside the project. */
-  const { paste: keep, attach } = chat
   const dropped = useCallback(
     ({ paths, files }: { paths: readonly string[]; files: readonly File[] }) => {
       const pictures = files.filter(keptAsPicture)
