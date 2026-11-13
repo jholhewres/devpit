@@ -14,8 +14,9 @@ pub enum IslandDrawn {
     Above,
     /// A Wayland layer anchored to the top (KDE, Hyprland, Sway).
     Layer,
-    /// A Wayland window that refuses focus, wherever the compositor puts it:
-    /// GNOME, or no `libgtk-layer-shell`.
+    /// An ordinary Wayland window, wherever the compositor puts it: GNOME, or
+    /// no `libgtk-layer-shell`. GTK cannot keep it from taking focus or from
+    /// standing in for devpit's window, so it opens only when asked for.
     Plain,
 }
 
@@ -23,6 +24,8 @@ pub enum IslandDrawn {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct IslandHow {
     pub drawn: IslandDrawn,
+    /// Whether the person asked for the island where it is [`IslandDrawn::Plain`].
+    pub anyway: bool,
 }
 
 /// What a tool is about to touch, read from its input, for the preview.

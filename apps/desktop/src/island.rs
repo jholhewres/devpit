@@ -16,9 +16,10 @@
 //!   island, decided by a poll that only runs while the island is shown.
 //!
 //! **Wayland** cannot place a window or keep it on top: there the island is a
-//! layer where the compositor has layer-shell, and an ordinary window that
-//! never takes focus where it does not (GNOME) — see `island_wayland`. Which
-//! of the two a start is on is `display_backend`'s choice.
+//! layer where the compositor has layer-shell. Where it does not (GNOME) it
+//! can only be an ordinary window, which GTK cannot keep from taking focus,
+//! so it opens there only when asked for — see `island_wayland`. Which of
+//! the two a start is on is `display_backend`'s choice.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -105,7 +106,7 @@ pub fn apply(app: &tauri::AppHandle) {
         .map(|settings| settings.island.unwrap_or(true))
         .unwrap_or(false);
     let open = app.get_webview_window(ISLAND);
-    match (wanted && placeable(), open) {
+    match (opens(wanted, drawn(), asked_anyway()) && placeable(), open) {
         (true, None) => {
             if let Err(err) = made(app) {
                 eprintln!("the island did not open: {err}");
@@ -116,6 +117,25 @@ pub fn apply(app: &tauri::AppHandle) {
         }
         _ => {}
     }
+}
+
+/// Whether the island opens: wanted, and asked for anyway where it would be an
+/// ordinary window that takes focus from devpit's.
+pub(crate) fn opens(wanted: bool, drawn: devpit_rpc::IslandDrawn, anyway: bool) -> bool {
+    wanted && (drawn != devpit_rpc::IslandDrawn::Plain || anyway)
+}
+
+/// Whether the person asked for the island where it is a plain window.
+fn asked_anyway() -> bool {
+    devpit_core::Store::open_default()
+        .ok()
+        .and_then(|store| {
+            store
+                .preference_flag(devpit_core::preference::ISLAND_ANYWAY)
+                .ok()
+        })
+        .flatten()
+        .unwrap_or(false)
 }
 
 /// Whether the island can open on this screen: X11, or Wayland as a layer or
@@ -474,16 +494,43 @@ pub(crate) fn note_drawn() {
     let _ = DRAWN.set(drawn);
 }
 
+fn drawn() -> devpit_rpc::IslandDrawn {
+    DRAWN
+        .get()
+        .copied()
+        .unwrap_or(devpit_rpc::IslandDrawn::Above)
+}
+
 /// `island.drawn` — how the island is drawn on this desktop.
 #[tauri::command]
 #[specta::specta]
-pub fn island_drawn() -> devpit_rpc::IslandHow {
+pub async fn island_drawn() -> devpit_rpc::IslandHow {
+    let anyway = crate::off_main::blocking(|| Ok(asked_anyway()))
+        .await
+        .unwrap_or(false);
     devpit_rpc::IslandHow {
-        drawn: DRAWN
-            .get()
-            .copied()
-            .unwrap_or(devpit_rpc::IslandDrawn::Above),
+        drawn: drawn(),
+        anyway,
     }
+}
+
+/// `island.anyway_set` — the island where it is a plain window, on or off.
+#[tauri::command]
+#[specta::specta]
+pub async fn island_anyway_set(
+    app: tauri::AppHandle,
+    on: bool,
+) -> Result<devpit_rpc::IslandHow, RpcError> {
+    crate::off_main::blocking(move || {
+        Ok(devpit_core::Store::open_default()?
+            .set_preference_flag(devpit_core::preference::ISLAND_ANYWAY, on)?)
+    })
+    .await?;
+    island_apply(app).await?;
+    Ok(devpit_rpc::IslandHow {
+        drawn: drawn(),
+        anyway: on,
+    })
 }
 
 /// `island.now` — every session the island would draw, asked as it mounts.
