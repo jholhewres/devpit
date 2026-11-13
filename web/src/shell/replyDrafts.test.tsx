@@ -84,4 +84,27 @@ describe('a reply the orchestrator drafted', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send as you' }))
     await waitFor(() => screen.getByText(/not in front in that terminal/))
   })
+
+  it('sends every draft waiting on one click, each as the person last typed it', async () => {
+    const onDone = vi.fn()
+    render(
+      <ReplyDrafts
+        profileId="claude"
+        sessions={[live('api-a', { draft: 'go on' }), live('api-b', { draft: 'run the tests' }), live('api-c', { draft: 'merge it', pane: null })]}
+        onDone={onDone}
+      />,
+    )
+    fireEvent.change(screen.getByLabelText('Reply to api-b, as you'), { target: { value: 'run the tests, then stop' } })
+    expect(replied).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Send all 2 as you' }))
+    await waitFor(() => expect(replied).toHaveBeenCalledTimes(2))
+    expect(replied).toHaveBeenCalledWith('claude', 'api-a', 'go on', 'the chat')
+    expect(replied).toHaveBeenCalledWith('claude', 'api-b', 'run the tests, then stop', 'the chat')
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+  })
+
+  it('offers no send-all for a single draft', () => {
+    render(<ReplyDrafts profileId="claude" sessions={[live('api-a', { draft: 'go on' })]} onDone={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /Send all/ })).toBeNull()
+  })
 })
