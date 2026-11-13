@@ -23,6 +23,10 @@
 #   DEVPIT_FORMAT=appimage  on Linux, take the AppImage even where apt exists
 #   DEVPIT_DRY_RUN=1        download and verify, then say what would happen
 #
+# On a terminal it draws a banner, a progress bar and each step, in colour
+# unless NO_COLOR is set. Piped, in CI or with TERM=dumb it prints plain
+# `devpit:` lines, so a log reads the same as ever.
+#
 # Everything is inside `main`, called on the last line: a download cut off
 # half way through is then a script that defines a function and runs nothing,
 # rather than one that runs its first half.
@@ -33,11 +37,160 @@ REPO="jholhewres/devpit"
 # The key every release is signed with: the updater's own (`pubkey` in
 # apps/desktop/tauri.conf.json, which a guard keeps this equal to).
 PUBKEY="RWQkWKDUdIb0t1UL0cbl8d7MLNvFlyj6Sq+Fb3CzQlQ772LUDqOjQdi+"
+DOCS="https://devpit.app/docs"
 
-say() { printf 'devpit: %s\n' "$*"; }
+# How it talks. `rich` only when stdout is a terminal that can take it; every
+# other case keeps the plain lines a log or a pipe has always had.
+ui() {
+  rich='' open='' now='' meter='' said='' utf=''
+  accent='' bold='' dim='' green='' red='' yellow='' off='' wipe=''
+  tick='+' cross='x' skip='-' busy='.' full='#' empty='-' dot='-' arrow='->' more='...'
+  [ -t 1 ] && [ -z "${CI:-}" ] && [ "${TERM:-dumb}" != dumb ] || return 0
+  rich=1
+  e=$(printf '\033')
+  wipe="${e}[K"
+  if [ -z "${NO_COLOR:-}" ]; then
+    case "${COLORTERM:-}:${TERM:-}" in
+      truecolor:* | 24bit:*) accent="${e}[38;2;226;121;91m" ;;
+      *256*) accent="${e}[38;5;173m" ;;
+      *) accent="${e}[33m" ;;
+    esac
+    bold="${e}[1m" dim="${e}[2m" green="${e}[32m" red="${e}[31m" yellow="${e}[33m" off="${e}[0m"
+  fi
+  case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+    *[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) utf=1 ;;
+  esac
+  if [ -n "$utf" ]; then
+    tick='✓' cross='✗' skip='–' busy='·' full='━' empty='─' dot='·' arrow='→' more='…'
+  fi
+  # stdin is the script itself under `curl | sh`, so the size comes from the tty.
+  cols=$({ stty size </dev/tty; } 2>/dev/null | awk '{ print $2 }')
+  case "$cols" in "" | 0 | *[!0-9]*) cols=${COLUMNS:-80} ;; esac
+  case "$cols" in "" | *[!0-9]*) cols=80 ;; esac
+  [ "$cols" -le 100 ] || cols=100
+}
+
+# A note: a plain line, or a dim one under the step it belongs to.
+say() {
+  if [ -n "$rich" ]; then
+    settle
+    printf '    %s%s%s\n' "$dim" "$*" "$off"
+  else
+    printf 'devpit: %s\n' "$*"
+  fi
+}
+
 fail() {
-  printf 'devpit: %s\n' "$*" >&2
+  if [ -n "${rich:-}" ]; then
+    unopen
+    if [ -n "$now" ]; then
+      printf '  %s%s%s %s\n' "$red" "$cross" "$off" "$now"
+      printf '    %s%s%s\n' "$red" "$*" "$off" >&2
+    else
+      printf '  %s%s %s%s\n' "$red" "$cross" "$*" "$off" >&2
+    fi
+    [ -z "$said" ] || printf '    %s\n' "$said" >&2
+  else
+    printf 'devpit: %s\n' "$*" >&2
+  fi
   exit 1
+}
+
+# A step under way, given as its plain line (or nothing) and as shown on a
+# terminal, where it stays until it ticks, crosses or skips.
+step() {
+  now=$2
+  if [ -z "$rich" ]; then
+    [ -z "$1" ] || printf 'devpit: %s\n' "$1"
+    return 0
+  fi
+  printf '  %s%s %s%s%s' "$dim" "$busy" "$2" "$more" "$off"
+  open=1
+}
+
+# A step done, the same two ways: ticked, or skipped.
+passed() { mark "$green$tick" "$@"; }
+skipped() { mark "$yellow$skip" "$@"; }
+mark() {
+  if [ -z "$rich" ]; then
+    [ -z "$2" ] || printf 'devpit: %s\n' "$2"
+    return 0
+  fi
+  unopen
+  printf '  %s%s %s\n' "$1" "$off" "$3"
+  now=''
+}
+
+# The open step line, wiped so its result takes its place.
+unopen() {
+  if [ -n "$open" ]; then
+    printf '\r%s' "$wipe"
+    open=''
+  fi
+}
+
+# The open step line, ended, when something else has to print under it.
+settle() {
+  if [ -n "$open" ]; then
+    printf '\n'
+    open=''
+  fi
+}
+
+banner() {
+  [ -n "$rich" ] || return 0
+  if [ -z "$utf" ] || [ "$cols" -lt 66 ]; then
+    printf '\n  %s%sdevpit%s  %sdesktop installer%s\n\n' "$bold" "$accent" "$off" "$dim" "$off"
+    return 0
+  fi
+  printf '\n  %s%s%s\n' "$accent" '    ██                          ▄▄    ██' "$off"
+  printf '  %s%s%s    %sdevpit%s\n' "$accent" '▄▄▄▄██  ▄▄▄▄▄▄  ▄▄  ▄▄  ▄▄▄▄▄▄  ▄▄  ▄▄██▄▄' "$off" "$bold" "$off"
+  printf '  %s%s%s    %sdesktop installer%s\n' "$accent" '██  ██  ██▄▄██  ██  ██  ██  ██  ██    ██  ' "$off" "$dim" "$off"
+  printf '  %s%s%s\n' "$accent" '██▄▄██  ██▄▄▄▄   ▀██▀   ██▄▄██  ██    ██▄▄' "$off"
+  printf '  %s%s%s\n\n' "$accent" '                        ██' "$off"
+}
+
+# What it is about to do, given the version already here: empty when there
+# is none, `?` when there is one whose version cannot be read.
+header() {
+  unopen
+  case "$1" in
+    "" | "$version") title="Installing devpit $version" ;;
+    "?") title="Updating devpit to $version" ;;
+    *) title="Updating devpit $1 $arrow $version" ;;
+  esac
+  printf '  %s%s%s\n  %s%s%s\n\n' "$bold" "$title" "$off" "$dim" "$where" "$off"
+}
+
+# The version installed now, as `header` takes it.
+installed() {
+  case "$how" in
+    deb) dpkg-query -W -f='${Version}' devpit 2>/dev/null || true ;;
+    appimage) [ ! -e "$HOME/.local/bin/devpit" ] || printf '?' ;;
+    macos)
+      for apps in /Applications "$HOME/Applications"; do
+        defaults read "$apps/devpit.app/Contents/Info" CFBundleShortVersionString 2>/dev/null && return 0
+      done
+      ;;
+  esac
+  return 0
+}
+
+# The last lines: how to open it, and where the docs are.
+finish() {
+  [ -n "$rich" ] || return 0
+  if [ "$1" = dry ]; then
+    printf '  %s%s%s Done\n\n  Nothing was installed: a dry run stops after the checks.\n' "$green" "$tick" "$off"
+  else
+    case "$how:$PATH:" in
+      macos:*) opens="Open devpit from Applications." ;;
+      appimage:*":$HOME/.local/bin:"* | deb:*) opens="Open devpit from your apps, or run \`devpit\`." ;;
+      *) opens="Open devpit from your apps, or run \`$HOME/.local/bin/devpit\`." ;;
+    esac
+    printf '\n  %s%s%s\n' "$bold" "$opens" "$off"
+    printf '  %sFrom here it keeps itself up to date.%s\n' "$dim" "$off"
+  fi
+  printf '  %sDocs: %s%s\n\n' "$dim" "$DOCS" "$off"
 }
 
 fetch() {
@@ -48,11 +201,106 @@ fetch() {
 # The big download shows its progress where someone is watching: a hundred
 # megabytes in silence reads as a hang.
 fetch_big() {
-  if [ -t 2 ]; then
-    curl --proto '=https' --tlsv1.2 -fL --progress-bar "$@"
+  if [ -n "$rich" ]; then
+    fetch_shown "$1" "$2"
+  elif [ -t 2 ]; then
+    curl --proto '=https' --tlsv1.2 -fL --progress-bar -o "$1" "$2"
   else
-    fetch "$@"
+    fetch -o "$1" "$2"
   fi
+}
+
+# curl in the foreground, so Ctrl-C reaches it, and the bar drawn beside it
+# from the headers and the file as they arrive.
+fetch_shown() {
+  : >"$1.head"
+  meter "$1" &
+  meter=$!
+  rc=0
+  curl --proto '=https' --tlsv1.2 -fsSL -D "$1.head" -o "$1" "$2" 2>"$1.err" || rc=$?
+  stop_meter
+  if [ "$rc" -ne 0 ]; then
+    said=$(cat "$1.err")
+    return "$rc"
+  fi
+  # The finished bar stays, full, above the step it belongs to.
+  got=$(size_of "$1")
+  bar "${got:-0}" "${got:-0}"
+  printf '\n'
+  open=''
+}
+
+stop_meter() {
+  [ -n "${meter:-}" ] || return 0
+  kill "$meter" 2>/dev/null || true
+  wait "$meter" 2>/dev/null || true
+  meter=''
+  printf '\r%s' "$wipe"
+}
+
+# Redraws the download until it is stopped: a bar once the size is known, a
+# spinner until then.
+meter() {
+  i=0
+  while :; do
+    total=$(content_length "$1.head")
+    have=$(size_of "$1")
+    if [ -n "$total" ] && [ "$total" -gt 0 ]; then
+      bar "${have:-0}" "$total"
+    else
+      printf '\r  %s%s%s %s%s  %s MB%s' "$accent" "$(spinner "$i")" "$off" "$now" "$more" "$(mb "${have:-0}")" "$wipe"
+    fi
+    i=$((i + 1))
+    sleep 0.1 2>/dev/null || sleep 1
+  done
+}
+
+# The last response's Content-Length: the redirects before it carry their own.
+content_length() {
+  awk '{ sub(/\r$/, ""); line = tolower($0) }
+    line ~ /^http\// { code = $2; size = "" }
+    line ~ /^content-length:/ { size = $2 }
+    END { if (code == 200 && size ~ /^[0-9]+$/) print size }' "$1" 2>/dev/null || true
+}
+
+size_of() { { wc -c <"$1"; } 2>/dev/null | tr -d ' '; }
+
+# Megabytes with one decimal, in integers: sh has no floating point.
+mb() {
+  tenths=$(($1 * 10 / 1048576))
+  printf '%d.%d' $((tenths / 10)) $((tenths % 10))
+}
+
+bar() {
+  pct=$(($1 * 100 / $2))
+  [ "$pct" -le 100 ] || pct=100
+  tail=$(printf '%3d%%  %s / %s MB' "$pct" "$(mb "$1")" "$(mb "$2")")
+  # One column short of the edge, so the line never wraps.
+  room=$((cols - ${#tail} - 5))
+  fill=$((room * pct / 100))
+  printf '\r  %s%s%s%s%s  %s%s' "$accent" "$(repeat "$full" "$fill")" "$dim" \
+    "$(repeat "$empty" $((room - fill)))" "$off" "$tail" "$wipe"
+}
+
+# Repeated by appending: cutting a string of multibyte glyphs is not portable.
+repeat() {
+  out='' n=$2
+  while [ "$n" -gt 0 ]; do
+    out="$out$1"
+    n=$((n - 1))
+  done
+  printf '%s' "$out"
+}
+
+spinner() {
+  if [ -z "$utf" ]; then
+    case $(($1 % 4)) in 0) printf '|' ;; 1) printf '/' ;; 2) printf '-' ;; *) printf '\134' ;; esac
+    return 0
+  fi
+  case $(($1 % 10)) in
+    0) printf '⠋' ;; 1) printf '⠙' ;; 2) printf '⠹' ;; 3) printf '⠸' ;; 4) printf '⠼' ;;
+    5) printf '⠴' ;; 6) printf '⠦' ;; 7) printf '⠧' ;; 8) printf '⠇' ;; *) printf '⠏' ;;
+  esac
 }
 
 latest_version() {
@@ -77,7 +325,8 @@ sha256_of() {
   fi
 }
 
-# Which file fits this machine, and how it goes in. Sets `asset` and `how`.
+# Which file fits this machine, and how it goes in. Sets `asset`, `how` and
+# `where`, the line that says so.
 choose() {
   version=$1
   os=$(uname -s)
@@ -96,9 +345,11 @@ choose() {
         command -v dpkg >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
         asset="devpit_${version}_${deb_arch}.deb"
         how=deb
+        where="Linux $dot $arch $dot .deb via apt"
       else
         asset="devpit_${version}_${image_arch}.AppImage"
         how=appimage
+        where="Linux $dot $arch $dot AppImage in ~/.local/bin"
       fi
       ;;
     Darwin)
@@ -107,6 +358,7 @@ choose() {
       # is what devpit's own updater installs.
       asset="devpit.app.tar.gz"
       how=macos
+      where="macOS $dot $arch $dot universal .app"
       ;;
     MINGW* | MSYS* | CYGWIN*)
       fail "on Windows, run the installer: https://github.com/$REPO/releases/download/v$version/devpit_${version}_x64-setup.exe — or run this script inside WSL"
@@ -123,16 +375,17 @@ choose() {
 verify_signature() {
   file=$1
   if ! command -v minisign >/dev/null 2>&1; then
-    say "signature not checked: install minisign to check it as well"
+    skipped "signature not checked: install minisign to check it as well" "minisign not found, signature skipped"
     return 0
   fi
+  step "" "Checking the signature"
   fetch -o "$file.sig.b64" "$base/$asset.sig" || fail "could not download the signature of $asset"
   # The release keeps each signature base64-encoded, as the updater reads it.
   { base64 -d <"$file.sig.b64" || openssl base64 -d -A <"$file.sig.b64"; } >"$file.minisig" 2>/dev/null ||
     fail "could not read the signature of $asset"
   minisign -Vq -P "$PUBKEY" -m "$file" -x "$file.minisig" >/dev/null 2>&1 ||
     fail "$asset is not signed by devpit's release key — refusing to install it"
-  say "signature matches"
+  passed "signature matches" "Signature matches devpit's release key"
 }
 
 install_deb() {
@@ -140,7 +393,7 @@ install_deb() {
   version=$2
   installed=$(dpkg-query -W -f='${Version}' devpit 2>/dev/null || true)
   if [ "$installed" = "$version" ]; then
-    say "devpit $version is already installed."
+    passed "devpit $version is already installed." "devpit $version is already installed"
     return 0
   fi
   # apt reads the package as the unprivileged `_apt` user, which cannot see
@@ -148,7 +401,9 @@ install_deb() {
   # back to reading it as root.
   chmod 755 "$(dirname "$file")"
   chmod 644 "$file"
+  step "" "Installing through apt"
   if [ "$(id -u)" -eq 0 ]; then
+    settle
     apt-get install -y "$file"
   else
     command -v sudo >/dev/null 2>&1 ||
@@ -156,7 +411,7 @@ install_deb() {
     say "installing through apt, which asks for your password"
     sudo apt-get install -y "$file"
   fi
-  say "devpit $version is installed. Open it from your applications."
+  passed "devpit $version is installed. Open it from your applications." "Installed through apt"
   if [ -n "$installed" ]; then
     say "if devpit was open, close it and open it again to run $version."
   fi
@@ -166,20 +421,22 @@ install_appimage() {
   file=$1
   version=$2
   bin="$HOME/.local/bin"
+  step "" "Installing"
   mkdir -p "$bin"
   # Under one name that does not change, so devpit replacing itself on update
   # replaces this same file rather than leaving versions to pile up.
   mv "$file" "$bin/devpit"
   chmod 755 "$bin/devpit"
-  say "devpit $version is at $bin/devpit"
+  passed "devpit $version is at $bin/devpit" "Installed at $bin/devpit"
   launcher "$bin/devpit"
   # `ldconfig` lives in /sbin, which is not on every user's PATH.
   if ! { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -q 'libfuse\.so\.2'; then
-    say "an AppImage needs FUSE 2, which this machine does not seem to have."
+    skipped "an AppImage needs FUSE 2, which this machine does not seem to have." "FUSE 2 not found, and an AppImage needs it"
     say "on Ubuntu and Debian: sudo apt install libfuse2"
   fi
+  # On a terminal, the last line says how to run it.
   case ":$PATH:" in
-    *":$bin:"*) say "run it with: devpit" ;;
+    *":$bin:"*) [ -n "$rich" ] || say "run it with: devpit" ;;
     *) say "$bin is not on your PATH — run it with: $bin/devpit" ;;
   esac
 }
@@ -221,13 +478,14 @@ Categories=Development;
 EOF
   command -v update-desktop-database >/dev/null 2>&1 &&
     update-desktop-database -q "$share/applications" 2>/dev/null || true
-  say "devpit is in your application menu"
+  passed "devpit is in your application menu" "Added to the application menu"
 }
 
 install_macos() {
   file=$1
   version=$2
   dir=$(dirname "$file")
+  step "" "Installing"
   tar -xzf "$file" -C "$dir"
   [ -d "$dir/devpit.app" ] || fail "the download did not hold devpit.app"
   if [ -w /Applications ]; then
@@ -239,22 +497,28 @@ install_macos() {
   target="$apps/devpit.app"
   installed=$(defaults read "$target/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)
   if [ "$installed" = "$version" ]; then
-    say "devpit $version is already installed."
+    passed "devpit $version is already installed." "devpit $version is already installed"
     return 0
   fi
   # Only this exact path, and only once the new copy is known to be there.
   rm -rf "$target"
   mv "$dir/devpit.app" "$target"
-  say "devpit $version is in $apps"
+  passed "devpit $version is in $apps" "Installed in $apps"
   say "the app is not notarised; if macOS refuses to open it, right-click it and choose Open."
 }
 
 main() {
+  ui
   command -v curl >/dev/null 2>&1 || fail "curl is needed to download devpit"
+  banner
 
   version=${DEVPIT_VERSION:-}
   if [ -z "$version" ]; then
+    step "" "Finding the latest release"
     version=$(latest_version) || fail "could not find the latest release on GitHub"
+    found="Latest release ${version#v}"
+  else
+    found="Release ${version#v}, from DEVPIT_VERSION"
   fi
   version=${version#v}
   # It goes into a URL: digits and dots, and nothing else.
@@ -263,6 +527,10 @@ main() {
   esac
 
   choose "$version"
+  if [ -n "$rich" ]; then
+    header "$(installed)"
+  fi
+  passed "" "$found"
   if grep -qi microsoft /proc/version 2>/dev/null; then
     say "in WSL devpit opens through WSLg: Windows 11, or Windows 10 with WSLg"
   fi
@@ -271,24 +539,27 @@ main() {
   # The folder goes on the way out, however that is. INT and TERM exit rather
   # than clean up and carry on: a trap that only tidies would leave Ctrl-C
   # tidying and then installing anyway.
-  trap 'rm -rf "$work"' EXIT
+  trap 'stop_meter; rm -rf "$work"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
 
   base="https://github.com/$REPO/releases/download/v$version"
-  say "downloading $asset ($version)"
-  fetch_big -o "$work/$asset" "$base/$asset" || fail "could not download $base/$asset"
-  fetch -o "$work/SHA256SUMS" "$base/SHA256SUMS" || fail "could not download the checksums for $version"
+  step "downloading $asset ($version)" "Downloading $asset"
+  fetch_big "$work/$asset" "$base/$asset" || fail "could not download $base/$asset"
+  passed "" "Downloaded $asset"
 
+  step "" "Checking the checksum"
+  fetch -o "$work/SHA256SUMS" "$base/SHA256SUMS" || fail "could not download the checksums for $version"
   expected=$(awk -v name="$asset" '$2 == name { print $1; exit }' "$work/SHA256SUMS")
   [ -n "$expected" ] || fail "$asset is not in the release's SHA256SUMS, so it cannot be checked — refusing to install it"
   actual=$(sha256_of "$work/$asset")
   [ "$actual" = "$expected" ] || fail "$asset does not match its checksum — refusing to install it"
-  say "checksum matches"
+  passed "checksum matches" "Checksum matches SHA256SUMS"
   verify_signature "$work/$asset"
 
   if [ -n "${DEVPIT_DRY_RUN:-}" ]; then
-    say "dry run: would install $asset as $how, and stop here"
+    skipped "dry run: would install $asset as $how, and stop here" "Dry run: would install $asset as $how"
+    finish dry
     return 0
   fi
 
@@ -298,7 +569,8 @@ main() {
     macos) install_macos "$work/$asset" "$version" ;;
   esac
 
-  say "from here devpit keeps itself up to date: it checks when it opens and once a day."
+  passed "from here devpit keeps itself up to date: it checks when it opens and once a day." "Done"
+  finish installed
 }
 
 main "$@"
