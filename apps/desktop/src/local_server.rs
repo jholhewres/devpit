@@ -17,7 +17,7 @@
 //! open a dialog nobody in front of it asked for.
 
 use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
@@ -193,6 +193,8 @@ pub(crate) struct Keys<'a> {
     pub codes: &'a Codes,
     pub session: &'a str,
     pub ticket: &'a str,
+    /// Whether the other end of the connection is this user's.
+    pub ours: &'a dyn Fn() -> bool,
 }
 
 pub(crate) fn door(request: &Request, keys: &Keys) -> Door {
@@ -201,6 +203,7 @@ pub(crate) fn door(request: &Request, keys: &Keys) -> Door {
         token,
         codes,
         session,
+        ours,
         ..
     } = *keys;
     if !host_allowed(request.header("host"), place)
@@ -215,7 +218,9 @@ pub(crate) fn door(request: &Request, keys: &Keys) -> Door {
             return Door::Unauthorized;
         }
         let query = request.query.as_str();
-        let code = in_query(query, "c").is_some_and(|said| codes.redeem(said, Instant::now()));
+        // Asked first, so another user's try leaves the code good for ours.
+        let code =
+            in_query(query, "c").is_some_and(|said| ours() && codes.redeem(said, Instant::now()));
         let token = in_query(query, "t").is_some_and(|said| same_secret(said, token));
         return if code || token {
             Door::Admit
@@ -364,12 +369,16 @@ pub(crate) fn start(app: tauri::AppHandle, home: &Path) -> std::io::Result<u16> 
                 .name("devpit-local".into())
                 .spawn(move || {
                     let _opened = opened;
+                    let ends = stream.peer_addr().ok().zip(stream.local_addr().ok());
+                    let ours =
+                        move || ends.is_some_and(|(peer, local)| connection_is_ours(peer, local));
                     let keys = Keys {
                         place: &place,
                         token: &token,
                         codes: &CODES,
                         session: &session,
                         ticket: &ticket,
+                        ours: &ours,
                     };
                     serve(app, stream, &keys);
                 });
@@ -495,9 +504,62 @@ pub(crate) fn hand_over(home: &Path, place: &Place, code: &str) -> std::io::Resu
         .map_err(|()| std::io::Error::other("the home is not an absolute path"))
 }
 
+/// Whether the connection from `peer` to this server's `local` is this
+/// user's: the kernel lists the client's end of it with its owner.
+#[cfg(target_os = "linux")]
+pub(crate) fn connection_is_ours(peer: SocketAddr, local: SocketAddr) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(me) = std::fs::metadata("/proc/self").map(|own| own.uid()) else {
+        return false;
+    };
+    std::fs::read_to_string("/proc/net/tcp")
+        .is_ok_and(|table| owner_in(&table, peer, local) == Some(me))
+}
+
+/// Off Linux there is no such table to read, so every connection counts.
+#[cfg(not(target_os = "linux"))]
+pub(crate) fn connection_is_ours(_peer: SocketAddr, _local: SocketAddr) -> bool {
+    true
+}
+
+/// The owner `/proc/net/tcp` gives the socket from `from` to `to`.
+#[cfg(target_os = "linux")]
+fn owner_in(table: &str, from: SocketAddr, to: SocketAddr) -> Option<u32> {
+    let (from, to) = (kernel_address(from)?, kernel_address(to)?);
+    table.lines().skip(1).find_map(|row| {
+        let fields: Vec<&str> = row.split_whitespace().collect();
+        if fields.get(1)? != &from || fields.get(2)? != &to {
+            return None;
+        }
+        fields.get(7)?.parse().ok()
+    })
+}
+
+/// An IPv4 address as that table writes it: in host byte order, in hex.
+#[cfg(target_os = "linux")]
+fn kernel_address(address: SocketAddr) -> Option<String> {
+    let SocketAddr::V4(address) = address else {
+        return None;
+    };
+    let ip = u32::from_ne_bytes(address.ip().octets());
+    Some(format!("{ip:08X}:{:04X}", address.port()))
+}
+
+/// Whether `program` is a browser that cannot read a page in the home: a
+/// snap reads no hidden folder there, and Ubuntu's `chromium-browser` runs
+/// the snap.
+pub(crate) fn confined(program: &Path) -> bool {
+    program.starts_with("/snap/")
+        || program
+            .file_name()
+            .is_some_and(|name| name == "chromium-browser")
+}
+
 /// "Open in browser": signs this browser in and opens the app, off the
-/// window's thread. The one-time code reaches it in a page only this user can
-/// read, and leaves the URL at the first redirect.
+/// window's thread. The one-time code reaches a Chromium in a page only this
+/// user can read; a browser that cannot read the home gets the link, which on
+/// Linux only a connection of this user's can trade. It leaves the URL at the
+/// first redirect.
 pub(crate) fn open_in_browser() {
     let (Some(place), Ok(home)) = (place(), devpit_core::Store::root()) else {
         return;
@@ -506,13 +568,17 @@ pub(crate) fn open_in_browser() {
         return;
     };
     std::thread::spawn(move || {
-        let Ok(url) = hand_over(&home, &place, &code) else {
+        let path = devpit_pty::login_path::search_path();
+        let found = |name: &str| devpit_pty::host_env::found_on(path, std::ffi::OsStr::new(name));
+        let (program, app) = opener(|name| found(name).is_some());
+        let handed = if app && found(program).is_some_and(|at| !confined(&at)) {
+            hand_over(&home, &place, &code)
+        } else {
+            Ok(sign_in_url(&place, &code))
+        };
+        let Ok(url) = handed else {
             return;
         };
-        let path = devpit_pty::login_path::search_path();
-        let (program, app) = opener(|name| {
-            devpit_pty::host_env::found_on(path, std::ffi::OsStr::new(name)).is_some()
-        });
         let mut command = devpit_pty::host_env::command(program);
         if app {
             command.arg(format!("--app={url}"));

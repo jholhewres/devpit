@@ -39,6 +39,7 @@ fn at_door_with(request: &Request, query: &str, codes: &Codes) -> Door {
             codes,
             session: SESSION,
             ticket: "ticket",
+            ours: &|| true,
         },
     )
 }
@@ -300,6 +301,52 @@ fn a_sign_in_code_admits_once_and_only_within_its_minute() {
     assert_eq!(with(TOKEN), Door::Unauthorized, "the token is no code");
 }
 
+/// The code is on a command line wherever the browser cannot read the page:
+/// another user who reads it there still cannot trade it, since only a
+/// connection of this user's gets past `/auth` with a code.
+#[test]
+fn a_code_from_another_users_connection_admits_nobody_and_stays_good() {
+    let place = place();
+    let codes = Codes::new();
+    let code = codes.issue(Instant::now()).expect("code");
+    let mut auth = asked("GET", "/auth", &[("host", &format!("{NAME}:41234"))]);
+    auth.query = format!("c={code}");
+    let theirs = Keys {
+        ours: &|| false,
+        ..keys(&place, &codes)
+    };
+    assert_eq!(door(&auth, &theirs), Door::Unauthorized);
+    assert_eq!(
+        door(&auth, &keys(&place, &codes)),
+        Door::Admit,
+        "still good for ours"
+    );
+}
+
+/// Read from the kernel's own table of connections: this process's own
+/// connection is ours, and one from a port nobody holds is not.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_connection_from_this_user_is_told_from_one_that_is_not() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let _client = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
+    let (stream, peer) = listener.accept().expect("accept");
+    let local = stream.local_addr().expect("local");
+    assert!(connection_is_ours(peer, local));
+    let nobody = std::net::SocketAddr::from(([127, 0, 0, 1], 1));
+    assert!(!connection_is_ours(nobody, local));
+}
+
+/// A snap reads no hidden folder of the home, and Ubuntu's `chromium-browser`
+/// is the snap under another name: those get the link, not the page.
+#[test]
+fn a_snap_browser_is_handed_the_link_since_it_cannot_read_the_home() {
+    assert!(confined(Path::new("/snap/bin/chromium")));
+    assert!(confined(Path::new("/usr/bin/chromium-browser")));
+    assert!(!confined(Path::new("/usr/bin/google-chrome")));
+    assert!(!confined(Path::new("/usr/bin/chromium")));
+}
+
 #[test]
 fn a_chromium_opens_it_as_an_app_and_otherwise_the_desktop_opens_the_link() {
     assert_eq!(
@@ -329,6 +376,7 @@ fn keys<'a>(place: &'a Place, codes: &'a Codes) -> Keys<'a> {
         codes,
         session: SESSION,
         ticket: "ticket",
+        ours: &|| true,
     }
 }
 
