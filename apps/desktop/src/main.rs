@@ -293,7 +293,9 @@ mod windows_bin;
 mod working;
 mod workspace;
 mod worktree_base;
+mod worktree_cleanup;
 mod worktree_setup;
+mod worktree_sweep;
 mod worktrees;
 mod wsfiles;
 
@@ -562,6 +564,8 @@ fn main() {
             error_sender::watch(app.handle().clone());
             // Says on stderr and in the error log when the window stops being answered.
             stall_watch::watch(app.handle().clone());
+            // Merged cards' worktrees and build caches, put away on their own.
+            worktree_cleanup::watch();
             // A run still marked `running` after a restart is a run whose
             // thread died with the last process. Closed here, before anything
             // draws, or the card says it is working forever.

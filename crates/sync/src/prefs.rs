@@ -42,6 +42,8 @@ pub const LOCAL: &[(&str, &str)] = &[
     (key::SESSION_HANDOFF_PERCENT, "sessions this machine starts"),
     (key::OPEN_IN_APPS, "the apps installed here"),
     (key::WORKTREES_HIDDEN, "this machine's worktrees"),
+    (key::WORKTREES_DELETE_MERGED, "this machine's worktrees"),
+    (key::WORKTREES_CLEANUP_LAST, "this machine's worktrees"),
     (
         key::AGENT_PROFILES,
         "config folders on this machine, and tokens",
