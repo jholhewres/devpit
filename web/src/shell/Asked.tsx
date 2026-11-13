@@ -48,6 +48,7 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
   const card = useFocused<HTMLElement>()
   const plan = question.touch?.kind === 'plan' ? question.touch.plan : null
   const what = plan ? '' : subjectOf(question)
+  const lines = what.split('\n').length
   return (
     <section
       className="asking"
@@ -68,6 +69,7 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
         ) : (
           <>
             <b>{question.tool}</b>
+            {lines > 1 && <span className="asking__lines">{` ${lines} lines`}</span>}
             {what ? <code className="asking__what">{` ${what}`}</code> : ' — allow this?'}
           </>
         )}
