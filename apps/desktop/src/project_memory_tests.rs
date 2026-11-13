@@ -99,3 +99,44 @@ fn the_summary_is_the_newest_entries_and_says_what_it_left_out() {
         "{summary}"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn a_guide_or_an_adr_leading_out_of_the_project_is_not_read() {
+    let outside = tempfile::tempdir().expect("outside");
+    std::fs::write(outside.path().join("secret.md"), "# Not this project's\n").expect("secret");
+    let dir = project();
+    std::os::unix::fs::symlink(
+        outside.path().join("secret.md"),
+        dir.path().join("README.md"),
+    )
+    .expect("guide link");
+    std::os::unix::fs::symlink(
+        outside.path().join("secret.md"),
+        dir.path().join("docs/adr/0002-outside.md"),
+    )
+    .expect("adr link");
+    assert!(seed(dir.path(), "2026-11-13").expect("seeded"));
+    let memory = read(dir.path(), "facts.md") + &read(dir.path(), "decisions.md");
+    assert!(!memory.contains("Not this project's"), "{memory}");
+    assert!(!memory.contains("README.md"), "{memory}");
+    assert!(!memory.contains("0002-outside"), "{memory}");
+    assert!(
+        memory.contains("1. Sync the person's workspace"),
+        "{memory}"
+    );
+}
+
+#[test]
+fn a_heading_is_looked_for_only_near_the_top_of_a_file() {
+    let dir = project();
+    let late = format!("{}# Too far down\n", "\n".repeat(HEAD_BYTES + 1));
+    std::fs::write(dir.path().join("docs/adr/0003-long.md"), late).expect("long adr");
+    seed(dir.path(), "2026-11-13").expect("seeded");
+    let decisions = read(dir.path(), "decisions.md");
+    assert!(!decisions.contains("Too far down"), "{decisions}");
+    assert!(
+        decisions.contains("· docs/adr/0003-long.md · docs/adr/0003-long.md"),
+        "{decisions}"
+    );
+}
