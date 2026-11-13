@@ -32,7 +32,6 @@ export function ReplyDrafts({
   if (drafted.length === 0) return null
 
   const settle = (name: string, why: string | null): void => {
-    setSending(null)
     setRefused((was) => ({ ...was, [name]: why ?? '' }))
     if (!why) setEdited(({ [name]: _gone, ...rest }) => rest)
     onDone()
@@ -41,7 +40,24 @@ export function ReplyDrafts({
   const send = (one: Drafted): void => {
     setSending(one.name)
     const text = edited[one.name] ?? one.draft
-    void ask(() => commands.orchestratorReply(profileId, one.name, text, 'the chat')).then((sent) => settle(one.name, sent.error))
+    void ask(() => commands.orchestratorReply(profileId, one.name, text, 'the chat')).then((sent) => {
+      setSending(null)
+      settle(one.name, sent.error)
+    })
+  }
+
+  /* Only what one click can type in: in a terminal, not on a question, not empty. */
+  const ready = (one: Drafted): boolean => one.waiting === null && one.pane !== null && (edited[one.name] ?? one.draft).trim() !== ''
+  const sendable = drafted.filter(ready)
+  const sendAll = (): void => {
+    setSending('')
+    void (async () => {
+      for (const one of sendable) {
+        const sent = await ask(() => commands.orchestratorReply(profileId, one.name, edited[one.name] ?? one.draft, 'the chat'))
+        settle(one.name, sent.error)
+      }
+      setSending(null)
+    })()
   }
 
   const drop = (one: Drafted): void => {
@@ -52,6 +68,13 @@ export function ReplyDrafts({
   return (
     <section className="wprompt rdraft" aria-label="Drafted for you to send">
       <p className="wprompt__t">Drafted for you to send</p>
+      {sendable.length > 1 && (
+        <div className="wprompt__opts">
+          <button className="wprompt__o" disabled={sending !== null} onClick={sendAll}>
+            Send all {sendable.length} as you
+          </button>
+        </div>
+      )}
       {drafted.map((one) => {
         const text = edited[one.name] ?? one.draft
         /* A session on a question hears nothing typed until someone picks. */

@@ -39,6 +39,15 @@ describe('what waits on the person, on the Remote', () => {
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ t: 'stopsConfirm' }))
   })
 
+  it('sends every draft on one press', () => {
+    const send = shown([], [draft('api', 'go on'), draft('web', 'run the tests')])
+    fireEvent.click(screen.getByRole('button', { name: 'Send all 2' }))
+    expect(send.mock.calls.map(([one]) => one)).toEqual([
+      { t: 'draftSend', profile: 'claude', name: 'api' },
+      { t: 'draftSend', profile: 'claude', name: 'web' },
+    ])
+  })
+
   it('offers no press to a device that may only watch', () => {
     shown([stop('claude', 'api')], [draft('api', 'go on'), draft('web', 'run the tests')], false)
     expect(screen.queryByRole('button', { name: /Stop|Send/ })).toBeNull()

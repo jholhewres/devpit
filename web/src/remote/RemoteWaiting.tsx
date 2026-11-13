@@ -58,6 +58,16 @@ export function RemoteWaiting({
           )}
         </div>
       )}
+      {typing && drafts.length > 1 && (
+        <div className="rm__acts">
+          <button
+            className="rm__btn rm__btn--go"
+            onClick={() => confirm(`Type each of these ${drafts.length} drafts in its session's terminal, as you?`) && drafts.forEach((draft) => send({ t: 'draftSend', profile: draft.profile, name: draft.name }))}
+          >
+            Send all {drafts.length}
+          </button>
+        </div>
+      )}
       {questions.map((question) => (
         <div className="rm__ask" key={question.id}>
           <span className="rm__dim">{question.project ?? (question.from === 'chat' ? 'a chat' : 'a terminal')} asks to</span>
