@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { keptAfter, type KeptTab } from './kept'
+import { inPlace, keptAfter, type KeptTab } from './kept'
 import { PANE_MOUNTS } from './paneMounts'
 import type { Tab } from './strip'
 import { useShellPick } from './shellStore'
@@ -44,10 +44,10 @@ export function Panes(): React.JSX.Element {
 
             {PANE_MOUNTS.flatMap((mount) =>
               mount.many
-                ? [
+                ? inPlace([
                     ...open.filter((tab) => tab.kind === mount.name).map((tab) => ({ projectId: here, tab })),
                     ...(mount.keep ? elsewhere.filter((one) => one.tab.kind === mount.name) : []),
-                  ].map(({ projectId, tab }) => {
+                  ]).map(({ projectId, tab }) => {
                     const shown = projectId === here && active?.id === tab.id
                     return (
                       <div key={tab.id} className={mount.className} data-pane={mount.name} data-show={String(shown)}>

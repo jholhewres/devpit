@@ -38,3 +38,10 @@ export function keptAfter(
     next.every((one, at) => one.projectId === was[at]?.projectId && one.tab === was[at]?.tab)
   return same ? was : next
 }
+
+/** The order kept tabs have in the page, the same whichever project is in
+ *  front. Ordered by project, a switch moved terminals in the DOM, and each
+ *  move takes an xterm's <style> out and back: WebKit rebuilds every rule. */
+export function inPlace<T extends { readonly tab: Tab }>(list: readonly T[]): T[] {
+  return [...list].sort((a, b) => (a.tab.id < b.tab.id ? -1 : a.tab.id > b.tab.id ? 1 : 0))
+}
