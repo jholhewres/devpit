@@ -6,10 +6,11 @@ import { ofName } from './languages'
 import { MdTable } from './MdTable'
 import { Painted } from './Painted'
 import { external, grown, linkTarget, mended, resolved, spans, type Block, type Parsed, type Span } from './markdown'
-import { Tick } from './MdTick'
+import { Pathed, Tick } from './MdTick'
 import { ask, commands } from './live'
 import { went } from './problems'
 import { useShellPick } from './shellStore'
+import { Zoomable } from './Zoom'
 
 /*
  * Markdown, drawn from parsed blocks.
@@ -144,7 +145,7 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
          is a URL — a relative image needs a read through the backend, and this
          says so rather than drawing a broken frame. */
       return external(span.src) ? (
-        <img className="md__img" src={span.src} alt={span.alt} />
+        <Zoomable src={span.src} name={span.alt || 'Image'} className="md__img" />
       ) : (
         <span className="md__tick">{resolved(path, span.src)}</span>
       )
@@ -157,6 +158,6 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
       return <button className="md__a" title={target === 'web' ? span.href : undefined} onClick={open}>{span.text}</button>
     }
     default:
-      return <>{span.text}</>
+      return <Pathed text={span.text} opens={opens} />
   }
 }

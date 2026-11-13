@@ -20,6 +20,8 @@ pub fn to_the_person(tool: &str) -> bool {
 pub struct Picks {
     drawn: Mutex<HashSet<String>>,
     chosen: Mutex<HashMap<String, Vec<Vec<String>>>>,
+    /// Why the person refused, for the agent to read.
+    reasons: Mutex<HashMap<String, String>>,
 }
 
 impl Picks {
@@ -62,9 +64,42 @@ pub(crate) fn pick(asking: &Asking, picks: &Picks, id: &str, chosen: Vec<Vec<Str
     answered
 }
 
+/// The longest reason kept: the agent reads a sentence, not a document.
+const MOST_REASON: usize = 2000;
+
+/// Keeps why, then refuses the question; nothing is kept for one that no
+/// longer waits.
+pub(crate) fn refuse(asking: &Asking, picks: &Picks, id: &str, reason: &str) -> bool {
+    let why: String = reason.trim().chars().take(MOST_REASON).collect();
+    if let Ok(mut all) = picks.reasons.lock() {
+        all.insert(id.to_owned(), why);
+    }
+    let answered = asking.answer(id, Answer::Deny);
+    if let (false, Ok(mut all)) = (answered, picks.reasons.lock()) {
+        all.remove(id);
+    }
+    answered
+}
+
+/// A refusal in the person's words, which the CLI hands the agent as the
+/// tool's result.
+fn refused_because(why: &str) -> String {
+    serde_json::json!({ "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": format!("Refused in devpit: {why}"),
+    }})
+    .to_string()
+}
+
 /// The hook's reply. Allowed with picks, they go in as the tool's `answers`,
 /// keyed by each question as it was asked, several choices joined by ", ".
 pub fn reply_for(picks: &Picks, id: &str, input: &str, answer: Answer) -> String {
+    let why = picks.reasons.lock().ok().and_then(|mut all| all.remove(id));
+    if let (Answer::Deny, Some(why)) = (answer, why.filter(|why| !why.is_empty())) {
+        picks.taken(id);
+        return refused_because(&why);
+    }
     let chosen = picks.taken(id);
     let Some(chosen) = chosen.filter(|_| answer == Answer::Allow) else {
         return decision(answer);
@@ -104,6 +139,28 @@ pub async fn permission_pick(
     crate::off_main::blocking(move || {
         use tauri::Manager;
         if pick(&app.state::<Asking>(), &app.state::<Picks>(), &id, chosen) {
+            return Ok(());
+        }
+        Err(RpcError::new(
+            ErrorCode::NotFound,
+            "that question is no longer waiting — it timed out, or the turn ended",
+        ))
+    })
+    .await
+}
+
+/// `permission.refuse` — a refusal with the person's reason, which the agent
+/// reads where it would have read the tool's result.
+#[tauri::command]
+#[specta::specta]
+pub async fn permission_refuse(
+    app: tauri::AppHandle,
+    id: String,
+    reason: String,
+) -> Result<(), RpcError> {
+    crate::off_main::blocking(move || {
+        use tauri::Manager;
+        if refuse(&app.state::<Asking>(), &app.state::<Picks>(), &id, &reason) {
             return Ok(());
         }
         Err(RpcError::new(

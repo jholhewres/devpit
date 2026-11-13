@@ -89,8 +89,12 @@ pub enum Part {
         input: String,
         allowed: bool,
     },
-    /// What the turn changed in the checkout, measured before and after it.
-    Changes { files: Vec<ChangedFile> },
+    /// What the turn changed in the checkout, and its tree before, to put back.
+    Changes {
+        files: Vec<ChangedFile>,
+        #[serde(default)]
+        before: Option<String>,
+    },
     /// This conversation was forked from another at one of its turns, which
     /// left that one as it was.
     Rewound {

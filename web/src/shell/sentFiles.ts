@@ -37,6 +37,19 @@ export function sentWith(text: string): { files: readonly SentFile[]; prompt: st
   return { files: [], prompt: text }
 }
 
+/* The line `withSkills` puts above the words: `/name`, or "Use the a and b skills." */
+const SKILL_LINE = /^(\/[\w:.-]+|Use the .+ skills\.)$/
+
+/* What copying a sent message gives: the words as typed, without the skill
+   line above them, and the files it went with named after them. */
+export function copiedOf(text: string): string {
+  const { files, prompt } = sentWith(text)
+  const lines = prompt.split('\n')
+  const words = lines.length > 1 && SKILL_LINE.test(lines[0]!) ? lines.slice(1).join('\n') : prompt
+  if (files.length === 0) return words
+  return [words, `Attached:\n${files.map((file) => `- ${file.path}`).join('\n')}`].filter(Boolean).join('\n\n')
+}
+
 /* Past this many lines a message folds, with a fade over where it was cut. */
 export const LONG_LINES = 14
 export const isLong = (prompt: string): boolean => prompt.split('\n').length > LONG_LINES || prompt.length > 1400

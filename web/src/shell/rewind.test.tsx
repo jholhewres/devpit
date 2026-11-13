@@ -22,7 +22,7 @@ describe('going back to an earlier turn', () => {
   it('is offered on a finished turn a fork can start from', () => {
     const rewind = vi.fn()
     render(<Turn message={answer} onRewind={rewind} />)
-    fireEvent.click(screen.getByLabelText('Go back to this turn'))
+    fireEvent.click(screen.getByLabelText('Fork from here'))
     expect(rewind).toHaveBeenCalledWith('turn_1')
   })
 
@@ -30,12 +30,12 @@ describe('going back to an earlier turn', () => {
      nothing to fork at, so the control is not drawn rather than failing. */
   it('is not offered where no fork is possible', () => {
     render(<Turn message={answer} />)
-    expect(screen.queryByLabelText('Go back to this turn')).toBeNull()
+    expect(screen.queryByLabelText('Fork from here')).toBeNull()
   })
 
   it('is not offered while the turn is still arriving', () => {
     render(<Turn message={{ ...answer, streaming: true }} onRewind={vi.fn()} />)
-    expect(screen.queryByLabelText('Go back to this turn')).toBeNull()
+    expect(screen.queryByLabelText('Fork from here')).toBeNull()
   })
 
   it('says in the fork where it came from, and opens that conversation', () => {

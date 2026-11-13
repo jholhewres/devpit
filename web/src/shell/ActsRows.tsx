@@ -8,8 +8,10 @@ import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
 import { EditCard } from './EditCardView'
 import { Markdown } from './MarkdownView'
+import { Pathed } from './MdTick'
 import { took } from './turnFold'
 import { useDisclosed } from './useDisclosed'
+import { Zoomable } from './Zoom'
 
 /*
  * What the agent did, as a foldable stack of rows.
@@ -17,6 +19,9 @@ import { useDisclosed } from './useDisclosed'
  * Open while it works, because that is when you want to watch; closed once it
  * is done, because by then the answer is what you came for.
  */
+
+/* Where a file the rows name opens: beside the chat, read in its folder. */
+export const OpensPath = createContext<((path: string) => void) | null>(null)
 
 /* The message the rows are of, to ask for an output the window got cut. */
 const MessageContext = createContext<string | null>(null)
@@ -193,7 +198,7 @@ function Whole({ callId, output }: { callId: string; output: string }): React.JS
     const text = textOf(whole)
     return (
       <>
-        {shown.map((src, at) => <img className="asec__img" key={at} src={src} alt={`Image ${at + 1} of the output`} />)}
+        {shown.map((src, at) => <Zoomable key={at} src={src} name={`Image ${at + 1} of the output`} className="asec__img" />)}
         {text.trim() && <Section label="Output, in full" body={text} />}
       </>
     )
@@ -302,6 +307,7 @@ function Section({ label, body }: Piece): React.JSX.Element {
    and the fades say there is more above or below without a scrollbar having
    to appear over the text. */
 function Scroller({ body }: { body: string }): React.JSX.Element {
+  const opens = useContext(OpensPath)
   const box = useRef<HTMLPreElement>(null)
   const [edge, setEdge] = useState({ top: true, bottom: true })
 
@@ -318,7 +324,7 @@ function Scroller({ body }: { body: string }): React.JSX.Element {
   return (
     <div className="ascroll">
       <pre className="ascroll__v" ref={box} onScroll={(event) => measure(event.currentTarget)}>
-        {body}
+        <Pathed text={body} opens={opens} />
       </pre>
       <span className="ascroll__f ascroll__f--t" aria-hidden="true" data-on={!edge.top} />
       <span className="ascroll__f ascroll__f--b" aria-hidden="true" data-on={!edge.bottom} />

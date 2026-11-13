@@ -6,6 +6,17 @@
 use devpit_agentcli::head::Head;
 use devpit_rpc::{ErrorCode, RpcError};
 
+/// Notes on the turn's end what it ran on: the model the CLI said it used,
+/// else the one asked for, and the effort it was asked to think at.
+pub(crate) fn ran_on(said: &mut devpit_agentcli::talk::Said, opening: &Head) {
+    said.end.model = said
+        .init
+        .as_ref()
+        .and_then(|init| init.model.clone())
+        .or_else(|| opening.model.clone());
+    said.end.effort = opening.effort.clone();
+}
+
 /// The head written before the turn runs.
 ///
 /// What the conversation already settled carries over; a turn may still change
@@ -98,7 +109,7 @@ pub(crate) fn failed_end(turn_id: &str) -> devpit_rpc::TurnEnd {
         stop_reason: Some("error".to_owned()),
         is_error: true,
         context: None,
-        unheard: Vec::new(),
+        ..Default::default()
     }
 }
 

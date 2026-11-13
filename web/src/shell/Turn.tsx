@@ -1,9 +1,9 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useCallback, useContext, useEffect, useState } from 'react'
 
-import { Acts } from './ActsRows'
+import { Acts, OpensPath } from './ActsRows'
 import { drawn, useActivity, type Activity } from './activity'
 import { acts, doing, tally, type Act } from './acts'
-import { joined } from './chat'
+import { joined, metaOf } from './chat'
 import { CopyButton } from './CopyButton'
 import type { Message, Part } from '../gen/bindings'
 import { inFolder } from './markdown'
@@ -32,6 +32,8 @@ import { foldOf, useDisclosed } from './useDisclosed'
 export const Turn = memo(function Turn({
   message,
   onRewind,
+  onEdit,
+  onAgain,
   folder,
   onOpen,
   onResend,
@@ -46,10 +48,15 @@ export const Turn = memo(function Turn({
   onOpen?: (path: string) => void
   /** Where the conversation runs; relative links in the answer are read there. */
   folder?: string | null
-  /** Present when this turn can be rewound to; called with its turn id. */
+  /** Present when this turn can be forked from; called with its turn id. */
   onRewind?: (turnId: string) => void
+  /** Present when the message that started this turn can be edited; called with its turn id. */
+  onEdit?: (turnId: string) => void
+  /** Sends a person's message again. */
+  onAgain?: () => void
 }): React.JSX.Element {
   const rewind = onRewind && message.turnId ? () => onRewind(message.turnId!) : undefined
+  const edit = onEdit && message.turnId ? () => onEdit(message.turnId!) : undefined
   const receipt = message.parts.find((part) => part.kind === 'receipt')
   if (message.role === 'system' && receipt?.kind === 'receipt') return <Receipt part={receipt} />
   const rewound = message.parts.find((part) => part.kind === 'rewound')
@@ -57,19 +64,21 @@ export const Turn = memo(function Turn({
   const compacted = message.parts.find((part) => part.kind === 'compacted')
   if (message.role === 'system' && compacted?.kind === 'compacted') return <div className="rwnd">{compactedAt(compacted.tokens)}</div>
 
-  if (message.role === 'user') return <Said message={message} onResend={onResend} />
-  return <Answer message={message} rewind={rewind} folder={folder ?? null} onOpen={onOpen} steered={steered} />
+  if (message.role === 'user') return <Said message={message} onResend={onResend} onEdit={edit} onAgain={onAgain} />
+  return <Answer message={message} rewind={rewind} edit={edit} folder={folder ?? null} onOpen={onOpen} steered={steered} />
 })
 
 function Answer({
   message,
   rewind,
+  edit,
   folder,
   onOpen,
   steered,
 }: {
   message: Message
   rewind?: () => void
+  edit?: () => void
   folder: string | null
   onOpen?: (path: string) => void
   steered: boolean
@@ -87,21 +96,33 @@ function Answer({
   /* What a settled turn folds: the work and earlier prose, never its answer or what a slash command said. A failed one folds nothing. */
   const hides = !live && !failed && shown.some((one, at) => at !== answer && (one.kind === 'prose' || rows(one).length > 0))
   const changed = message.parts.flatMap((part) => (part.kind === 'changes' ? part.files : []))
+  const show = useShellPick((shell) => shell.show)
+  /* A path the answer or a tool row names, read where the conversation runs. */
+  const opens = useCallback(
+    (here: string): void => {
+      const path = inFolder(folder, here)
+      if (onOpen) onOpen(path)
+      else show('file', { id: `file:${path}`, path })
+    },
+    [folder, onOpen, show],
+  )
 
   return (
+    <OpensPath.Provider value={opens}>
     <article className="turn" data-ended={ended ? outcome(ended) : undefined}>
       {!live && !failed && activity !== 'zen' && (hides || ended) && (
         <TurnStatus message={message} work={shown.flatMap(rows)} hides={hides} open={open} toggle={() => setOpen((was) => !was)} />
       )}
-      <Segments message={message} every={every} shown={shown} answer={answer} folded={hides && !open && activity !== 'zen'} lastWork={failed ? lastWork : -1} folder={folder} onOpen={onOpen} activity={activity} steered={steered} />
+      <Segments message={message} every={every} shown={shown} answer={answer} folded={hides && !open && activity !== 'zen'} lastWork={failed ? lastWork : -1} activity={activity} steered={steered} />
       <TurnDelegations parts={message.parts} />
       <TurnDrafts parts={message.parts} />
       <TurnApps parts={message.parts} messageId={message.id} />
       {failed && <Failed message={message} />}
       {!live && <TurnChanges files={changed} parts={message.parts} />}
       {live && <Working parts={message.parts} since={millis(message.createdAt)} />}
-      {!live && <Foot message={message} rewind={rewind} />}
+      {!live && <Foot message={message} rewind={rewind} edit={edit} />}
     </article>
+    </OpensPath.Provider>
   )
 }
 
@@ -113,8 +134,6 @@ function Segments({
   answer,
   folded,
   lastWork,
-  folder,
-  onOpen,
   activity,
   steered,
 }: {
@@ -125,8 +144,6 @@ function Segments({
   folded: boolean
   /** The work a failed turn ended on, kept open; -1 for none. */
   lastWork: number
-  folder: string | null
-  onOpen?: (path: string) => void
   activity: Activity
   steered: boolean
 }): React.JSX.Element {
@@ -138,7 +155,7 @@ function Segments({
         if (folded && at !== answer && one.kind !== 'said') return null
         if (!drawn(one, at, answer, activity, steered)) return null
         if (one.kind === 'prose')
-          return <Reply key={one.at} source={one.text} live={live && at === last} folder={folder} onOpen={onOpen} />
+          return <Reply key={one.at} source={one.text} live={live && at === last} />
         if (one.kind === 'said')
           return (
             <pre className="said__cmd" key={one.at}>
@@ -206,30 +223,11 @@ function Failed({ message }: { message: Message }): React.JSX.Element {
 
 /* The answer as it has arrived: the backend paces it into batches, and each
    new block fades in rather than the text being typed out on a timer. */
-function Reply({
-  source,
-  live,
-  folder,
-  onOpen,
-}: {
-  source: string
-  live: boolean
-  folder: string | null
-  onOpen?: (path: string) => void
-}): React.JSX.Element {
-  const show = useShellPick((shell) => shell.show)
-
+function Reply({ source, live }: { source: string; live: boolean }): React.JSX.Element {
+  const opens = useContext(OpensPath)
   return (
     <div className="reply" data-live={live || undefined} data-fade={(live && !reducedMotion()) || undefined}>
-      <Markdown
-        source={source}
-        live={live}
-        opens={(here) => {
-          const path = inFolder(folder, here)
-          if (onOpen) onOpen(path)
-          else show('file', { id: `file:${path}`, path })
-        }}
-      />
+      <Markdown source={source} live={live} opens={opens ?? undefined} />
     </div>
   )
 }
@@ -272,27 +270,33 @@ function Working({ parts, since }: { parts: Message['parts']; since: number | nu
   )
 }
 
-function Foot({ message, rewind }: { message: Message; rewind?: () => void }): React.JSX.Element | null {
+/* Under a settled turn: one quiet line of when it ended, on what, how long
+   and for how much, and on hover what can be done with it. */
+function Foot({ message, rewind, edit }: { message: Message; rewind?: () => void; edit?: () => void }): React.JSX.Element | null {
   const said = message.parts
     .filter((part) => part.kind === 'text')
     .map((part) => ('text' in part ? part.text : ''))
     .join('\n\n')
+  const meta = metaOf(message)
 
-  if (!said && !rewind) return null
+  if (!said && !rewind && !edit && meta.length === 0) return null
 
   return (
     <div className="turn__foot">
-      {rewind && (
-        <button
-          className="tfbtn"
-          aria-label="Go back to this turn"
-          title="Go on from here in a new conversation — this one stays as it is"
-          onClick={rewind}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
-        </button>
-      )}
-      {said && <CopyButton className="tfbtn" text={said} />}
+      {meta.length > 0 && <span className="tmeta">{meta.join(' · ')}</span>}
+      <span className="hbar">
+        {said && <CopyButton className="tfbtn" text={said} />}
+        {edit && (
+          <button className="tfbtn" aria-label="Edit from here" title="Edit the message that started this turn, in a new conversation" onClick={edit}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+          </button>
+        )}
+        {rewind && (
+          <button className="tfbtn" aria-label="Fork from here" title="Go on from this answer in a new conversation — this one stays as it is" onClick={rewind}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2" /><circle cx="18" cy="5" r="2" /><circle cx="12" cy="19" r="2" /><path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5" /></svg>
+          </button>
+        )}
+      </span>
     </div>
   )
 }

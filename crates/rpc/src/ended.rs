@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 /// What a turn cost and why it stopped.
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnEnd {
     pub turn_id: String,
@@ -16,6 +16,11 @@ pub struct TurnEnd {
     pub context: Option<crate::frame::Context>,
     /// Messages steered into the turn that the agent never took in, by id.
     pub unheard: Vec<String>,
+    /// The model the CLI said it ran on, and the effort it was asked for.
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub effort: Option<String>,
 }
 
 /// When an answer ended and why: the facts, read into words by the screen.
@@ -33,6 +38,19 @@ pub struct Ended {
     /// As [`TurnEnd::unheard`]. Absent from a line written before it existed.
     #[serde(default)]
     pub unheard: Vec<String>,
+    /// What the turn ran on and spent, for the line under it. Absent from a
+    /// line written before it existed.
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub effort: Option<String>,
+    #[serde(default)]
+    pub cost_usd: Option<f64>,
+    #[serde(default)]
+    pub duration_ms: Option<u32>,
+    /// How full the context was when it ended.
+    #[serde(default)]
+    pub tokens: Option<u32>,
 }
 
 impl Ended {
@@ -43,6 +61,11 @@ impl Ended {
             is_error: end.is_error,
             error: None,
             unheard: end.unheard.clone(),
+            model: end.model.clone(),
+            effort: end.effort.clone(),
+            cost_usd: end.cost_usd,
+            duration_ms: end.duration_ms.map(|ms| ms as u32),
+            tokens: end.context.map(|context| context.used),
         }
     }
 }

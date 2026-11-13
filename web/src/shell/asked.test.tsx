@@ -42,6 +42,23 @@ describe('a question in the chat', () => {
     ])
   })
 
+  it('can be refused with a reason, which goes to the agent with the refusal', () => {
+    const answered = vi.fn()
+    render(<Asked questions={[question]} onAnswer={answered} />)
+    fireEvent.change(screen.getByLabelText('Reason for refusing, told to the agent'), { target: { value: ' run the unit tests only ' } })
+    fireEvent.click(screen.getByText('Refuse'))
+    expect(answered).toHaveBeenCalledWith('q1', 'deny', undefined, 'run the unit tests only')
+  })
+
+  it('takes Enter in the reason as the refusal, never as an allow', () => {
+    const answered = vi.fn()
+    render(<Asked questions={[question]} onAnswer={answered} />)
+    const why = screen.getByLabelText('Reason for refusing, told to the agent')
+    fireEvent.change(why, { target: { value: 'not now' } })
+    fireEvent.keyDown(why, { key: 'Enter' })
+    expect(answered.mock.calls).toEqual([['q1', 'deny', undefined, 'not now']])
+  })
+
   it('says what "always" covers before it is pressed', () => {
     render(<Asked questions={[question]} onAnswer={() => {}} />)
     expect(screen.getByText('Always in this chat').getAttribute('title')).toContain('this exact command')

@@ -1,16 +1,33 @@
 import type { Message } from '../gen/bindings'
-import { isLong, sentWith, type SentFile } from './sentFiles'
+import { clock } from './chat'
+import { CopyButton } from './CopyButton'
+import { copiedOf, isLong, sentWith, type SentFile } from './sentFiles'
 import { useShellPick } from './shellStore'
 import { useStream } from './Streamed'
+import { millis } from './turnFold'
 import { foldOf, useDisclosed } from './useDisclosed'
+import { Zoomable } from './Zoom'
 
 /* What a person said: the files as chips and pictures, then the words.
-   `onResend` when it was steered into a turn that ended without taking it in. */
-export function Said({ message, onResend }: { message: Message; onResend?: () => void }): React.JSX.Element {
-  const { files, prompt } = sentWith(message.parts.map((part) => ('text' in part ? part.text : '')).join(''))
+   `onResend` when it was steered into a turn that ended without taking it in.
+   Hovered, it offers to copy it, edit from it or send it again. */
+export function Said({
+  message,
+  onResend,
+  onEdit,
+  onAgain,
+}: {
+  message: Message
+  onResend?: () => void
+  onEdit?: () => void
+  onAgain?: () => void
+}): React.JSX.Element {
+  const text = message.parts.map((part) => ('text' in part ? part.text : '')).join('')
+  const { files, prompt } = sentWith(text)
   const long = isLong(prompt)
   const projectId = useShellPick((shell) => shell.project?.id ?? null)
   const [open, setOpen] = useDisclosed(foldOf(message.id, 'said'), false)
+  const at = millis(message.createdAt)
 
   return (
     <article className="said" data-lost={onResend ? '' : undefined}>
@@ -37,6 +54,20 @@ export function Said({ message, onResend }: { message: Message; onResend?: () =>
           <button onClick={onResend}>Resend</button>
         </p>
       )}
+      <div className="hbar said__bar">
+        {at !== null && <span className="tmeta">{clock(at)}</span>}
+        <CopyButton className="tfbtn" text={copiedOf(text)} label="Copy message" />
+        {onEdit && (
+          <button className="tfbtn" aria-label="Edit from here" title="Edit this message in a new conversation that goes back to before it" onClick={onEdit}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+          </button>
+        )}
+        {onAgain && (
+          <button className="tfbtn" aria-label="Send again" title="Send this message again" onClick={onAgain}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+          </button>
+        )}
+      </div>
     </article>
   )
 }
@@ -52,9 +83,5 @@ const Chip = ({ file }: { file: SentFile }): React.JSX.Element => (
 function Picture({ file, projectId }: { file: SentFile; projectId: string | null }): React.JSX.Element {
   const { url, error } = useStream(projectId, file.path)
   if (error) return <Chip file={file} />
-  return (
-    <span className="said__pic" title={file.path}>
-      {url && <img src={url} alt={file.name} />}
-    </span>
-  )
+  return <span className="said__pic">{url && <Zoomable src={url} name={file.name} path={file.path} className="said__img" />}</span>
 }

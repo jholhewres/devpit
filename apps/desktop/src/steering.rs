@@ -187,7 +187,7 @@ pub fn chat_cancel(
         stop_reason: Some("cancelled".to_owned()),
         is_error: false,
         context: None,
-        unheard: Vec::new(),
+        ..Default::default()
     }))
 }
 

@@ -9,7 +9,7 @@ import type {
   TurnEnd,
 } from '../gen/bindings'
 import { inBrowser } from '../transport'
-import { outcome } from './turnFold'
+import { millis, outcome, took } from './turnFold'
 import { inTauri } from './window'
 
 /* chat.send streams over a Channel, like the pty, so it is hand-written for
@@ -231,4 +231,46 @@ export function continuable(messages: readonly Message[], sending: boolean): boo
   if (!last) return false
   if (last.role === 'user') return true
   return last.role === 'assistant' && !last.streaming && last.ended != null && outcome(last.ended) === 'stopped'
+}
+
+/* A message's words, as the person sent them. */
+export const saidText = (message: Message): string => message.parts.map((part) => ('text' in part ? part.text : '')).join('')
+
+/* What "Retry" sends again: the last thing said, when the turn it started
+   failed or never answered. */
+export function retryable(messages: readonly Message[], sending: boolean): string | null {
+  const last = messages.at(-1)
+  if (sending || !last) return null
+  const failed = last.role === 'user' || (last.role === 'assistant' && !last.streaming && last.ended != null && outcome(last.ended) === 'failed')
+  const said = failed ? messages.findLast((one) => one.role === 'user') : undefined
+  return said ? saidText(said) : null
+}
+
+/* How many files an edit from `turnId` can put back: what that turn and the
+   later ones changed, when the checkout they found was kept. */
+export function putBackFrom(messages: readonly Message[], turnId: string): number {
+  const from = messages.findIndex((one) => one.turnId === turnId)
+  if (from < 0) return 0
+  const changes = messages.slice(from).flatMap((one) => one.parts.flatMap((part) => (part.kind === 'changes' ? [part] : [])))
+  if (!changes[0]?.before) return 0
+  return new Set(changes.flatMap((part) => part.files.map((file) => file.path))).size
+}
+
+/* A time of day in the person's own format. */
+export const clock = (ms: number): string => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+/* The quiet line under a turn: when it ended, on what, how long, how much. */
+export function metaOf(message: Pick<Message, 'createdAt' | 'ended'>): readonly string[] {
+  const ended = message.ended
+  const began = millis(message.createdAt)
+  const at = millis(ended?.at) ?? began
+  const ms = ended?.durationMs ?? (began !== null && ended ? (millis(ended.at) ?? began) - began : null)
+  return [
+    at === null ? null : clock(at),
+    ended?.model?.replace(/^claude-/, '').replace(/-\d{8}$/, ''),
+    ended?.effort,
+    ms ? took(ms) : null,
+    ended?.tokens ? `${Math.round(ended.tokens / 1000)}k tokens` : null,
+    ended?.costUsd ? money(ended.costUsd) : null,
+  ].filter((one): one is string => Boolean(one))
 }

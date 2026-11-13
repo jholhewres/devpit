@@ -2,7 +2,7 @@ import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'r
 
 import type { Message } from '../gen/bindings'
 import { steeredAnswers } from './activity'
-import { continuable, unanswered } from './chat'
+import { continuable, retryable, unanswered } from './chat'
 import { useMessage, useMessagesPick, type ChatMessages } from './chatMessages'
 import { Turn } from './Turn'
 import type { Reveal } from './useJump'
@@ -40,8 +40,10 @@ export function ChatThread({
   folder,
   rewindable,
   onRewind,
+  onEdit,
   onOpen,
   onContinue,
+  onRetry,
   onResend,
   reveal,
 }: {
@@ -57,9 +59,13 @@ export function ChatThread({
   folder: string | null
   rewindable: readonly string[]
   onRewind: (turnId: string) => void
+  /** Goes back to before a turn, its message to edit. */
+  onEdit: (turnId: string) => void
   onOpen: (path: string) => void
   /** Picks the conversation up where its last turn stopped. */
   onContinue: () => void
+  /** Sends again the message whose turn failed. */
+  onRetry: (text: string) => void
   /** Sends again the words of a message steered in that never reached the agent. */
   onResend?: (text: string) => void
   /** Where the thread hands up how to bring a message into view. */
@@ -68,7 +74,7 @@ export function ChatThread({
   const ids = useMessagesPick(messages, idsOf)
   const lost = useMessagesPick(messages, lostOf)
   const steered = useMessagesPick(messages, steeredAnswers)
-  const end = useMessagesPick(messages, (all) => ({ unanswered: unanswered(all, sending), continuable: continuable(all, sending) }))
+  const end = useMessagesPick(messages, (all) => ({ unanswered: unanswered(all, sending), continuable: continuable(all, sending), retry: retryable(all, sending) }))
   const guess = useCallback((id: string) => estimate(messages.byId(id)), [messages])
   const view = useWindow(ids, guess, box)
   /* Sent again from here: not offered twice. */
@@ -80,6 +86,7 @@ export function ChatThread({
     },
     [messages, onResend],
   )
+  const again = useCallback((id: string) => onResend?.(textOf(messages.byId(id))), [messages, onResend])
   const offered = useMemo(() => new Set(onResend ? lost.filter((id) => !resent.has(id)) : []), [lost, resent, onResend])
   useLayoutEffect(() => {
     if (reveal) reveal.current = view.reveal
@@ -100,13 +107,20 @@ export function ChatThread({
           onOpen={onOpen}
           rewindable={rewindable}
           onRewind={onRewind}
+          onEdit={onEdit}
+          onAgain={onResend ? again : undefined}
           onResend={offered.has(id) ? resend : undefined}
           steered={steered.includes(id)}
         />
       ))}
       {view.after > 0 && <div className="thread__gap" style={{ height: view.after - GAP }} aria-hidden />}
       {end.unanswered && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
-      {end.continuable && <button className="thread__go" onClick={onContinue}>Continue</button>}
+      {(end.continuable || end.retry !== null) && (
+        <div className="thread__end">
+          {end.continuable && <button className="thread__go" onClick={onContinue}>Continue</button>}
+          {end.retry !== null && <button className="thread__go" onClick={() => onRetry(end.retry!)}>Retry</button>}
+        </div>
+      )}
       {error && <div className="exempty__t" role="alert">{error}</div>}
     </div>
   )
@@ -121,6 +135,8 @@ const Row = memo(function Row({
   onOpen,
   rewindable,
   onRewind,
+  onEdit,
+  onAgain,
   onResend,
   steered,
 }: {
@@ -131,6 +147,8 @@ const Row = memo(function Row({
   onOpen: (path: string) => void
   rewindable: readonly string[]
   onRewind: (turnId: string) => void
+  onEdit: (turnId: string) => void
+  onAgain?: (id: string) => void
   onResend?: (id: string) => void
   steered: boolean
 }): React.JSX.Element | null {
@@ -148,6 +166,8 @@ const Row = memo(function Row({
         folder={folder}
         onOpen={onOpen}
         onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined}
+        onEdit={onEdit}
+        onAgain={onAgain ? () => onAgain(id) : undefined}
         onResend={onResend ? () => onResend(id) : undefined}
         steered={steered}
       />

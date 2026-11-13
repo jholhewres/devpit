@@ -75,3 +75,13 @@ fn picking_for_a_question_nobody_waits_on_keeps_nothing() {
     ));
     assert!(picks.taken("q_gone").is_none());
 }
+
+#[test]
+fn a_refusal_with_no_words_is_the_plain_refusal() {
+    let asking = Asking::default();
+    let picks = Picks::default();
+    let hear = asking.opened("q1");
+    assert!(refuse(&asking, &picks, "q1", "   "));
+    let said = reply_for(&picks, "q1", "{}", asking.wait("q1", hear));
+    assert_eq!(said, decision(Answer::Deny));
+}

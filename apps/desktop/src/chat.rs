@@ -286,6 +286,7 @@ pub async fn chat_send(
         return Ok(end);
     }
 
+    crate::chat_turn::ran_on(&mut said, &opening);
     let ended = devpit_rpc::Ended::of(&said.end, crate::chat_listening::now());
     let Said {
         end,

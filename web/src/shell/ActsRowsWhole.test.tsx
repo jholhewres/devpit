@@ -47,6 +47,8 @@ describe('an output the window got cut', () => {
 
     expect(asked).toEqual([['p1', 'c1', 'm1', 'call_1']])
     expect(screen.getByRole('img').getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=')
+    fireEvent.click(screen.getByRole('button', { name: 'Enlarge Image 1 of the output' }))
+    expect(screen.getByRole('dialog', { name: 'Image 1 of the output, enlarged' })).toBeTruthy()
   })
 
   it('offers nothing for an output that went whole', () => {
