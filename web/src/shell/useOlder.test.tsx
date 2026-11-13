@@ -2,6 +2,7 @@ import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../gen/bindings'
+import { chatMessages, useMessagesPick } from './chatMessages'
 import { prepended } from './frames'
 import { PAGE, useOlder } from './useOlder'
 
@@ -40,19 +41,20 @@ afterEach(() => {
 })
 
 function thread(first: Message[], older: boolean): { box: HTMLDivElement; shown: () => string[] } {
-  let messages = first
+  const store = chatMessages(first)
   let more = older
   let height = 1000
   let redraw: () => void = () => {}
   function Thread(): React.JSX.Element {
+    const messages = useMessagesPick(store, (all) => all)
     const { top, stalled } = useOlder(
       { projectId: 'p', conversationId: 'c' },
-      messages,
+      store,
       more,
       (page, left) => {
-        messages = [...prepended(messages, page)]
         more = left
         height += 400 * page.length
+        store.set((was) => prepended(was, page))
         redraw()
       },
       boxRef,

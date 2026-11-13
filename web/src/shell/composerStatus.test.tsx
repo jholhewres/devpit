@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message, Part } from '../gen/bindings'
+import { chatMessages } from './chatMessages'
 import { ComposerStatus } from './ComposerStatus'
 
 afterEach(cleanup)
@@ -22,7 +23,7 @@ const started: Part = {
 
 describe('work left running, above the composer', () => {
   it('lists a running command and stops that one task', async () => {
-    render(<ComposerStatus conversationId="conv_1" messages={[answer([started])]} />)
+    render(<ComposerStatus conversationId="conv_1" messages={chatMessages([answer([started])])} />)
     expect(screen.getByText('sleep 60 && echo late')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Stop sleep 60 && echo late' }))
     await waitFor(() => expect(stopped).toHaveBeenCalledWith('conv_1', 'bxk020dqw'))
@@ -31,7 +32,7 @@ describe('work left running, above the composer', () => {
   it('drops the row once the CLI says it stopped', () => {
     // The ending the probe measured: killed, then stopped.
     const ended: Part = { ...(started as Extract<Part, { kind: 'task' }>), status: 'stopped' }
-    const { container } = render(<ComposerStatus conversationId="c" messages={[answer([started, ended])]} />)
+    const { container } = render(<ComposerStatus conversationId="c" messages={chatMessages([answer([started, ended])])} />)
     expect(container.firstChild).toBeNull()
   })
 })
@@ -48,14 +49,14 @@ describe('the checklist, above the composer', () => {
       ...create('2', 'Edit notes.txt'),
       { kind: 'tool_call', id: 'u', name: 'TaskUpdate', input: JSON.stringify({ taskId: '1', status: 'completed' }), state: 'ok', parent: null },
     ]
-    const { container } = render(<ComposerStatus conversationId="c" messages={[answer(parts)]} />)
+    const { container } = render(<ComposerStatus conversationId="c" messages={chatMessages([answer(parts)])} />)
     expect(screen.getByText('1 of 2 done')).toBeTruthy()
     expect(container.querySelector('[data-changed]')?.textContent).toContain('Read notes.txt')
   })
 
   it('reads only the newest answer', () => {
     const old = { ...answer(create('1', 'from an old turn')), id: 'old' }
-    const { container } = render(<ComposerStatus conversationId="c" messages={[old, answer([])]} />)
+    const { container } = render(<ComposerStatus conversationId="c" messages={chatMessages([old, answer([])])} />)
     expect(container.firstChild).toBeNull()
   })
 })

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import type { Message } from '../gen/bindings'
+import type { Message, Part } from '../gen/bindings'
 import { elapsed, running, tasksOf } from './backgroundTasks'
 import { checklistOf, done } from './checklist'
+import { useMessagesPick, type ChatMessages } from './chatMessages'
 import { ask, commands } from './live'
 
 /*
@@ -13,20 +14,23 @@ import { ask, commands } from './live'
  * or abandoned, and either way it is not what the agent is doing now.
  */
 
+const NONE: readonly Part[] = []
+
+/* The newest answer's parts other than its text, item by item the same while only its text grows. */
+const workOf = (all: readonly Message[]): readonly Part[] =>
+  all.findLast((one) => one.role === 'assistant')?.parts.filter((part) => part.kind !== 'text') ?? NONE
+
 export function ComposerStatus({
   conversationId,
   messages,
 }: {
   conversationId: string
-  messages: readonly Message[]
+  messages: ChatMessages
 }): React.JSX.Element | null {
-  /* Read from the end, and only when the messages change: the clock below
-     ticks every second and must not walk the thread each time. */
-  const latest = messages.findLast((one) => one.role === 'assistant')
-  const { tasks, list } = useMemo(() => {
-    const parts = latest?.parts ?? []
-    return { tasks: tasksOf(parts).filter(running), list: checklistOf(parts) }
-  }, [latest])
+  /* Read from the end, and only when the work changes: the clock below ticks
+     every second and must not walk the thread, nor a streamed batch draw it. */
+  const work = useMessagesPick(messages, workOf)
+  const { tasks, list } = useMemo(() => ({ tasks: tasksOf(work).filter(running), list: checklistOf(work) }), [work])
 
   /* When each task was first seen here. The CLI sends no start time, and
      "running for" is the question a person glancing at the strip is asking. */

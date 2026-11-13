@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Message } from '../gen/bindings'
 import { CONTINUE, continuable } from './chat'
+import { chatMessages } from './chatMessages'
 import { ChatThread } from './ChatThread'
 import { rangesIn } from './chatSearch'
 import { Markdown } from './MarkdownView'
@@ -24,7 +25,7 @@ function Thread({ messages, onContinue }: { messages: readonly Message[]; onCont
   const nothing = (): void => {}
   return (
     <div ref={box}>
-      <ChatThread messages={messages} box={box} top={top} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={onContinue} />
+      <ChatThread messages={chatMessages(messages)} box={box} top={top} older={false} stalled={false} onMore={nothing} sending={false} error={null} folder={null} rewindable={[]} onRewind={nothing} onOpen={nothing} onContinue={onContinue} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ChatQueue, Message } from '../gen/bindings'
+import { chatMessages } from './chatMessages'
 import { ChatPane } from './ChatPane'
 
 /* What a step started — the queue read from disk, a steer's answer, a write —
@@ -19,7 +20,7 @@ const answer = (id: string): Message =>
 
 const picture = { name: 'pasted-1.png', path: '/h/pasted/pasted-1.png', kind: 'png' }
 const chat = {
-  messages: [user('u1', 'first prompt'), answer('a1'), user('u2', '@/w/a.ts\nsecond prompt'), answer('a2'), user('u3', 'last prompt'), answer('a3')],
+  messages: chatMessages([user('u1', 'first prompt'), answer('a1'), user('u2', '@/w/a.ts\nsecond prompt'), answer('a2'), user('u3', 'last prompt'), answer('a3')]),
   rewindable: [], files: [] as typeof picture[], skills: [], previews: {}, asked: [], error: null, sending: false, failed: false,
   profileId: 'prof_1', profiles: [], cost: 0, session: null, card: null, older: false, folder: null,
   say: vi.fn(), steer: vi.fn(async () => true), stop: vi.fn(), answer: vi.fn(), detach: vi.fn(), attach: vi.fn(), paste: vi.fn(),

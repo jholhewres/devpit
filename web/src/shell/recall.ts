@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 
 import type { Message } from '../gen/bindings'
+import type { ChatMessages } from './chatMessages'
 import { matches } from './shortcuts'
 
 /*
@@ -42,7 +43,7 @@ export function walked(count: number, at: number | null, up: boolean): number | 
  * the walk, and the keys move the caret again.
  */
 export function useRecall(
-  messages: readonly Message[],
+  messages: ChatMessages,
   prompt: string,
   setPrompt: (text: string) => void,
   attached: boolean,
@@ -51,7 +52,7 @@ export function useRecall(
   return (event) => {
     const up = matches('recallPrompt', event)
     if ((!up && !matches('recallNext', event)) || attached) return false
-    const prompts = promptsOf(messages)
+    const prompts = promptsOf(messages.get())
     if (at.current !== null && prompt !== prompts[at.current]) at.current = null
     if (at.current === null && prompt !== '') return false
     const next = walked(prompts.length, at.current, up)

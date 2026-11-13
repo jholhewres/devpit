@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { Message } from '../gen/bindings'
+import { useMessagesPick, type ChatMessages } from './chatMessages'
 import { ask, commands } from './live'
 import { useFollow, type Follow } from './useFollow'
 
@@ -11,17 +12,15 @@ export const PAGE = 50
    showed, measured from the bottom, since everything grew above it. */
 export function useOlder(
   where: { projectId: string; conversationId: string } | null,
-  messages: readonly Message[],
+  messages: ChatMessages,
   older: boolean,
   took: (page: readonly Message[], older: boolean) => void,
   box: React.RefObject<HTMLElement | null>,
 ): Older {
   const top = useRef<HTMLDivElement>(null)
   const [stalled, setStalled] = useState(false)
-  const drawn = useRef(messages)
-  drawn.current = messages
   const asking = useRef(false)
-  const first = messages[0]?.id ?? null
+  const first = useMessagesPick(messages, (all) => all[0]?.id ?? null)
   /* Height under the top of the view, before a page went in above it. */
   const below = useRef<number | null>(null)
 
@@ -33,12 +32,12 @@ export function useOlder(
       asking.current = false
       if (!page.data) return
       /* The top stays in view after a page of nothing new, and nothing would ask again. */
-      const ids = new Set(drawn.current.map((one) => one.id))
+      const ids = new Set(messages.get().map((one) => one.id))
       setStalled(page.data.older && !page.data.messages.some((one) => !ids.has(one.id)))
       below.current = scroll ? scroll.scrollHeight - scroll.scrollTop : null
       took(page.data.messages, page.data.older)
     })
-  }, [where, first, box, took])
+  }, [where, first, box, took, messages])
 
   /* Back where it was before the page above is painted, not a frame after. */
   useLayoutEffect(() => {
@@ -72,9 +71,11 @@ export type Older = { top: React.RefObject<HTMLDivElement | null>; stalled: bool
 export function useThread(
   projectId: string | null,
   conversationId: string,
-  chat: { messages: readonly Message[]; older: boolean; took: (page: readonly Message[], older: boolean) => void },
+  chat: { messages: ChatMessages; older: boolean; took: (page: readonly Message[], older: boolean) => void },
 ): Follow<HTMLDivElement> & Older {
-  const follow = useFollow<HTMLDivElement>(chat.messages)
+  /* Pinned again when a message comes or goes; a turn growing is heard as a resize. */
+  const shape = useMessagesPick(chat.messages, (all) => ({ count: all.length, last: all.at(-1)?.id }))
+  const follow = useFollow<HTMLDivElement>(shape)
   const where = useMemo(() => (projectId ? { projectId, conversationId } : null), [projectId, conversationId])
   const older = useOlder(where, chat.messages, chat.older, chat.took, follow.box)
   return { ...follow, ...older }
