@@ -5,7 +5,8 @@ import type { LiveSession, StopAsked } from '../gen/bindings'
 import { StopsAsked } from './StopsAsked'
 
 let asked: StopAsked[] = []
-const confirmed = vi.fn(async (..._args: unknown[]) => ({ stopped: [] as string[], failed: [] as string[] }))
+let answered = { stopped: [] as string[], failed: [] as string[], changed: [] as string[] }
+const confirmed = vi.fn(async (..._args: unknown[]) => answered)
 const dropped = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock('./live', () => ({
   ask: async (call: () => Promise<unknown>) => ({ data: await call(), error: null, loading: false }),
@@ -20,6 +21,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   asked = []
+  answered = { stopped: [], failed: [], changed: [] }
 })
 
 const live = (name: string): LiveSession => ({ name, pid: 1, status: 'idle', projectName: 'api' }) as LiveSession
@@ -37,7 +39,7 @@ describe('the stops the orchestrator asked for', () => {
     expect(confirmed).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Stop all 3' }))
     await waitFor(() => expect(confirmed).toHaveBeenCalledTimes(1))
-    expect(confirmed).toHaveBeenCalledWith('claude', ['a1', 'a2', 'a3'])
+    expect(confirmed).toHaveBeenCalledWith('claude', asked)
     await waitFor(() => expect(onDone).toHaveBeenCalled())
   })
 
@@ -47,14 +49,40 @@ describe('the stops the orchestrator asked for', () => {
     await screen.findByText('a1')
     expect(screen.queryByText('gone')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Stop it' }))
-    await waitFor(() => expect(confirmed).toHaveBeenCalledWith('claude', ['a1']))
+    await waitFor(() => expect(confirmed).toHaveBeenCalledWith('claude', [stop('a1')]))
+  })
+
+  it('says which would lose more by the click, and stops none of those', async () => {
+    asked = [stop('a1'), stop('a2')]
+    answered = { stopped: ['a1'], failed: [], changed: ['a2: its folder has 2 file(s) not committed'] }
+    render(<StopsAsked profileId="claude" sessions={[live('a1'), live('a2')]} onDone={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop all 2' }))
+    await screen.findByText(/would lose more now: a2: its folder has 2 file\(s\) not committed/)
+  })
+
+  it('lets the message of a failed stop go', async () => {
+    asked = [stop('a1')]
+    answered = { stopped: [], failed: ['a1: it could not be stopped'], changed: [] }
+    render(<StopsAsked profileId="claude" sessions={[live('a1')]} onDone={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop it' }))
+    await screen.findByText(/could not be stopped/)
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByText(/could not be stopped/)).toBeNull())
+  })
+
+  it('keeps one running and leaves the others asked', async () => {
+    asked = [stop('a1'), stop('a2')]
+    render(<StopsAsked profileId="claude" sessions={[live('a1'), live('a2')]} onDone={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep a2 running' }))
+    await waitFor(() => expect(dropped).toHaveBeenCalledWith('claude', ['a2']))
+    expect(confirmed).not.toHaveBeenCalled()
   })
 
   it('keeps them running without stopping anything', async () => {
     asked = [stop('a1')]
     render(<StopsAsked profileId="claude" sessions={[live('a1')]} onDone={vi.fn()} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Keep running' }))
-    await waitFor(() => expect(dropped).toHaveBeenCalledWith('claude'))
+    await waitFor(() => expect(dropped).toHaveBeenCalledWith('claude', ['a1']))
     expect(confirmed).not.toHaveBeenCalled()
   })
 

@@ -137,7 +137,7 @@ pub use remote::RemoteAct;
 pub use remote_view::{
     RemoteActivities, RemoteActivity, RemoteAsking, RemoteDevice, RemoteDraft, RemoteIn,
     RemoteOrchestrator, RemoteOut, RemotePairing, RemoteProject, RemoteQuestion, RemoteRelay,
-    RemoteSession, RemoteShapes, RemoteTalks, RemoteTerminal, RemoteVia, RemoteView,
+    RemoteSession, RemoteShapes, RemoteStop, RemoteTalks, RemoteTerminal, RemoteVia, RemoteView,
     TailscaleState,
 };
 pub use review::{

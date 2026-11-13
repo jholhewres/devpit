@@ -163,13 +163,59 @@ pub(crate) fn stop(
             return Err(RpcError::new(ErrorCode::Conflict, why));
         }
     }
+    end(app, profile_id, name, &found, by)
+}
+
+/// What a person's click on a stop came to.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Clicked {
+    Stopped,
+    /// It would lose this now, which the click did not show: not stopped.
+    Changed(String),
+}
+
+/// Whether a click that showed `seen` as what a stop loses covers what it
+/// loses `now`: nothing, or that very loss. Otherwise `now`, to show first.
+pub(crate) fn as_seen(seen: Option<&str>, now: Option<String>) -> Result<(), String> {
+    match now {
+        Some(now) if seen != Some(now.as_str()) => Err(now),
+        _ => Ok(()),
+    }
+}
+
+/// Stops `name` (only `only`) on the person's click, which showed `seen` as
+/// what it loses: read again here, at the click, in the one read the stop
+/// goes on.
+pub(crate) fn stop_as_seen(
+    app: &AppHandle,
+    profile_id: &str,
+    name: &str,
+    only: Option<i32>,
+    seen: Option<&str>,
+) -> Result<Clicked, RpcError> {
+    let found = running(profile_id, name, only)?;
+    let (busy, dirty) = stake(&found);
+    if let Err(now) = as_seen(seen, at_stake(busy, dirty)) {
+        return Ok(Clicked::Changed(now));
+    }
+    end(app, profile_id, name, &found, "person").map(|_| Clicked::Stopped)
+}
+
+/// Ends `found`, the sessions called `name`, and closes their terminals.
+fn end(
+    app: &AppHandle,
+    profile_id: &str,
+    name: &str,
+    found: &[crate::live_sessions::Running],
+    by: &str,
+) -> Result<Value, RpcError> {
     if let Ok(store) = crate::projects::store() {
         for id in found.iter().filter_map(|one| one.session_id.as_deref()) {
             let _ = store.session_stopped(id, by, crate::ended_sessions::now_secs());
         }
     }
     let mut terminal = Value::Null;
-    for one in &found {
+    for one in found {
         match (&one.pane, &one.job) {
             (Some(pane), _) => {
                 let tab_id = close_pane(app, &pane.project_id, &pane.pane_id)?;

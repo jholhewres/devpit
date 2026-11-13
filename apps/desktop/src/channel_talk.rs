@@ -119,7 +119,7 @@ pub(crate) async fn heard(line: &(impl Line + Sync), desk: &(impl Desk + Sync), 
             },
         )
         .await;
-    let offered = turn.end();
+    let offered = together(turn.end());
     let mut messages = match answer {
         Ok(answer) => shaped(&answer, privacy),
         // Why can carry the agent's own output, which minimal keeps in devpit.
@@ -131,6 +131,7 @@ pub(crate) async fn heard(line: &(impl Line + Sync), desk: &(impl Desk + Sync), 
     if !offered.is_empty() {
         let asks: Vec<String> = offered
             .iter()
+            .filter(|action| !matches!(action, Action::All(_)))
             .map(|action| asked(action, privacy))
             .collect();
         messages.push(format!("Waiting for your press:\n{}", asks.join("\n")));
@@ -283,6 +284,23 @@ pub(crate) fn split(text: &str, most: usize) -> Vec<String> {
     pieces
 }
 
+/// The buttons a turn asked for, and one more for each kind asked several
+/// times: N stops, or N drafts, go in one press.
+pub(crate) fn together(offered: Vec<Action>) -> Vec<Action> {
+    let of = |kind: fn(&Action) -> bool| -> Vec<Action> {
+        offered.iter().filter(|one| kind(one)).cloned().collect()
+    };
+    let stops = of(|one| matches!(one, Action::StopSession { .. }));
+    let drafts = of(|one| matches!(one, Action::SendDraft { .. }));
+    let mut all = offered;
+    for several in [stops, drafts] {
+        if several.len() > 1 {
+            all.push(Action::All(several));
+        }
+    }
+    all
+}
+
 /// What a button under an answer will do, as much as `privacy` lets out.
 fn asked(action: &Action, privacy: Privacy) -> String {
     let named = privacy != Privacy::Minimal;
@@ -295,8 +313,15 @@ fn asked(action: &Action, privacy: Privacy) -> String {
         }
         Action::SendDraft { session, .. } if named => format!("send the draft to {session}"),
         Action::SendDraft { .. } => "send a draft".to_owned(),
-        Action::StopSession { session, .. } if named => format!("stop {session}"),
-        Action::StopSession { .. } => "stop a session".to_owned(),
+        Action::StopSession {
+            session, losing, ..
+        } => {
+            let who = if named { session.as_str() } else { "a session" };
+            match losing {
+                Some(losing) => format!("stop {who}, which loses work: {losing}"),
+                None => format!("stop {who}"),
+            }
+        }
         Action::MoveCard { card, lane, .. } if named => {
             format!("move «{card}» to {lane}, which starts its step")
         }

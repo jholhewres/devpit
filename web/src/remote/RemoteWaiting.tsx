@@ -1,6 +1,6 @@
-import type { AgentHealth, RemoteDraft, RemoteIn, RemoteQuestion } from '../gen/bindings'
+import type { AgentHealth, RemoteDraft, RemoteIn, RemoteQuestion, RemoteStop } from '../gen/bindings'
 
-/* What agents are waiting on the person for, answered from here. */
+/* What agents and orchestrators are waiting on the person for, answered from here. */
 
 const what = (question: RemoteQuestion): string => {
   try {
@@ -15,6 +15,7 @@ const what = (question: RemoteQuestion): string => {
 export function RemoteWaiting({
   questions,
   drafts,
+  stops,
   health,
   answering,
   typing,
@@ -22,6 +23,7 @@ export function RemoteWaiting({
 }: {
   questions: readonly RemoteQuestion[]
   drafts: readonly RemoteDraft[]
+  stops: readonly RemoteStop[]
   health: AgentHealth | null
   answering: boolean
   typing: boolean
@@ -29,7 +31,33 @@ export function RemoteWaiting({
 }): React.JSX.Element {
   return (
     <div className="rm__list">
-      {questions.length === 0 && drafts.length === 0 && <p className="rm__said">Nothing is waiting on you.</p>}
+      {questions.length === 0 && drafts.length === 0 && stops.length === 0 && <p className="rm__said">Nothing is waiting on you.</p>}
+      {stops.length > 0 && (
+        <div className="rm__ask">
+          <span className="rm__dim">{stops.length > 1 ? `Asked to stop these ${stops.length} sessions` : 'Asked to stop this session'}; work in flight is lost</span>
+          {stops.map(({ profile, stop }) => (
+            <div key={`${profile}/${stop.name}`}>
+              <code className="rm__what">{stop.name}</code>
+              {stop.losing && <span className="rm__dim">{stop.losing}</span>}
+            </div>
+          ))}
+          {typing ? (
+            <div className="rm__acts">
+              <button className="rm__btn" onClick={() => send({ t: 'stopsDrop', stops: [...stops] })}>
+                Keep running
+              </button>
+              <button
+                className="rm__btn rm__btn--go"
+                onClick={() => confirm(`Stop ${stops.map(({ stop }) => stop.name).join(', ')}, as you?`) && send({ t: 'stopsConfirm', stops: [...stops] })}
+              >
+                {stops.length > 1 ? `Stop all ${stops.length}` : 'Stop it'}
+              </button>
+            </div>
+          ) : (
+            <span className="rm__dim">Typing is allowed on the machine, per device.</span>
+          )}
+        </div>
+      )}
       {questions.map((question) => (
         <div className="rm__ask" key={question.id}>
           <span className="rm__dim">{question.project ?? (question.from === 'chat' ? 'a chat' : 'a terminal')} asks to</span>

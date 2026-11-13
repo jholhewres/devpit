@@ -7,7 +7,8 @@ import { onCarried } from './window'
 /*
  * The stops the orchestrator asked for that the person's own words did not
  * cover, above its composer: every session listed with what it would lose,
- * and one click stops them all, as the person. Nothing stops without it.
+ * and one click stops them all, as the person. Nothing stops without it, and
+ * one that would lose more by the click than it showed is not stopped.
  */
 
 /** Said by the window's backend when an orchestrator asks for a stop. */
@@ -36,19 +37,22 @@ export function StopsAsked({
   const shown = asked.filter((one) => sessions.some((live) => live.name === one.name && (one.pid === null || live.pid === one.pid)))
   if (shown.length === 0 && !said) return null
 
+  /* The click confirms the stops as shown: each stops on the loss it showed. */
   const stopAll = (): void => {
     setStopping(true)
-    void ask(() => commands.orchestratorStopsConfirm(profileId, shown.map((one) => one.name))).then((done) => {
+    void ask(() => commands.orchestratorStopsConfirm(profileId, shown)).then((done) => {
       setStopping(false)
-      setSaid(done.error ?? (done.data?.failed.length ? done.data.failed.join(' · ') : null))
+      const changed = (done.data?.changed ?? []).map((one) => `Not stopped, it would lose more now: ${one}`)
+      const said = [done.error, ...(done.data?.failed ?? []), ...changed].filter(Boolean)
+      setSaid(said.length > 0 ? said.join(' · ') : null)
       read()
       onDone()
     })
   }
 
-  const keep = (): void => {
+  const keep = (names: readonly string[]): void => {
     setSaid(null)
-    void commands.orchestratorStopsDrop(profileId).then(read)
+    void commands.orchestratorStopsDrop(profileId, [...names]).then(read)
   }
 
   const many = shown.length > 1
@@ -62,6 +66,11 @@ export function StopsAsked({
               <p className="wprompt__who">
                 <span className="osess__name">{one.name}</span>
                 <span className="osess__where">{sessions.find((live) => live.name === one.name)?.projectName ?? 'outside devpit'}</span>
+                {many && (
+                  <button className="wprompt__o wprompt__esc" disabled={stopping} aria-label={`Keep ${one.name} running`} onClick={() => keep([one.name])}>
+                    Keep
+                  </button>
+                )}
               </p>
               {one.losing && <p className="osess__said">{one.losing}</p>}
             </div>
@@ -70,13 +79,20 @@ export function StopsAsked({
             <button className="wprompt__o" disabled={stopping} onClick={stopAll}>
               {many ? `Stop all ${shown.length}` : 'Stop it'}
             </button>
-            <button className="wprompt__o wprompt__esc" disabled={stopping} onClick={keep}>
+            <button className="wprompt__o wprompt__esc" disabled={stopping} onClick={() => keep(shown.map((one) => one.name))}>
               Keep running
             </button>
           </div>
         </>
       )}
-      {said && <p className="osess__said">{said}</p>}
+      {said && (
+        <p className="osess__said">
+          {said}{' '}
+          <button className="wprompt__o wprompt__esc" aria-label="Dismiss" onClick={() => setSaid(null)}>
+            ×
+          </button>
+        </p>
+      )}
     </section>
   )
 }

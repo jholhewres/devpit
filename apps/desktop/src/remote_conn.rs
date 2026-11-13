@@ -127,6 +127,7 @@ pub(crate) fn serve(
             typing: device.typing,
             answering: device.answering,
             binary: true,
+            stops: true,
         },
     );
     converse(
@@ -326,6 +327,29 @@ fn drafts_now() -> RemoteOut {
             })
             .collect(),
     }
+}
+
+/// The stops waiting on the person's click, and what the last click came to.
+pub(crate) fn stops_now(said: Option<String>) -> RemoteOut {
+    RemoteOut::Stops {
+        stops: crate::stop_asked::all(),
+        said,
+    }
+}
+
+/// The stops a viewer sent, by the orchestrator account each waits for.
+fn by_profile(stops: &[devpit_rpc::RemoteStop]) -> Vec<(String, Vec<devpit_rpc::StopAsked>)> {
+    let mut grouped: Vec<(String, Vec<devpit_rpc::StopAsked>)> = Vec::new();
+    for one in stops {
+        match grouped
+            .iter_mut()
+            .find(|(profile, _)| *profile == one.profile)
+        {
+            Some((_, list)) => list.push(one.stop.clone()),
+            None => grouped.push((one.profile.clone(), vec![one.stop.clone()])),
+        }
+    }
+    grouped
 }
 
 fn failed(why: impl Into<String>) -> Option<RemoteOut> {
@@ -571,6 +595,37 @@ fn answer(
             }
             crate::remote::note(root, device, &format!("sent a draft to {name}"));
             Some(drafts_now())
+        }
+        RemoteIn::Stops => Some(stops_now(None)),
+        RemoteIn::StopsConfirm { stops } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            let mut said = Vec::new();
+            for (profile, shown) in by_profile(&stops) {
+                let done = crate::stop_asked::confirm_now(app, &profile, &shown);
+                if !done.stopped.is_empty() {
+                    let names = done.stopped.join(", ");
+                    crate::remote::note(root, device, &format!("stopped {names}"));
+                }
+                said.extend(
+                    done.changed
+                        .iter()
+                        .map(|one| format!("Not stopped, it would lose more now: {one}")),
+                );
+                said.extend(done.failed.iter().map(|one| format!("Not stopped: {one}")));
+            }
+            Some(stops_now((!said.is_empty()).then(|| said.join(" · "))))
+        }
+        RemoteIn::StopsDrop { stops } => {
+            if !device.typing {
+                return failed("this device may only watch — allow it to type on the machine");
+            }
+            for (profile, shown) in by_profile(&stops) {
+                let names: Vec<String> = shown.into_iter().map(|one| one.name).collect();
+                crate::stop_asked::drop_now(app, &profile, &names);
+            }
+            Some(stops_now(None))
         }
         RemoteIn::CardCreate { project, title } => {
             if !device.typing {

@@ -296,11 +296,12 @@ fn respond_in(
                 .and_then(Value::as_i64)
                 .map(|pid| pid as i32);
             let force = asked.params.get("force").and_then(Value::as_bool) == Some(true);
+            let losing = crate::stopping::losing(profile, &name, pid).map_err(said)?;
             let press = crate::channels::Action::StopSession {
                 profile: profile.to_owned(),
                 session: name.clone(),
                 pid,
-                force,
+                losing: losing.clone(),
             };
             if crate::channel_talk::offer(&here.id, press) {
                 return Ok(crate::channel_talk::pending(
@@ -311,16 +312,17 @@ fn respond_in(
             let live = crate::live_sessions::orchestrator_sessions_now(profile).map_err(said)?;
             let word = crate::draft_sending::last_word(profile, Path::new(&here.root_path)).ok();
             let running: Vec<&str> = live.sessions.iter().map(|one| one.name.as_str()).collect();
-            let losing = crate::stopping::losing(profile, &name, pid).map_err(said)?;
-            if let Err(why) = crate::stop_asked::allowed(
-                word.as_ref(),
-                &name,
-                &running,
-                crate::stop_asked::swapped(&live.sessions, &name, pid),
-                losing.as_deref(),
+            let request = crate::stop_asked::Request {
+                said: word.as_ref(),
+                name: &name,
+                pid,
+                running: &running,
+                swapped: crate::stop_asked::swapped(&live.sessions, &name, pid),
+                losing,
                 force,
-            ) {
-                let asked = crate::stop_asked::ask(profile, &name, pid, losing, &why);
+                drafted: crate::reply_drafts::drafted(profile, &name).is_some(),
+            };
+            if let Err(asked) = crate::stop_asked::requested(profile, &request) {
                 let _ = app.emit(crate::stop_asked::STOP_ASKED, profile);
                 return Ok(asked);
             }

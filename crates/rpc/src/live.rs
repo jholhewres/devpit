@@ -202,4 +202,7 @@ pub struct StopsConfirmed {
     pub stopped: Vec<String>,
     /// `name: why`, for each that could not be stopped.
     pub failed: Vec<String>,
+    /// `name: loss`, for each that would lose more now than the click
+    /// showed: not stopped, and waiting again with it.
+    pub changed: Vec<String>,
 }

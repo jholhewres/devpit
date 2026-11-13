@@ -562,12 +562,12 @@ export const commands = {
 	/**  `orchestrator.stops_asked` — the stops waiting for the person's click. */
 	orchestratorStopsAsked: (profileId: string) => __TAURI_INVOKE<StopsAsked>("orchestrator_stops_asked", { profileId }),
 	/**
-	 *  `orchestrator.stops_confirm` — the person's click: each of `names` still
-	 *  waiting stops as theirs, with what it loses, which the click was shown.
+	 *  `orchestrator.stops_confirm` — the person's click on the stops as it
+	 *  showed them: each stops as theirs on the loss it showed, read again now.
 	 */
-	orchestratorStopsConfirm: (profileId: string, names: string[]) => typedError<StopsConfirmed, RpcError>(__TAURI_INVOKE("orchestrator_stops_confirm", { profileId, names })),
-	/**  `orchestrator.stops_drop` — the person keeps them running. */
-	orchestratorStopsDrop: (profileId: string) => __TAURI_INVOKE<void>("orchestrator_stops_drop", { profileId }),
+	orchestratorStopsConfirm: (profileId: string, stops: StopAsked[]) => typedError<StopsConfirmed, RpcError>(__TAURI_INVOKE("orchestrator_stops_confirm", { profileId, stops })),
+	/**  `orchestrator.stops_drop` — the person keeps `names` running. */
+	orchestratorStopsDrop: (profileId: string, names: string[]) => __TAURI_INVOKE<void>("orchestrator_stops_drop", { profileId, names }),
 	/**  `island.draft` — the reply drafted for a session the island shows, if any. */
 	islandDraft: (sessionId: string) => typedError<string | null, RpcError>(__TAURI_INVOKE("island_draft", { sessionId })),
 	/**  `island.draft_send` — sends that draft into the session's terminal, as the person. */
@@ -4968,7 +4968,19 @@ handle?: number | null } |
 /**  The replies orchestrators drafted for the person to send. */
 { t: "drafts" } | 
 /**  Types a draft into its session's terminal. Only a device allowed to type. */
-{ t: "draftSend"; profile: string; name: string } | { t: "agentHealth" } | 
+{ t: "draftSend"; profile: string; name: string } | 
+/**
+ *  The stops orchestrators asked for, waiting on the person's click. Sent
+ *  only to a host whose welcome said `stops`.
+ */
+{ t: "stops" } | 
+/**
+ *  The person's click on the stops as the viewer showed them: each stops
+ *  on the loss it showed. Only a device allowed to type.
+ */
+{ t: "stopsConfirm"; stops: RemoteStop[] } | 
+/**  The person keeps these running. Only a device allowed to type. */
+{ t: "stopsDrop"; stops: RemoteStop[] } | { t: "agentHealth" } | 
 /**  A card in the project's first lane. Only a device allowed to type. */
 { t: "cardCreate"; project: string; title: string } | 
 /**
@@ -5026,14 +5038,24 @@ export type RemoteOrchestrator = {
 /**  What the host says. */
 export type RemoteOut = { t: "welcome"; device: string; host: string; typing: boolean; answering: boolean; 
 /**  The host reads and sends raw terminal bytes; absent from an older one. */
-binary?: boolean } | 
+binary?: boolean; 
+/**
+ *  The host shows the stops waiting on the person's click; absent
+ *  from an older one.
+ */
+stops?: boolean } | 
 /**
  *  The device proved its pairing code and waits for the person at the
  *  machine to allow it. An older viewer passes it by.
  */
 { t: "approving" } | 
 /**  Said once, then the connection ends. */
-{ t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | { t: "agentHealth"; health: AgentHealth } | 
+{ t: "refused"; why: string } | { t: "projects"; projects: RemoteProject[] } | { t: "paneBytes"; pane: string; b64: string } | { t: "paneClosed"; pane: string } | { t: "board"; project: string; board: Board } | { t: "boardChanged"; project: string } | { t: "waiting"; questions: RemoteQuestion[] } | { t: "chats"; project: string; conversations: Conversations } | { t: "chat"; project: string; conversation: Conversation } | { t: "drafts"; drafts: RemoteDraft[] } | 
+/**
+ *  The stops waiting on the person's click, and what the last click on
+ *  them came to. An older viewer passes it by.
+ */
+{ t: "stops"; stops: RemoteStop[]; said: string | null } | { t: "agentHealth"; health: AgentHealth } | 
 /**  A session started from here, by the name to find it under. */
 { t: "started"; name: string } | 
 /**  A secret was kept, said by its name alone. */
@@ -5102,6 +5124,13 @@ export type RemoteState = {
 	 *  but not connected yet — its process starts with the next message.
 	 */
 	url: string | null,
+};
+
+/**  A stop an orchestrator asked for, waiting on the person's click. */
+export type RemoteStop = {
+	/**  The orchestrator's account. */
+	profile: string,
+	stop: StopAsked,
 };
 
 /**  Who there is to talk to from the Remote. */
@@ -5767,6 +5796,11 @@ export type StopsConfirmed = {
 	stopped: string[],
 	/**  `name: why`, for each that could not be stopped. */
 	failed: string[],
+	/**
+	 *  `name: loss`, for each that would lose more now than the click
+	 *  showed: not stopped, and waiting again with it.
+	 */
+	changed: string[],
 };
 
 /**  A cookie store on this machine that a pane could be given. */
