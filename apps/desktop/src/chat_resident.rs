@@ -367,6 +367,7 @@ fn woke(app: &AppHandle, conversation: &str, logs: &std::path::Path) -> Woken {
     };
     let relay = app.state::<crate::chat_relay::Relay>();
     let (frames, relaying) = relay.open(conversation, Channel::new(|_| Ok(())));
+    let frames = crate::chat_pace::paced(frames);
     let turn_id = format!("turn_{}", ulid::Ulid::generate());
     let answer_id = format!("msg_{}", ulid::Ulid::generate());
     let began = crate::chat_listening::now();

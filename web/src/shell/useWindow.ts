@@ -18,12 +18,18 @@ export const MOST = 60
 /* Rows a conversation opens with, before anything is measured. */
 export const FIRST = 16
 
+/* Kept per message: the spacers sum every row on each streamed frame, and only the growing one is new. */
+const guessed = new WeakMap<Message, number>()
+
 /* A row's height before it was ever drawn, by what it holds. */
 export function estimate(message: Message): number {
+  const known = guessed.get(message)
+  if (known !== undefined) return known
   const text = message.parts.reduce((sum, part) => sum + ('text' in part ? part.text.length : 0), 0)
-  if (message.role === 'user') return 48 + 22 * Math.ceil(text / 90) + GAP
   const acts = message.parts.filter((part) => part.kind !== 'text').length
-  return 64 + 28 * Math.min(acts, 6) + 22 * Math.ceil(text / 110) + GAP
+  const height = message.role === 'user' ? 48 + 22 * Math.ceil(text / 90) + GAP : 64 + 28 * Math.min(acts, 6) + 22 * Math.ceil(text / 110) + GAP
+  guessed.set(message, height)
+  return height
 }
 
 /* The rows that cover `over` past each edge of the view, `top` being where it starts. */
