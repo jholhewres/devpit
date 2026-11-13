@@ -1,13 +1,16 @@
-import { act, cleanup, configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ChatQueue, Message } from '../gen/bindings'
 import { ChatPane } from './ChatPane'
 
-/* Every wait here ends on mocks that answer at once; only rendering the pane
-   takes time, past the default second on a loaded CI runner. Under the 5 s
-   test limit, so a stuck wait still says which query it was. */
-configure({ asyncUtilTimeout: 3000 })
+/* What a step started — the queue read from disk, a steer's answer, a write —
+   is settled before the next step looks, instead of polled for under a time
+   budget a loaded runner outruns. Every mock answers with a promise, so one
+   turn of the event loop inside act drains them, and act draws what they set. */
+const settled = (): Promise<void> => act(async () => void (await new Promise((done) => setTimeout(done, 0))))
+/* Only a hang guard: nothing below waits on time. Rendering the pane is slow under load. */
+const LIMIT = 30_000
 
 const user = (id: string, text: string): Message =>
   ({ id, turnId: null, role: 'user', parts: [{ kind: 'text', text, parent: null }], createdAt: 0, streaming: false }) as Message
@@ -73,18 +76,21 @@ describe('Mod+Shift+Enter with a turn running', () => {
     const first = { id: 'q1', prompt: 'look at this', files: [picture], skills: [] }
     disk.queue = { items: [first, { id: 'q2', prompt: 'then this', files: [], skills: [] }], paused: false }
     render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
-    await screen.findByText('look at this')
+    await settled()
+    expect(screen.getByText('look at this')).toBeTruthy()
 
     fireEvent.keyDown(field(), { key: 'Enter', ctrlKey: true, shiftKey: true })
-    await waitFor(() => expect(screen.queryByText('look at this')).toBeNull())
+    await settled()
+    expect(screen.queryByText('look at this')).toBeNull()
     expect(chat.steer).toHaveBeenCalledTimes(1)
     expect(chat.steer).toHaveBeenCalledWith('look at this', first)
     expect(chat.say).not.toHaveBeenCalled()
 
     fireEvent.keyDown(field(), { key: 'Enter', ctrlKey: true, shiftKey: true, repeat: true })
+    await settled()
     expect(chat.steer).toHaveBeenCalledTimes(1)
     expect(screen.getByText('then this')).toBeTruthy()
-  })
+  }, LIMIT)
 
   it('Mod+Enter steers what is typed, with what is attached, instead of queueing it', async () => {
     chat.sending = true
@@ -104,15 +110,18 @@ describe('a stop with messages queued', () => {
     chat.sending = true
     disk.queue = { items: [{ id: 'q1', prompt: 'wait for me', files: [picture], skills: [] }], paused: false }
     render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
-    await screen.findByText('wait for me')
+    await settled()
+    expect(screen.getByText('wait for me')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
-    await screen.findByText('Queue paused')
+    await settled()
+    expect(screen.getByText('Queue paused')).toBeTruthy()
     expect(chat.stop).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Back to composer' }))
     expect(field().value).toBe('wait for me')
     expect(chat.keep).toHaveBeenCalledWith(picture)
-    await waitFor(() => expect(disk.queue.items).toEqual([]))
-  })
+    await settled()
+    expect(disk.queue.items).toEqual([])
+  }, LIMIT)
 })
 
 describe('↑ and ↓ in an empty composer', () => {
