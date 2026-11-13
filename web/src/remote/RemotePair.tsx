@@ -32,7 +32,7 @@ export function RemotePair({ onPaired }: { onPaired: (token: string) => void }):
   return (
     <main className="rm rm--center">
       <h1 className="rm__title">Pair this device</h1>
-      <p className="rm__said">On the machine: Settings → General → Remote → Pair a device. The code is good once, for ten minutes.</p>
+      <p className="rm__said">On the machine: Settings → Remote → Pair a device. The code is good once, for ten minutes.</p>
       <label className="rm__field">
         <span>Code</span>
         <input value={code} onChange={(event) => setCode(event.target.value)} autoCapitalize="characters" autoComplete="off" spellCheck={false} />
