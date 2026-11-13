@@ -301,8 +301,7 @@ pub async fn chat_send(
         session_id,
         anchor,
     );
-    let at = checkout_at.to_string_lossy();
-    crate::idle_compact::arm(&app, &project_id, &conversation_id, &profile_id, &at);
+    let at = checkout_at.to_string_lossy().into_owned();
 
     // The end goes out before git reads what the turn changed. The answer is
     // written once it has, under the guard: a turn let in sooner would write
@@ -324,6 +323,8 @@ pub async fn chat_send(
         ..opened
     };
     let _ = append(&file, &answered);
+    // Once the answer is written: the timer counts idle from the transcript.
+    crate::idle_compact::arm(&app, &project_id, &conversation_id, &profile_id, &at);
     drop(guard);
     Ok(end)
 }

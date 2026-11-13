@@ -241,6 +241,19 @@ pub(crate) fn evicted<'a>(
         .collect()
 }
 
+/// Whether this conversation has a process running now.
+pub(crate) fn running(app: &AppHandle, conversation_id: &str) -> bool {
+    app.try_state::<Residents>()
+        .and_then(|residents| {
+            residents
+                .0
+                .lock()
+                .ok()
+                .map(|all| all.contains_key(conversation_id))
+        })
+        .unwrap_or(false)
+}
+
 /// Sends a control request to this conversation's process. False when it has
 /// none running.
 pub(crate) fn control(
