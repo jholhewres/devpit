@@ -1,8 +1,12 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ChatQueue, Message } from '../gen/bindings'
 import { ChatPane } from './ChatPane'
+
+/* Every wait here ends on mocks that answer at once; only rendering the pane
+   takes time, past the default second on a loaded CI runner. */
+configure({ asyncUtilTimeout: 5000 })
 
 const user = (id: string, text: string): Message =>
   ({ id, turnId: null, role: 'user', parts: [{ kind: 'text', text, parent: null }], createdAt: 0, streaming: false }) as Message
