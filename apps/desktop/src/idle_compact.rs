@@ -361,14 +361,20 @@ fn resumed(
     let hooks = crate::steps::hook_settings();
     let cwd = crate::chat_turn::turn_cwd(head.cwd.as_deref(), cwd).ok()?;
     let mode = head.permission.as_deref();
-    let staying = crate::chat_resident::staying(
-        app,
-        project_id,
-        conversation_id,
-        sessions,
-        &profile.driver,
-        mode,
-    );
+    // Only through a process this conversation already has: starting one
+    // would close the one another conversation of the project listens in.
+    let staying = crate::chat_resident::running(app, conversation_id)
+        .then(|| {
+            crate::chat_resident::staying(
+                app,
+                project_id,
+                conversation_id,
+                sessions,
+                &profile.driver,
+                mode,
+            )
+        })
+        .flatten();
     let turn = Say {
         command: &path,
         env: &env,
