@@ -1,7 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Context } from '../gen/bindings'
 
+import { ActivityContext, activityOf, keepActivity, seen, type Activity } from './activity'
+import { ActivityPick } from './ActivityPick'
 import { ASKS, CONTINUE, money } from './chat'
 import type { Extras } from './queueing'
 import { titleOf, type Tab } from './strip'
@@ -62,6 +64,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     asked: all.reduce((sum, one) => sum + (one.role === 'user' ? 1 : 0), 0),
   }))
   const [finding, setFinding] = useState(false)
+  const [activity, setActivity] = useState(() => activityOf(tab.id))
+  const pickActivity = useCallback((picked: Activity) => {
+    keepActivity(tab.id, picked)
+    setActivity(picked)
+  }, [tab.id])
   useShortcut('findChat', () => {
     if (!mine || count === 0) return false
     setFinding(true)
@@ -96,7 +103,7 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
 
   return (
     <>
-      <ChatCorner tabId={tab.id} card={chat.card} context={chat.context} session={chat.session} cost={chat.cost} orchestrator={project?.orchestrator ?? null} projectId={project?.id ?? null} sending={chat.sending} supervised={ASKS(chat.permission)} />
+      <ChatCorner tabId={tab.id} card={chat.card} context={chat.context} session={chat.session} cost={chat.cost} orchestrator={project?.orchestrator ?? null} projectId={project?.id ?? null} sending={chat.sending} supervised={ASKS(chat.permission)} activity={activity} onActivity={pickActivity} />
 
       <DropTarget mine={mine} onDrop={dropped} />
       <div className="scroll" ref={follow.box}>
@@ -104,9 +111,11 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
           <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => composer.current?.put(text)} />
         ) : (
           <AppsScopeContext.Provider value={scope}>
+            <ActivityContext.Provider value={seen(activity, finding)}>
             <WholeFrom conversationId={tab.id}>
               <ChatThread messages={chat.messages} box={follow.box} top={follow.top} older={chat.older} stalled={follow.stalled} onMore={follow.more} sending={chat.sending} error={chat.error} folder={chat.folder ?? null} rewindable={chat.rewindable} onRewind={chat.rewind} onOpen={setPeek} onContinue={() => chat.say(CONTINUE)} onResend={(text) => (chat.sending ? void chat.steer(text, NONE) : chat.say(text, undefined, NONE))} reveal={reveal} />
             </WholeFrom>
+            </ActivityContext.Provider>
           </AppsScopeContext.Provider>
         )}
       </div>
@@ -131,6 +140,8 @@ const ChatCorner = memo(function ChatCorner({
   projectId,
   sending,
   supervised,
+  activity,
+  onActivity,
 }: {
   tabId: string
   card: ChatCard | null
@@ -141,9 +152,12 @@ const ChatCorner = memo(function ChatCorner({
   projectId: string | null
   sending: boolean
   supervised: boolean
+  activity: Activity
+  onActivity: (activity: Activity) => void
 }): React.JSX.Element {
   return (
     <PaneCorner tabId={tabId} what="chat">
+      <ActivityPick value={activity} onPick={onActivity} />
       <ChatCardChip card={card} />
       <ContextMeter context={context} />
       {session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>}

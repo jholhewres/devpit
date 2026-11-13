@@ -1,6 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { Message } from '../gen/bindings'
+import { steeredAnswers } from './activity'
 import { continuable, unanswered } from './chat'
 import { useMessage, useMessagesPick, type ChatMessages } from './chatMessages'
 import { Turn } from './Turn'
@@ -66,6 +67,7 @@ export function ChatThread({
 }): React.JSX.Element {
   const ids = useMessagesPick(messages, idsOf)
   const lost = useMessagesPick(messages, lostOf)
+  const steered = useMessagesPick(messages, steeredAnswers)
   const end = useMessagesPick(messages, (all) => ({ unanswered: unanswered(all, sending), continuable: continuable(all, sending) }))
   const guess = useCallback((id: string) => estimate(messages.byId(id)), [messages])
   const view = useWindow(ids, guess, box)
@@ -99,6 +101,7 @@ export function ChatThread({
           rewindable={rewindable}
           onRewind={onRewind}
           onResend={offered.has(id) ? resend : undefined}
+          steered={steered.includes(id)}
         />
       ))}
       {view.after > 0 && <div className="thread__gap" style={{ height: view.after - GAP }} aria-hidden />}
@@ -119,6 +122,7 @@ const Row = memo(function Row({
   rewindable,
   onRewind,
   onResend,
+  steered,
 }: {
   id: string
   messages: ChatMessages
@@ -128,6 +132,7 @@ const Row = memo(function Row({
   rewindable: readonly string[]
   onRewind: (turnId: string) => void
   onResend?: (id: string) => void
+  steered: boolean
 }): React.JSX.Element | null {
   const message = useMessage(messages, id)
   const row = useRef<HTMLDivElement>(null)
@@ -144,6 +149,7 @@ const Row = memo(function Row({
         onOpen={onOpen}
         onRewind={message.turnId && rewindable.includes(message.turnId) ? onRewind : undefined}
         onResend={onResend ? () => onResend(id) : undefined}
+        steered={steered}
       />
     </div>
   )

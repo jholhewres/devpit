@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { imagesOf, isCut, namedImages, textOf, WholeContext } from './cutOutput'
 import { ask, commands } from './live'
 import { acts, actionLabel, grouped, groupTarget, headline, isGroup, type Act, type Group, type Kind } from './acts'
+import { shownRows, useActivity } from './activity'
 import type { Part } from '../gen/bindings'
 import { editDiff } from './editCard'
 import { EditCard } from './EditCardView'
@@ -43,7 +44,7 @@ export function Acts({
   /** Stays open once it settles: the work a failed turn ended on. */
   kept?: boolean
 }): React.JSX.Element | null {
-  const rows = acts(parts, every)
+  const rows = shownRows(acts(parts, every), useActivity())
   const [open, setOpen] = useDisclosed(messageId && `${messageId}:${fold}`, live || kept)
   /* Open while it runs and folded once done; a turn drawn again keeps what was chosen. */
   const was = useRef(live)

@@ -20,7 +20,7 @@ export const ROWS: Partial<Record<PrefsPane, readonly string[]>> = {
     'Error reports',
   ],
   notifications: ['Island', 'Pause', 'Reminders', 'Focus mode'],
-  sessions: ['Open the next card on its own', 'Hand off a full session', 'Ask before stopping a terminal'],
+  sessions: ['Open the next card on its own', 'Hand off a full session', 'Chat activity', 'Ask before stopping a terminal'],
   voice: ['Voice messages'],
   remote: ['Remote', 'Allow remote MCP (read-only)', 'Calendar'],
 }

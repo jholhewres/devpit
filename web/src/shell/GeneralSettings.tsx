@@ -1,3 +1,4 @@
+import { ActivityDefault } from './ActivityPick'
 import { CalendarSettings } from './CalendarSettings'
 import { DeskSettings } from './DeskSettings'
 import { DisplaySettings } from './DisplaySettings'
@@ -62,6 +63,7 @@ export function GeneralPanes({
       <section className="prefs__in" hidden={pane !== 'sessions'}>
         <h1 className="prefs__h">Sessions</h1>
         <SessionRelaySettings />
+        <ActivityDefault />
         <PrefSwitch on={on('confirmStop')} onFlip={flip('confirmStop')} title="Ask before stopping a terminal" said={<>A terminal still running something asks before it is closed. Its &ldquo;Don&rsquo;t ask again&rdquo; turns this off; this turns it back on.</>} />
       </section>
 
