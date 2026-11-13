@@ -192,6 +192,9 @@ pub(crate) fn respond_with(
     let lines_at = |commit: &str, file: &str| {
         devpit_git::lines_at(&root, commit, file, MOST_COUNTED).map_err(|err| err.to_string())
     };
+    // The project's approved lessons join the checklist the change is held to.
+    let lessons = crate::project_memory::lessons(Path::new(&project.root_path));
+    let body = crate::project_lessons::checklist(&card.body, &lessons);
     let done = review::reviewed(&Given {
         root: &root,
         runs: &runs,
@@ -200,7 +203,7 @@ pub(crate) fn respond_with(
         card: Card {
             id: &card.id,
             title: &card.title,
-            body: &card.body,
+            body: &body,
         },
         git: pinned.as_ref().map(|(base, head, files, diff, _)| Git {
             base,

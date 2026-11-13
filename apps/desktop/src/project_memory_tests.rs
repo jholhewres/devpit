@@ -140,3 +140,68 @@ fn a_heading_is_looked_for_only_near_the_top_of_a_file() {
         "{decisions}"
     );
 }
+
+#[test]
+fn an_approved_lesson_is_kept_with_its_source_and_date_and_a_discarded_one_leaves_no_trace() {
+    let dir = project();
+    let root = dir.path();
+    seed(root, "2026-11-13").expect("seeded");
+    propose(
+        root,
+        "2026-11-13",
+        "#331",
+        &[
+            "Wait 3 s for the queue test.".to_owned(),
+            "Run make fmt.".to_owned(),
+        ],
+    )
+    .expect("proposed");
+    let waiting = proposals(root);
+    assert_eq!(waiting.len(), 2);
+    assert_eq!(waiting[0].source, "#331");
+
+    let edited = "Wait 3 s for the queue test under load.";
+    decide(
+        root,
+        "2026-11-14",
+        "#331",
+        "Wait 3 s for the queue test.",
+        Some(edited),
+    )
+    .expect("approved");
+    decide(root, "2026-11-14", "#331", "Run make fmt.", None).expect("discarded");
+
+    assert!(
+        read(root, "lessons.md")
+            .contains("- 2026-11-14 · #331 · Wait 3 s for the queue test under load.\n"),
+        "{}",
+        read(root, "lessons.md")
+    );
+    for file in ["lessons.md", "proposed.md", "facts.md", "decisions.md"] {
+        assert!(!read(root, file).contains("make fmt"), "{file}");
+    }
+    assert!(proposals(root).is_empty());
+    let kept = lessons(root);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0].text, edited);
+    // Decided once: the same proposal is not there to decide again.
+    assert!(decide(root, "2026-11-14", "#331", "Run make fmt.", None).is_err());
+}
+
+#[test]
+fn review_rounds_and_repeated_findings_are_logged_per_card() {
+    let dir = project();
+    let root = dir.path();
+    seed(root, "2026-11-13").expect("seeded");
+    measure(root, "2026-11-13", "#331", 3, 2).expect("logged");
+    measure(root, "2026-11-14", "#332", 1, 0).expect("logged");
+    let lines: Vec<serde_json::Value> = read(root, "metrics.jsonl")
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("a JSON line"))
+        .collect();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(
+        lines[0],
+        serde_json::json!({ "day": "2026-11-13", "card": "#331", "reviewRounds": 3, "repeatedFindings": 2 })
+    );
+}

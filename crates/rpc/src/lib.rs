@@ -29,6 +29,7 @@ pub mod focus;
 mod frame;
 pub mod front;
 pub mod island;
+pub mod lessons;
 pub mod live;
 pub mod mcp_health;
 pub mod pause;
@@ -108,6 +109,7 @@ pub use island::{
     IslandAsked, IslandChange, IslandChecks, IslandDrawn, IslandHow, IslandNow, IslandPull,
     IslandQuestion, IslandRect, IslandSession, IslandStep, IslandVerdict, Touch,
 };
+pub use lessons::{LessonProposal, LessonProposals};
 pub use live::{
     EndedSession, EndedSessions, LivePane, LiveSession, LiveSessions, PendingPrompt,
     ProjectProposal, PromptOption, RemoteState, SessionOnCard, SessionTold, SessionsOnCard,

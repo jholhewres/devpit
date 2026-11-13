@@ -22,12 +22,12 @@ use crate::{
     live_answer, live_sessions, mcp, mcp_apps, mcp_health, media, moving, notices, openers,
     opening, orchestrator, orchestrator_links, outside_sessions, pane_asking, pane_screen,
     pane_tmux, panels, panes, pasting, paths, pausing, plan_limits, plugin_data, plugins,
-    profile_waiting, project_naming, project_proposals, projects, reading_path, rebound, receipts,
-    recipes, regrouping, reminders, remote, reply_drafts, reveal, rewinding, runs_list, saves,
-    search, session_cost, session_search, session_window, sessions, settings, shell_launch,
-    sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering, steps,
-    stop_asked, stopping, tab_opening, threads, transcribe, tray, update, watching, workspace,
-    worktree_base, worktree_cleanup, worktree_setup, worktrees, wsfiles,
+    profile_waiting, project_lessons, project_naming, project_proposals, projects, reading_path,
+    rebound, receipts, recipes, regrouping, reminders, remote, reply_drafts, reveal, rewinding,
+    runs_list, saves, search, session_cost, session_search, session_window, sessions, settings,
+    shell_launch, sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering,
+    steps, stop_asked, stopping, tab_opening, threads, transcribe, tray, update, watching,
+    workspace, worktree_base, worktree_cleanup, worktree_setup, worktrees, wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -119,6 +119,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         devflow_jev::devflow_calibration,
         devflow_asks::devflow_asks,
         devflow_asks::devflow_answer,
+        project_lessons::lessons_proposed,
+        project_lessons::lesson_decide,
         devflow_screen::devflow_screen,
         devflow_screen::devflow_preview,
         devflow_screen::devflow_create,

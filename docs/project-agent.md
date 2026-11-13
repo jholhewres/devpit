@@ -66,14 +66,38 @@ left out of what the agent is handed, and counted as left out.
 
 The files are written on the agent's first wake, from the guides the project
 already has (`AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/architecture.md`)
-and its ADRs in `docs/adr/`. After that, devpit never writes over them.
+and its ADRs in `docs/adr/`. After that, devpit never writes over them; it
+only appends the lessons the person approves.
 
 The agent is woken with a summary: each file's newest entries, at most twenty
 each, and how many more there are. It reads the files themselves when it
 needs the rest.
 
+## Lessons from closed cards
+
+When a card lands in the done column, devpit:
+
+1. Logs one line to `metrics.jsonl`: the day, the card, its review rounds
+   (one per `[devflow] review:` comment) and the findings its last review
+   found again (`repeats` in its `findings.json`), so the lessons' effect can
+   be measured.
+2. Asks the project agent, under the profile of an orchestrator linked to the
+   project, what the card teaches. It reads the card's comments (its handoff,
+   its review and gate results, the person's corrections) and its last
+   review's findings, as data, and answers zero to three lessons.
+3. Keeps them in `proposed.md`, each dated and with the card as its source.
+
+Each proposal waits under the top bar and on its card, with Approve, Edit
+and Discard. Approved, as it is or edited, it is appended to `lessons.md`
+with the card and the day. Discarded, it is removed and nothing keeps it.
+
+The newest twenty approved lessons go into every brief the agent writes and
+into every Devflow review of the project, as items of the checklist the change
+is held to.
+
 ## Projects without an agent
 
 A project gets `.devpit/project-agent/` only when its agent is first asked.
-Nothing else in devpit reads that folder, so a project whose agent was never
-asked works exactly as it did, and every other tool keeps its shape.
+A closed card is measured and its lessons asked for only in a project that has
+that folder, so a project whose agent was never asked works exactly as it did,
+and every other tool keeps its shape.

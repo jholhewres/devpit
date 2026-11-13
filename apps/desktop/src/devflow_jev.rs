@@ -303,6 +303,15 @@ fn completion_rubric(root: &Path) -> String {
     }
 }
 
+/// Whether `column` is the board's done lane.
+pub(crate) fn in_done(columns: &[devpit_core::store::ColumnRow], column: Option<&str>) -> bool {
+    columns.iter().any(|one| {
+        Some(one.id.as_str()) == column
+            && devpit_core::store::column_roles::role_of(one.role.as_deref(), &one.name)
+                == Some("done")
+    })
+}
+
 /// Labels a decision with the person's verdict, saying what they did.
 fn label(store: &Store, decision: &str, passing: bool, action: &str) {
     let _ = store.label_decision(decision, if passing { "pass" } else { "fail" }, action);
@@ -316,14 +325,7 @@ pub(crate) fn moved(store: &Store, project_id: &str, card_id: &str, from: Option
     let Ok(columns) = store.columns(project_id) else {
         return;
     };
-    let done = |column: Option<&str>| {
-        columns.iter().any(|one| {
-            Some(one.id.as_str()) == column
-                && devpit_core::store::column_roles::role_of(one.role.as_deref(), &one.name)
-                    == Some("done")
-        })
-    };
-    let (left_done, into_done) = (done(from), done(Some(to)));
+    let (left_done, into_done) = (in_done(&columns, from), in_done(&columns, Some(to)));
     if left_done == into_done {
         return;
     }
