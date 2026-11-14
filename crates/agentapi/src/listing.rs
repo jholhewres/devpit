@@ -33,7 +33,7 @@ pub(crate) const ORCHESTRATOR_ONLY: [&str; 14] = [
 pub(crate) const DECISIONS: [&str; 2] = ["devpit_decide", "devpit_rubric_run"];
 
 /// The tools that change nothing, which a host may run without asking.
-pub(crate) const READ_ONLY: [&str; 13] = [
+pub(crate) const READ_ONLY: [&str; 15] = [
     "devpit_context",
     "devpit_board",
     "devpit_card",
@@ -47,6 +47,8 @@ pub(crate) const READ_ONLY: [&str; 13] = [
     "devpit_devflow_status",
     "devpit_devflow_skill",
     "devpit_schedules",
+    "devpit_heartbeat_status",
+    "devpit_briefing",
 ];
 
 /// The tools whose change cannot be taken back: work in flight, a file.
