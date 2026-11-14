@@ -37,6 +37,7 @@ pub mod lifecycle;
 #[cfg(test)]
 mod lifecycle_tests;
 mod log;
+mod naming;
 pub mod pinned;
 pub mod remote;
 mod reviewed;
@@ -70,9 +71,10 @@ pub use glance::{glance, Glance};
 pub use ignoring::{exclude, ignored};
 pub use index::{commit, stage, unstage};
 pub use lifecycle::{
-    assignable, branch_for, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,
+    assignable, create, disk_usage, remove, uncommitted, worktree_home, Loss, Made,
 };
 pub use log::{commits_in, history, show, touched_since, upstream_of};
+pub use naming::{branch_for, pattern_allowed, unused_branch, BRANCH_PATTERN};
 pub use reviewed::{code_changed_between, lines_at, review_diff, Reviewed, UNCOMMITTED};
 pub use search::{grep, GrepHit, GrepOutcome, SearchFlags};
 pub use snapshot::{changed_between, snapshot, Changed};

@@ -108,17 +108,25 @@ pub fn checkout_of(
         .map_err(|err| err.to_string())?
         .unwrap_or_default();
     let at = devpit_git::worktree_at(&base, &home, &main, &project_id, card_id);
-    let branch = devpit_git::branch_for(&card.title, card_id);
+    let recorded = store.card_branch(card_id).map_err(|err| err.to_string())?;
 
     // A worktree removed before left its branch: back onto it, from where it
     // began, rather than failing to make the branch a second time.
-    let made = match devpit_git::branch_left(&main, card_id) {
+    let made = match devpit_git::branch_left(&main, card_id, recorded.as_deref()) {
         Some(left) => devpit_git::reattach(&main, &at, &left, card.base_ref.as_deref()),
-        None => devpit_git::create(&main, &at, &branch, "HEAD"),
+        None => devpit_git::create(
+            &main,
+            &at,
+            &new_branch(store, &project_id, &main, &card)?,
+            "HEAD",
+        ),
     }
     .map_err(|err| err.to_string())?;
     store
         .set_card_front(card_id, made.path.to_str(), Some(made.base_ref.as_str()))
+        .map_err(|err| err.to_string())?;
+    store
+        .set_card_branch(card_id, &made.branch)
         .map_err(|err| err.to_string())?;
     // A worktree is a git root of its own: the main checkout's trust stops short of it.
     crate::folder_trust::trust(&[&made.path]);
@@ -149,6 +157,27 @@ pub fn checkout_of(
         }
         _ => Ok(made.path),
     }
+}
+
+/// The name Settings → Worktrees gives this card's branch, with a number
+/// added when that name is taken.
+fn new_branch(
+    store: &Store,
+    project_id: &str,
+    main: &Path,
+    card: &devpit_core::CardRow,
+) -> Result<String, String> {
+    let pattern = store
+        .preference(devpit_core::preference::WORKTREE_BRANCH)
+        .map_err(|err| err.to_string())?
+        .unwrap_or_default();
+    let number = store
+        .card_numbers(project_id)
+        .map_err(|err| err.to_string())?
+        .get(&card.id)
+        .copied();
+    let wanted = devpit_git::branch_for(&pattern, &card.title, number, &card.id);
+    Ok(devpit_git::unused_branch(main, &wanted))
 }
 
 /// What a preparation leaves on the card: what it did, or where it failed

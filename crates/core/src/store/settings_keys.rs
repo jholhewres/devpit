@@ -17,6 +17,8 @@ pub const TERMINAL_CONTRAST: &str = "terminal.minimum_contrast";
 pub const TERMINAL_BACKEND: &str = "terminal.backend";
 /// Where new worktrees are created. Empty is the devpit workspace.
 pub const WORKTREE_BASE: &str = "worktrees.base";
+/// What a new card's branch is called. Empty is `{type}/{number}-{slug}`.
+pub const WORKTREE_BRANCH: &str = "worktrees.branch_pattern";
 /// Whether a finished card opens the next card of its epic in a session of
 /// its own: only when `on`.
 pub const SESSION_NEXT_CARD: &str = "sessions.next_card";

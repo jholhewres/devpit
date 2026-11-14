@@ -83,6 +83,27 @@ impl Store {
         Ok(())
     }
 
+    /// The branch the card's worktree was made on: it stays when the
+    /// checkout goes, since the branch does too.
+    pub fn set_card_branch(&self, card_id: &str, branch: &str) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE card SET branch = ?2, updated_at = ?3 WHERE id = ?1",
+            rusqlite::params![card_id, branch, now()],
+        )?;
+        Ok(())
+    }
+
+    /// [`Self::set_card_branch`]'s branch, if devpit recorded one.
+    pub fn card_branch(&self, card_id: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .conn
+            .query_row("SELECT branch FROM card WHERE id = ?1", [card_id], |row| {
+                row.get(0)
+            })
+            .optional()?
+            .flatten())
+    }
+
     /// When this card is due, or `None` to clear it; `timed` when the date
     /// carries a time somebody chose. A new date reminds again.
     pub fn set_card_due(

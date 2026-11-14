@@ -573,3 +573,15 @@ fn forgetting_a_checkout_keeps_where_the_work_began() {
     assert_eq!(row.worktree_path, None);
     assert_eq!(row.base_ref.as_deref(), Some("abc123"));
 }
+
+#[test]
+fn a_cards_branch_is_recorded_and_outlives_its_checkout() {
+    let (_dir, store, card) = seeded();
+    assert_eq!(store.card_branch(&card).expect("read"), None);
+    store.set_card_branch(&card, "feat/1-x").expect("branch");
+    store.forget_card_checkout(&card).expect("forget");
+    assert_eq!(
+        store.card_branch(&card).expect("read").as_deref(),
+        Some("feat/1-x")
+    );
+}

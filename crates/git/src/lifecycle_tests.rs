@@ -12,37 +12,6 @@ fn repo(at: &Path) {
 }
 
 #[test]
-fn a_branch_is_named_after_the_card_and_prefixed() {
-    assert_eq!(
-        branch_for("Fix the login redirect", "card_01HZXY9K"),
-        "devpit/fix-the-login-redirect-01hzxy9k"
-    );
-}
-
-#[test]
-fn an_accented_title_keeps_its_letters() {
-    assert_eq!(
-        branch_for("Telemetria e logs de produção", "card_01M38MRZ"),
-        "devpit/telemetria-e-logs-de-producao-01m38mrz"
-    );
-}
-
-#[test]
-fn a_title_with_nothing_nameable_in_it_still_gets_a_branch() {
-    assert_eq!(
-        branch_for("!!! ???", "card_abcdefgh"),
-        "devpit/card-abcdefgh"
-    );
-}
-
-#[test]
-fn two_cards_with_the_same_title_get_different_branches() {
-    let one = branch_for("Refactor", "card_aaaaaaaa");
-    let two = branch_for("Refactor", "card_bbbbbbbb");
-    assert_ne!(one, two);
-}
-
-#[test]
 fn a_worktree_lives_outside_the_repository() {
     let home = Path::new("/home/someone/.devpit");
     let path = worktree_home(home, "proj", "card");
@@ -157,13 +126,14 @@ fn a_card_checked_out_again_goes_back_on_its_own_branch() {
     std::fs::create_dir_all(&root).expect("mkdir");
     repo(&root);
     let at = dir.path().join("wt");
-    let branch = branch_for("Fix it", "card_01HZXY9K");
+    // An older devpit's name, which the card never recorded.
+    let branch = "devpit/fix-it-01hzxy9k".to_owned();
     let first = create(&root, &at, &branch, "HEAD").expect("create");
     remove(&root, &at, false).expect("remove");
 
-    let left = branch_left(&root, "card_01HZXY9K").expect("the branch is still there");
+    let left = branch_left(&root, "card_01HZXY9K", None).expect("the branch is still there");
     assert_eq!(left, branch);
-    assert_eq!(branch_left(&root, "card_99999999"), None);
+    assert_eq!(branch_left(&root, "card_99999999", None), None);
 
     let again = reattach(&root, &at, &left, Some(&first.base_ref)).expect("reattach");
     assert_eq!(again.branch, branch);
@@ -172,4 +142,25 @@ fn a_card_checked_out_again_goes_back_on_its_own_branch() {
         "the diff keeps its starting point"
     );
     assert!(at.join("a.txt").exists());
+}
+
+#[test]
+fn a_card_goes_back_on_the_branch_it_recorded_whatever_it_is_called() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join("main");
+    std::fs::create_dir_all(&root).expect("mkdir");
+    repo(&root);
+    let at = dir.path().join("wt");
+    create(&root, &at, "feat/7-fix-it", "HEAD").expect("create");
+    remove(&root, &at, false).expect("remove");
+
+    assert_eq!(
+        branch_left(&root, "card_01HZXY9K", Some("feat/7-fix-it")).as_deref(),
+        Some("feat/7-fix-it")
+    );
+    assert_eq!(branch_left(&root, "card_01HZXY9K", None), None);
+    assert_eq!(
+        branch_left(&root, "card_01HZXY9K", Some("feat/7-gone")),
+        None
+    );
 }

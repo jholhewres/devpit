@@ -43,37 +43,6 @@ pub fn unaccented(title: &str) -> String {
         .collect()
 }
 
-/// The branch a card's worktree gets.
-///
-/// The `devpit/` prefix does two jobs: it shows whose branch this is in a bare
-/// `git branch`, and it makes the set safe to delete in bulk without catching
-/// something a person made by hand.
-pub fn branch_for(title: &str, card_id: &str) -> String {
-    format!("devpit/{}-{}", slug(title), short(card_id))
-}
-
-fn slug(title: &str) -> String {
-    let mut out = String::new();
-    for ch in unaccented(title).chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.extend(ch.to_lowercase());
-        } else if !out.ends_with('-') {
-            out.push('-');
-        }
-    }
-    let trimmed = out.trim_matches('-');
-    // Cut on a character boundary, and only after: a branch name is a path
-    // component, and a long title is not worth a long one.
-    let short: String = trimmed.chars().take(40).collect();
-    let short = short.trim_end_matches('-');
-    if short.is_empty() {
-        // A title with nothing nameable in it still needs a branch.
-        "card".to_owned()
-    } else {
-        short.to_owned()
-    }
-}
-
 /// The tail of the id, which is the part that differs between two cards made
 /// in the same second.
 pub(crate) fn short(card_id: &str) -> String {
