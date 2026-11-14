@@ -6,7 +6,8 @@
 use devpit_agentcli::head::{marks_path, write_marks};
 use devpit_rpc::{ConversationMarks, Conversations, ErrorCode, RpcError, Thread};
 
-/// `chat.list` — every conversation this project has had.
+/// `chat.list` — every conversation this project has had, but the archived
+/// ones, which `chat.archived` lists.
 ///
 /// The transcripts were always on disk; nothing listed them, so closing a tab
 /// left a file nobody could reach again.
