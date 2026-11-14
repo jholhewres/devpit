@@ -91,4 +91,17 @@ describe("a chat's questions", () => {
     await waitFor(() => expect(answered).toHaveBeenCalledWith('q1', 'deny'))
     expect(refused).not.toHaveBeenCalled()
   })
+
+  it('leave plan mode once its plan is approved, for the mode that asks before changing anything', async () => {
+    const plan: Question = { id: 'q3', sessionId: 'ses_1', tool: 'ExitPlanMode', input: '{"plan":"# A"}', cwd: '/w', touch: { kind: 'plan', plan: '# A' } }
+    const { result } = renderHook(() => useChat('conv_a'))
+    await waitFor(() => expect(result.current.session).toBe('ses_1'))
+    act(() => result.current.setPermission('plan'))
+    act(() => heard.asked?.(plan))
+    act(() => result.current.answer('q3', 'deny'))
+    expect(result.current.permission).toBe('plan')
+    act(() => heard.asked?.(plan))
+    act(() => result.current.answer('q3', 'allow'))
+    expect(result.current.permission).toBe('manual')
+  })
 })

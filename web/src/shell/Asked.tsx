@@ -42,7 +42,9 @@ export function Asked({
           <Allowing
             key={question.id}
             question={question}
-            onAnswer={(said, reason) => (reason?.trim() ? onAnswer(question.id, said, undefined, reason.trim()) : onAnswer(question.id, said))}
+            onAnswer={(said, reason, plan) =>
+              plan ? onAnswer(question.id, said, [[plan]]) : reason?.trim() ? onAnswer(question.id, said, undefined, reason.trim()) : onAnswer(question.id, said)
+            }
           />
         )
       })}
@@ -51,11 +53,14 @@ export function Asked({
 }
 
 /* A request: what it is about on its first line, the tool's JSON folded away.
-   A refusal can say why, and the agent reads it in place of the tool's result. */
-function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said: Said, reason?: string) => void }): React.JSX.Element {
+   A refusal can say why, and the agent reads it in place of the tool's result.
+   A plan is approved as written or as edited here, or refused. */
+function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said: Said, reason?: string, plan?: string) => void }): React.JSX.Element {
   const card = useFocused<HTMLElement>()
   const [why, setWhy] = useState('')
   const plan = question.touch?.kind === 'plan' ? question.touch.plan : null
+  const [editing, setEditing] = useState<string | null>(null)
+  const edited = plan !== null && editing !== null && editing.trim() !== plan.trim() ? editing : undefined
   const what = plan ? '' : subjectOf(question)
   const lines = what.split('\n').length
   return (
@@ -63,12 +68,13 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
       className="asking"
       ref={card}
       tabIndex={-1}
+      aria-label={plan ? 'Plan' : undefined}
       onKeyDown={(event) => {
         if (composing(event)) return
         const said = allowKey(event.key, event.target === event.currentTarget)
         if (!said) return
         event.preventDefault()
-        onAnswer(said, said === 'deny' ? why : undefined)
+        onAnswer(said, said === 'deny' ? why : undefined, said === 'allow' ? edited : undefined)
       }}
     >
       <div className="asking__t">
@@ -84,11 +90,14 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
           </>
         )}
       </div>
-      {plan && (
-        <div className="asking__plan">
-          <Markdown source={plan} />
-        </div>
-      )}
+      {plan &&
+        (editing === null ? (
+          <div className="asking__plan">
+            <Markdown source={plan} />
+          </div>
+        ) : (
+          <textarea className="asking__edit" aria-label="The plan, as the agent will follow it" value={editing} onChange={(event) => setEditing(event.target.value)} />
+        ))}
       <details className="asking__more">
         <summary>Details</summary>
         <pre className="asking__in">{question.input}</pre>
@@ -107,14 +116,19 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
           }}
         />
         <button className="btn" onClick={() => onAnswer('deny', why)}>
-          {plan ? 'Keep planning' : 'Refuse'}
+          Refuse
         </button>
+        {plan && editing === null && (
+          <button className="btn" onClick={() => setEditing(plan)}>
+            Edit
+          </button>
+        )}
         {!plan && (
           <button className="btn" onClick={() => onAnswer('always')} title={alwaysMeans(question.tool)}>
             Always in this chat
           </button>
         )}
-        <button className="btn btn--go" onClick={() => onAnswer('allow')}>
+        <button className="btn btn--go" onClick={() => onAnswer('allow', undefined, edited)}>
           {plan ? 'Approve' : 'Allow'}
         </button>
       </div>

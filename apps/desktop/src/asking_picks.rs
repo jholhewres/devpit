@@ -8,8 +8,9 @@ use devpit_rpc::{ErrorCode, RpcError};
 
 use crate::asking::{decision, Answer, Asking};
 
-/// The tools that put something to the person.
-const TO_THE_PERSON: [&str; 2] = ["AskUserQuestion", "ExitPlanMode"];
+/// The tools that put something to the person. A plan is too, on the CLI's
+/// own prompt (`asking_plan`).
+const TO_THE_PERSON: [&str; 1] = ["AskUserQuestion"];
 
 pub fn to_the_person(tool: &str) -> bool {
     TO_THE_PERSON.contains(&tool)
@@ -50,6 +51,11 @@ impl Picks {
 
     pub(crate) fn taken(&self, id: &str) -> Option<Vec<Vec<String>>> {
         self.chosen.lock().ok()?.remove(id)
+    }
+
+    /// Why the person refused, taken once.
+    pub(crate) fn reason(&self, id: &str) -> Option<String> {
+        self.reasons.lock().ok()?.remove(id)
     }
 }
 
@@ -95,7 +101,7 @@ fn refused_because(why: &str) -> String {
 /// The hook's reply. Allowed with picks, they go in as the tool's `answers`,
 /// keyed by each question as it was asked, several choices joined by ", ".
 pub fn reply_for(picks: &Picks, id: &str, input: &str, answer: Answer) -> String {
-    let why = picks.reasons.lock().ok().and_then(|mut all| all.remove(id));
+    let why = picks.reason(id);
     if let (Answer::Deny, Some(why)) = (answer, why.filter(|why| !why.is_empty())) {
         picks.taken(id);
         return refused_because(&why);
