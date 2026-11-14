@@ -497,6 +497,7 @@ pub(crate) fn handle_giving(
                 .chain(offered)
                 .chain(relayed)
                 .chain(crate::assistant::offered(seat))
+                .chain(crate::consult::offered(seat))
                 .filter_map(|tool| crate::listing::listed(tool, seat))
                 .collect::<Vec<_>>() })
         }
@@ -554,7 +555,8 @@ fn call(
         .iter()
         .chain(&SETUP_TOOLS)
         .chain(STAGED.iter().map(|(_, tool)| tool))
-        .chain(&crate::assistant::TOOLS);
+        .chain(&crate::assistant::TOOLS)
+        .chain(&crate::consult::TOOLS);
     let Some(tool) = every.find(|tool| tool.name == name) else {
         return said(&format!("devpit has no tool `{name}`"), true);
     };

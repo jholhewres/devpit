@@ -397,3 +397,47 @@ fn the_assistants_methods_refuse_without_assistant_mode() {
         );
     }
 }
+
+/// A project's session reaches its own project's agent and no other one; an
+/// orchestrator asks with its own tool, and a project whose agent was never
+/// asked has none to consult.
+#[test]
+fn a_session_consults_its_own_projects_agent_and_no_other() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (app, other) = (dir.path().join("app"), dir.path().join("other"));
+    for root in [&app, &other] {
+        std::fs::create_dir_all(root.join(".devpit/project-agent")).expect("memory");
+    }
+    let projects = vec![project("app", &app, &[]), project("other", &other, &[])];
+    let consult = |params: Value| -> Asked {
+        serde_json::from_value(json!({
+            "method": "project_agent_consult", "params": params, "cwd": "", "author": "agt-1",
+        }))
+        .expect("asked")
+    };
+    let question = json!({ "question": "Where are the guards?" });
+
+    let refused = respond_in(
+        None,
+        &projects,
+        &projects[0],
+        &consult(json!({ "project": "other", "question": "Where are the guards?" })),
+    )
+    .expect_err("another project");
+    assert!(refused.contains("only an orchestrator"), "{refused}");
+    // Its own passes every guard and goes to the agent, which needs the window.
+    let own = respond_in(None, &projects, &projects[0], &consult(question.clone()))
+        .expect_err("no window in a test");
+    assert!(own.contains("window is not running"), "{own}");
+
+    let orchestrating = orchestrator("prj_orch", &dir.path().join("orch"));
+    let refused = respond_in(None, &projects, &orchestrating, &consult(question.clone()))
+        .expect_err("an orchestrator");
+    assert!(refused.contains("devpit_project_agent_ask"), "{refused}");
+
+    std::fs::remove_dir_all(app.join(".devpit")).expect("forgotten");
+    let none =
+        respond_in(None, &projects, &projects[0], &consult(question)).expect_err("never asked");
+    assert!(none.contains("no project agent"), "{none}");
+    assert!(!app.join(".devpit").exists(), "consulting made a memory");
+}

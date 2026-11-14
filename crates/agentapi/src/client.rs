@@ -44,7 +44,7 @@ pub fn wait_for(method: &str) -> Duration {
         "devflow_gate" => GATING,
         "repo" | "transcript" | "artifact_save" | "artifact_restore" | "devflow_publish" => READING,
         "devflow_evidence" | "devflow_review" | "devflow_stage" => CHECKING,
-        "project_agent_ask" | "project_agent_brief" => ASKING,
+        "project_agent_ask" | "project_agent_brief" | "project_agent_consult" => ASKING,
         _ => WAIT,
     }
 }

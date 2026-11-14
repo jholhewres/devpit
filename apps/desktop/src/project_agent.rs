@@ -22,6 +22,14 @@ use tauri::{AppHandle, Emitter, Manager};
 
 /// The methods answered here.
 pub(crate) const METHODS: [&str; 2] = ["project_agent_ask", "project_agent_brief"];
+/// What a project's own session asks with, apart from the orchestrator's.
+pub(crate) const SESSION_METHODS: [&str; 2] = ["project_agent_consult", "project_agent_propose"];
+/// The questions one session may ask its project's agent.
+pub(crate) const QUESTIONS: u32 = 10;
+/// The longest proposal a session makes: one line of the memory.
+const PROPOSAL_CHARS: usize = 1000;
+/// What a brief says about the project agent starts here.
+const NUDGE: &str = "## The project agent";
 /// How long an agent nobody asks keeps its process.
 const IDLE: Duration = Duration::from_secs(10 * 60);
 pub(crate) const NOT_STARTED: &str = "the project agent could not start";
@@ -60,6 +68,8 @@ pub(crate) struct Answer {
 pub(crate) struct Agents {
     idle: Duration,
     all: Mutex<HashMap<String, Arc<Mutex<Agent>>>>,
+    /// The questions each session asked, by session.
+    spent: Mutex<HashMap<String, u32>>,
 }
 
 #[derive(Default)]
@@ -86,6 +96,7 @@ impl Agents {
         Self {
             idle,
             all: Mutex::default(),
+            spent: Mutex::default(),
         }
     }
 
@@ -118,6 +129,35 @@ impl Agents {
             }
         });
         answer
+    }
+
+    /// `session`'s question to `key`'s agent, and how many of its
+    /// [`QUESTIONS`] are left. One the agent could not answer is not counted.
+    pub(crate) fn consult(
+        &self,
+        key: &str,
+        session: &str,
+        wake: &Wake,
+        question: &str,
+    ) -> Result<(Answer, u32), String> {
+        let unavailable = |_| "the project agents are unavailable".to_owned();
+        {
+            let mut spent = self.spent.lock().map_err(unavailable)?;
+            let asked = spent.entry(session.to_owned()).or_default();
+            if *asked >= QUESTIONS {
+                return Err(format!(
+                    "this session has asked the project agent its budget of {QUESTIONS} questions: read the code, or ask the person"
+                ));
+            }
+            *asked += 1;
+        }
+        let answer = self.ask(key, wake, question);
+        let mut spent = self.spent.lock().map_err(unavailable)?;
+        let asked = spent.entry(session.to_owned()).or_default();
+        if answer.is_err() {
+            *asked = asked.saturating_sub(1);
+        }
+        answer.map(|answer| (answer, QUESTIONS.saturating_sub(*asked)))
     }
 
     /// Whether `key`'s agent has its process.
@@ -285,6 +325,155 @@ pub(crate) fn brief_prompt(
          it, and the rules, decisions and pitfalls from your memory that apply.{lessons} Answer \
          with the brief alone, in Markdown."
     )
+}
+
+/// Keeps what a session wants remembered as a proposal from `source`, for
+/// the person to approve; answers the memory file it would go to.
+pub(crate) fn propose_for_session(
+    root: &Path,
+    day: &str,
+    source: &str,
+    kind: &str,
+    text: &str,
+) -> Result<&'static str, String> {
+    let file = match kind {
+        "fact" => "facts.md",
+        "lesson" => "lessons.md",
+        "decision" => "decisions.md",
+        other => return Err(format!("`kind` is fact, lesson or decision, not `{other}`")),
+    };
+    // One line of the memory, whatever the session sent.
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        return Err("what to propose? pass `text`".to_owned());
+    }
+    if text.chars().count() > PROPOSAL_CHARS {
+        return Err(format!(
+            "a proposal is one line of at most {PROPOSAL_CHARS} characters"
+        ));
+    }
+    crate::project_memory::propose(
+        root,
+        day,
+        source,
+        &[crate::project_memory::aimed(file, &text, None)],
+    )?;
+    Ok(file)
+}
+
+/// `prompt`, telling a session to consult its project's agent first; as it
+/// was for a project whose agent was never asked.
+pub(crate) fn nudged(prompt: &str, root: &Path) -> String {
+    if prompt.trim().is_empty()
+        || prompt.contains(NUDGE)
+        || !root.join(crate::project_memory::DIR).is_dir()
+    {
+        return prompt.to_owned();
+    }
+    format!(
+        "{}\n\n{NUDGE}\n\nThis project has an agent that keeps its memory: facts, lessons and \
+         decisions. Ask it with `devpit_project_agent_consult` before exploring broadly, and \
+         before choosing a pattern its memory may already settle: where something is, how \
+         something is done here, whether it was decided. It answers for this project only, \
+         {QUESTIONS} questions per session. What is worth remembering goes to \
+         `devpit_project_agent_propose`, which waits for the person's approval: never edit \
+         `.devpit/project-agent/` yourself.",
+        prompt.trim_end()
+    )
+}
+
+/// The profile of an orchestrator linked to `project_id`, which its agent is
+/// woken under when no orchestrator is asking.
+pub(crate) fn linked_profile(projects: &[Project], project_id: &str) -> Result<String, String> {
+    projects
+        .iter()
+        .filter(|one| {
+            crate::orchestrator_links::linked(Path::new(&one.root_path))
+                .iter()
+                .any(|id| id == project_id)
+        })
+        .find_map(|one| one.orchestrator.clone())
+        .ok_or_else(|| "no orchestrator is linked to this project".to_owned())
+}
+
+/// `project_agent_consult` and `project_agent_propose`, for a session of
+/// `here`: its own project's agent, never another's, and never an orchestrator.
+pub(crate) fn from_session(
+    app: Option<&AppHandle>,
+    here: &Project,
+    projects: &[Project],
+    asked: &crate::agent_api::Asked,
+) -> Result<Value, String> {
+    if here.orchestrator.is_some() {
+        return Err(
+            "an orchestrator asks a project's agent with devpit_project_agent_ask".to_owned(),
+        );
+    }
+    let root = Path::new(&here.root_path);
+    if !root.join(crate::project_memory::DIR).is_dir() {
+        return Err(
+            "this project has no project agent yet: the orchestrator's first question to it makes one"
+                .to_owned(),
+        );
+    }
+    let text = |name: &str| {
+        asked
+            .params
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+    };
+    let cwd = Path::new(&asked.cwd);
+    if asked.method == "project_agent_propose" {
+        let board = crate::board::board_still_now(here.id.clone()).map_err(|err| err.message)?;
+        let card = match text("cardId") {
+            Some(id) => board.cards.iter().find(|card| card.id == id),
+            None => crate::agent_api::card_at(&board, cwd),
+        }
+        .ok_or("which card did it come from? pass `cardId`")?;
+        let source = card
+            .number
+            .map_or_else(|| card.id.clone(), |number| format!("#{number}"));
+        let file = propose_for_session(
+            root,
+            &today(),
+            &source,
+            text("kind").unwrap_or_default(),
+            text("text").unwrap_or_default(),
+        )?;
+        if let Some(app) = app {
+            let _ = app.emit("lessons:proposed", &here.id);
+        }
+        return Ok(json!({
+            "project": here.name,
+            "proposed": file,
+            "source": source,
+            "waiting": "for the person's Approve, Edit or Discard",
+        }));
+    }
+    let question = text("question").ok_or("what to ask? pass `question`")?;
+    let app = app.ok_or("devpit's window is not running")?;
+    let (command, env, mcp) = waking(&linked_profile(projects, &here.id)?)?;
+    let wake = Wake {
+        command: &command,
+        env: &env,
+        root,
+        name: &here.name,
+        mcp_config: mcp.as_deref(),
+    };
+    // A session devpit did not start is known by where it stands.
+    let session = match asked.author.as_str() {
+        "" => cwd.display().to_string(),
+        author => author.to_owned(),
+    };
+    let (answer, left) = app
+        .state::<Agents>()
+        .consult(&here.id, &session, &wake, question)?;
+    if answer.proposed > 0 {
+        let _ = app.emit("lessons:proposed", &here.id);
+    }
+    Ok(json!({ "project": here.name, "answer": answer.text, "woke": answer.woke, "left": left }))
 }
 
 pub(crate) fn today() -> String {
