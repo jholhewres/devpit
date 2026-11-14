@@ -111,7 +111,7 @@ vi.mock('./window', () => ({
   onPermissionAsked: () => () => {},
   onPermissionSettled: () => () => {},
 }))
-const shell = { project: { id: 'p', rootPath: '/w', orchestrator: null }, show: vi.fn() }
+const shell = { project: { id: 'p', rootPath: '/w', orchestrator: null as string | null }, show: vi.fn() }
 vi.mock('./shellStore', () => ({ useShellPick: (pick: (from: typeof shell) => unknown) => pick(shell) }))
 
 /* What a new chat's project says it starts with. */
@@ -443,5 +443,16 @@ describe('a new chat', () => {
     await waitFor(() => expect(result.current.permission).toBe('manual'))
     expect(result.current.model ?? null).toBeNull()
   })
-})
 
+  it('keeps an orchestrator in the mode it listens in, whatever its project says', async () => {
+    projectSettings.applied = { model: 'opus', permissionMode: 'manual' }
+    shell.project = { ...shell.project, orchestrator: 'claude' }
+    try {
+      const { result } = renderHook(() => useChat('conv_orch'))
+      await waitFor(() => expect(result.current.model).toBe('opus'))
+      await waitFor(() => expect(result.current.permission).toBe('acceptEdits'))
+    } finally {
+      shell.project = { ...shell.project, orchestrator: null }
+    }
+  })
+})

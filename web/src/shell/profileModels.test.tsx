@@ -36,6 +36,12 @@ describe("a profile's models in Settings → Providers", () => {
     await waitFor(() => expect(write).toHaveBeenLastCalledWith('glm', { modelsOff: [], advisorModel: null }))
   })
 
+  it('never offers to switch off the default model', async () => {
+    render(<ProfileModels profileId="glm" />)
+    await screen.findByRole('checkbox', { name: 'Offer glm-4.6' })
+    expect(screen.queryByRole('checkbox', { name: 'Offer default' })).toBeNull()
+  })
+
   it('keeps an advisor model, and none when emptied', async () => {
     render(<ProfileModels profileId="glm" />)
     const advisor = await screen.findByLabelText('Advisor model')

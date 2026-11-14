@@ -34,15 +34,11 @@ fn the_repo_file_gives_its_model_permission_mode_and_branch_name() {
     assert_eq!(from_repo(dir.path()), Ok(Scoped::default()));
     repo_file(
         dir.path(),
-        r#"{"model":"sonnet","permissionMode":"acceptEdits","worktree":{"branchPattern":"fix/{slug}"}}"#,
+        r#"{"model":"sonnet","permissionMode":"plan","worktree":{"branchPattern":"fix/{slug}"}}"#,
     );
     assert_eq!(
         from_repo(dir.path()),
-        Ok(scoped(
-            Some("sonnet"),
-            Some("acceptEdits"),
-            Some("fix/{slug}")
-        ))
+        Ok(scoped(Some("sonnet"), Some("plan"), Some("fix/{slug}")))
     );
 }
 
@@ -134,4 +130,43 @@ fn only_model_names_known_modes_and_branch_patterns_are_kept() {
     assert!(refused(&scoped(Some("op us"), None, None)).is_some());
     assert!(refused(&scoped(None, Some("everything"), None)).is_some());
     assert!(refused(&scoped(None, None, Some("feat/..{slug}"))).is_some());
+}
+
+#[test]
+fn a_repository_never_starts_chats_in_a_mode_that_asks_less_than_supervised() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for mode in ["bypassPermissions", "acceptEdits"] {
+        repo_file(
+            dir.path(),
+            &format!(r#"{{"permissionMode":"{mode}","model":"opus"}}"#),
+        );
+        let said = from_repo(dir.path()).expect_err(mode);
+        assert!(said.contains("only you choose"), "{said}");
+    }
+    repo_file(dir.path(), r#"{"permissionMode":"plan"}"#);
+    assert!(from_repo(dir.path()).is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_repo_file_that_is_not_a_file_is_not_read() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir_all(dir.path().join(REPO_FILE)).expect("a folder in its place");
+    let said = from_repo(dir.path()).expect_err("not a file");
+    assert!(said.contains("not a file"), "{said}");
+}
+
+#[test]
+fn one_setting_changes_and_the_others_stay() {
+    let set = scoped(Some("opus"), Some("plan"), Some("fix/{slug}"));
+    assert_eq!(
+        with_field(set.clone(), "model", Some("haiku".to_owned())),
+        Ok(scoped(Some("haiku"), Some("plan"), Some("fix/{slug}")))
+    );
+    assert_eq!(
+        with_field(set.clone(), "permissionMode", Some("  ".to_owned())),
+        Ok(scoped(Some("opus"), None, Some("fix/{slug}")))
+    );
+    assert!(with_field(set.clone(), "theme", Some("dark".to_owned())).is_err());
+    assert!(with_field(set, "model", Some("not a model".to_owned())).is_err());
 }

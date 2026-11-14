@@ -17,8 +17,8 @@ const settings = (projectId: string | null): ProjectSettings => {
     repoProblem: null,
   }
 }
-const write = vi.fn(async (projectId: string | null, next: Scoped) => {
-  if (projectId) own = { ...own, [projectId]: next }
+const write = vi.fn(async (projectId: string | null, field: keyof Scoped, value: string | null) => {
+  if (projectId) own = { ...own, [projectId]: { ...own[projectId], [field]: value } }
   return settings(projectId)
 })
 vi.mock('./live', () => ({
@@ -26,7 +26,7 @@ vi.mock('./live', () => ({
   commands: {
     projectList: async () => ({ projects: [{ id: 'api', name: 'api', orchestrator: null }, { id: 'crew', name: 'Release crew', orchestrator: 'claude' }] }),
     projectSettingsRead: async (projectId: string | null) => settings(projectId),
-    projectSettingsWrite: (projectId: string | null, next: Scoped) => write(projectId, next),
+    projectSettingsWrite: (projectId: string | null, field: keyof Scoped, value: string | null) => write(projectId, field, value),
   },
 }))
 
@@ -47,7 +47,7 @@ describe('settings applied per project', () => {
     fireEvent.change(scope, { target: { value: 'api' } })
     await waitFor(() => expect((screen.getByLabelText('Default model') as HTMLInputElement).placeholder).toBe('haiku from all projects'))
     fireEvent.blur(screen.getByLabelText('Default model'), { target: { value: 'opus' } })
-    await waitFor(() => expect(write).toHaveBeenLastCalledWith('api', { model: 'opus' }))
+    await waitFor(() => expect(write).toHaveBeenLastCalledWith('api', 'model', 'opus'))
   })
 
   it("say where a project's permission mode comes from, and keep the project's own", async () => {
@@ -55,7 +55,7 @@ describe('settings applied per project', () => {
     fireEvent.change(await screen.findByLabelText('Applying settings for (Permission mode)'), { target: { value: 'api' } })
     expect(await screen.findByRole('option', { name: 'As Plan from .devpit/settings.json' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Permission mode'), { target: { value: 'acceptEdits' } })
-    await waitFor(() => expect(write).toHaveBeenLastCalledWith('api', { permissionMode: 'acceptEdits' }))
+    await waitFor(() => expect(write).toHaveBeenLastCalledWith('api', 'permissionMode', 'acceptEdits'))
   })
 
   it("leave the machine's branch name to Settings → Worktrees and take a project's own", async () => {
@@ -64,6 +64,6 @@ describe('settings applied per project', () => {
     expect(screen.queryByLabelText('Branch name for this project')).toBeNull()
     fireEvent.change(screen.getByLabelText('Applying settings for (Branch name for this project)'), { target: { value: 'api' } })
     fireEvent.blur(await screen.findByLabelText('Branch name for this project'), { target: { value: 'fix/{slug}' } })
-    await waitFor(() => expect(write).toHaveBeenLastCalledWith('api', { branchPattern: 'fix/{slug}' }))
+    await waitFor(() => expect(write).toHaveBeenLastCalledWith('api', 'branchPattern', 'fix/{slug}'))
   })
 })

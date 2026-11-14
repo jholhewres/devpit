@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
 import { PrefRow } from './PrefRow'
-import { CHECK_DEFAULT, CHECK_MINUTES, checksChanged } from './providerChecks'
+import { CHECK_DEFAULT, CHECK_MINUTES, checksChanged } from './checkEvery'
 
 /* Settings → Providers: how often sign-ins and MCP servers are checked. */
 export function ProviderChecks(): React.JSX.Element {

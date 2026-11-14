@@ -1399,11 +1399,11 @@ export const commands = {
 	/**  `project.settings_read` — `projectId` empty for the machine's. */
 	projectSettingsRead: (projectId: string | null) => typedError<ProjectSettings, RpcError>(__TAURI_INVOKE("project_settings_read", { projectId })),
 	/**
-	 *  `project.settings_write` — a project's own settings, replaced; for the
-	 *  machine, its model and permission mode (its branch name is chosen where it
-	 *  always was, in Settings → Worktrees).
+	 *  `project.settings_write` — one setting of a project, or of the machine,
+	 *  changed and the others left as they are now. The machine's branch name is
+	 *  chosen where it always was, in Settings → Worktrees.
 	 */
-	projectSettingsWrite: (projectId: string | null, settings: Scoped) => typedError<ProjectSettings, RpcError>(__TAURI_INVOKE("project_settings_write", { projectId, settings })),
+	projectSettingsWrite: (projectId: string | null, field: string, value: string | null) => typedError<ProjectSettings, RpcError>(__TAURI_INVOKE("project_settings_write", { projectId, field, value })),
 	/**  `worktree.sources` — the kinds this project has, and which are shown. */
 	worktreeSources: (projectId: string | null) => typedError<Source[], RpcError>(__TAURI_INVOKE("worktree_sources", { projectId })),
 	/**  `worktree.source_show` — shows or hides one kind. */

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Credentials, SignIns } from '../gen/bindings'
 import { useAway } from './away'
 import { ask, commands } from './live'
-import { useCheckEvery } from './providerChecks'
+import { useCheckEvery } from './checkEvery'
 import { useShell } from './useShell'
 
 /*
