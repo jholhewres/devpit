@@ -179,6 +179,7 @@ async fn telling_a_session_to_go_on_drafts_it_with_a_button_whose_press_sends_it
             "prof_c15b",
             Path::new("/no/log/read"),
             "noiseless-mvp",
+            false,
         )
         .expect("asked");
         assert_eq!(asked["done"], false);

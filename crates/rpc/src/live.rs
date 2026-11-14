@@ -206,3 +206,39 @@ pub struct StopsConfirmed {
     /// showed: not stopped, and waiting again with it.
     pub changed: Vec<String>,
 }
+
+/// A confirmation an orchestrator needs from the person before it acts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Guardrail {
+    /// Stopping a session.
+    Stop,
+    /// A forced stop, or one that loses work.
+    ForceStop,
+    /// Sending a drafted reply as the person.
+    SendDraft,
+}
+
+/// When a guardrail waits for the person.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum GuardrailMode {
+    /// Asks unless the orchestrator's chat runs in Full access.
+    Follow,
+    Always,
+    Never,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GuardrailRow {
+    pub guardrail: Guardrail,
+    pub mode: GuardrailMode,
+}
+
+/// An orchestrator's guardrails, each with its mode.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Guardrails {
+    pub rows: Vec<GuardrailRow>,
+}

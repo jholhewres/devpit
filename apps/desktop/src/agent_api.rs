@@ -318,6 +318,18 @@ fn respond_in(
                 .map(|pid| pid as i32);
             let force = asked.params.get("force").and_then(Value::as_bool) == Some(true);
             let losing = crate::stopping::losing(profile, &name, pid).map_err(said)?;
+            let guardrail = crate::stop_asked::guardrail(force, losing.as_deref());
+            if crate::guardrails::off(here, guardrail) {
+                let done = crate::stopping::stop(app, profile, &name, pid, "orchestrator", force)
+                    .map_err(said)?;
+                let did = format!(
+                    "{}; it lost {}",
+                    done["stopped"].as_str().unwrap_or(&name),
+                    losing.as_deref().unwrap_or("nothing")
+                );
+                let root = Path::new(&here.root_path);
+                return Ok(crate::guardrails::reported(root, guardrail, &did, done));
+            }
             let press = crate::channels::Action::StopSession {
                 profile: profile.to_owned(),
                 session: name.clone(),
@@ -381,11 +393,13 @@ fn respond_in(
             let profile = orchestrating(here)?;
             let name = text("name").ok_or(WHICH_SESSION)?;
             in_reach(here, profile, &name)?;
+            let unasked = crate::guardrails::off(here, devpit_rpc::Guardrail::SendDraft);
             return crate::draft_sending::send(
                 &here.id,
                 profile,
                 Path::new(&here.root_path),
                 &name,
+                unasked,
             );
         }
         "log" => {

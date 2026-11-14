@@ -186,6 +186,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         ),
       },
       {
+        id: 'orchestrator',
+        label: 'Orchestrator',
+        about: 'guardrails confirm ask stop force draft send full access permission',
+        icon: (
+          <svg {...stroke}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+        ),
+      },
+      {
         id: 'assistant',
         label: 'Assistant',
         about: 'assistant mode heartbeat schedules routines proactive check in ci blocked waiting briefing away',

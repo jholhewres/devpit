@@ -13,6 +13,7 @@ import { ProviderRows } from './ProviderRows'
 import { flagOn, type Flag } from './settingsFlags'
 import { AccountsSettings } from './AccountsSettings'
 import { AssistantSettings } from './AssistantSettings'
+import { GuardrailSettings } from './GuardrailSettings'
 import { ChannelsPane } from './ChannelsPane'
 import { DecisionsSettings } from './DecisionsSettings'
 import { DevflowSettings } from './DevflowSettings'
@@ -180,10 +181,8 @@ export function Settings({
           </section>
           <section className="prefs__in" hidden={pane !== 'channels'}><ChannelsPane /></section>
           <section className="prefs__in" hidden={pane !== 'assistant'}><h1 className="prefs__h">Assistant</h1><AssistantSettings /></section>
-          <section className="prefs__in" hidden={pane !== 'decisions'}>
-            <h1 className="prefs__h">Decisions</h1>
-            <DecisionsSettings />
-          </section>
+          <section className="prefs__in" hidden={pane !== 'orchestrator'}><h1 className="prefs__h">Orchestrator</h1><GuardrailSettings /></section>
+          <section className="prefs__in" hidden={pane !== 'decisions'}><h1 className="prefs__h">Decisions</h1><DecisionsSettings /></section>
           <section className="prefs__in" hidden={pane !== 'devflow'}>
             <h1 className="prefs__h">Devflow</h1>
             <DevflowSettings />

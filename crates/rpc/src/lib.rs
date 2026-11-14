@@ -112,9 +112,9 @@ pub use island::{
 };
 pub use lessons::{LessonProposal, LessonProposals, MemoryDecision, ProjectAgentAnswer};
 pub use live::{
-    EndedSession, EndedSessions, LivePane, LiveSession, LiveSessions, PendingPrompt,
-    ProjectProposal, PromptOption, RemoteState, SessionOnCard, SessionTold, SessionsOnCard,
-    StopAsked, StopsAsked, StopsConfirmed,
+    EndedSession, EndedSessions, Guardrail, GuardrailMode, GuardrailRow, Guardrails, LivePane,
+    LiveSession, LiveSessions, PendingPrompt, ProjectProposal, PromptOption, RemoteState,
+    SessionOnCard, SessionTold, SessionsOnCard, StopAsked, StopsAsked, StopsConfirmed,
 };
 pub use mcp_health::{AgentHealth, McpHealth, McpServerHealth, McpState};
 pub use pause::Paused;
