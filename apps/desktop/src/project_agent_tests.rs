@@ -470,3 +470,129 @@ fn a_brief_says_to_consult_the_project_agent_first_and_old_briefs_still_work() {
     assert_eq!(nudged(&once, &bench.root), once);
     assert_eq!(nudged("  ", &bench.root), "  ");
 }
+
+/// The sidebar chat's question, with the stand-in's retry as [`asked`].
+fn chatted(agents: &Agents, bench: &Bench, question: &str) -> ProjectAgentAnswer {
+    for _ in 0..5 {
+        match chat(agents, "p1", &wake(bench), question) {
+            Err(why) if why.contains(NOT_STARTED) => std::thread::sleep(Duration::from_millis(50)),
+            other => return other.expect("answered").0,
+        }
+    }
+    panic!("the stand-in never started");
+}
+
+#[test]
+fn the_sidebar_chat_is_answered_by_the_resident_agent_and_resumes_after_idle_out() {
+    let bench = bench();
+    let agents = Agents::idling_after(Duration::from_millis(200));
+    asked(&agents, &bench, "the orchestrator's question");
+    let answer = chatted(&agents, &bench, "How are tests run?");
+    assert_eq!(answer.answer, "answer 2");
+    assert!(
+        !answer.woke,
+        "the process the orchestrator woke answers the chat"
+    );
+    let lines = lines_read(&bench);
+    assert!(
+        lines[1].contains("How are tests run?") && lines[1].contains("Name the files"),
+        "{lines:?}"
+    );
+
+    idled_out(&agents);
+    let again = chatted(&agents, &bench, "And the guards?");
+    assert!(again.woke);
+    let said = log(&bench.log);
+    let starts: Vec<&str> = said
+        .lines()
+        .filter(|line| line.starts_with("argv "))
+        .collect();
+    assert_eq!(starts.len(), 2, "{said}");
+    assert!(starts[1].contains("--resume s-1"), "{}", starts[1]);
+}
+
+#[test]
+fn the_sidebar_chat_cannot_write_files() {
+    let bench = bench();
+    let agents = Agents::idling_after(Duration::from_secs(60));
+    chatted(&agents, &bench, "Delete AGENTS.md");
+    let start = log(&bench.log)
+        .lines()
+        .find(|line| line.starts_with("argv "))
+        .map(|line| format!("{line} "))
+        .expect("a start");
+    assert!(start.contains("--permission-mode plan"), "{start}");
+    for rule in [
+        "Edit",
+        "Write",
+        "NotebookEdit",
+        "Bash(rm *)",
+        "Bash(mv *)",
+        "Bash(git commit *)",
+        "Bash(git push *)",
+        "Bash(*>*)",
+    ] {
+        assert!(
+            start.contains(&format!("--disallowedTools={rule} ")),
+            "{rule} is not refused: {start}"
+        );
+    }
+}
+
+#[test]
+fn an_answer_cites_the_project_files_it_names_and_no_other() {
+    let bench = bench();
+    std::fs::create_dir_all(bench.root.join("src")).expect("src");
+    std::fs::write(bench.root.join("src/main.rs"), "fn main() {}\n").expect("main");
+    let outside = bench.root.parent().expect("parent").join("secret.txt");
+    std::fs::write(&outside, "no\n").expect("outside");
+    let answer = format!(
+        "See `src/main.rs:3` and [the guide](./AGENTS.md). Not src/gone.rs, ../secret.txt, {} \
+         or the folder src/. Again: {}/src/main.rs.",
+        outside.display(),
+        bench.root.display(),
+    );
+    assert_eq!(cited(&bench.root, &answer), ["src/main.rs", "AGENTS.md"]);
+}
+
+#[test]
+fn a_fact_from_the_chat_waits_for_approval_and_writes_nothing_on_its_own() {
+    let bench = bench();
+    let agents = Agents::idling_after(Duration::from_secs(60));
+    chatted(&agents, &bench, "How are tests run?");
+    let facts = bench.root.join(".devpit/project-agent/facts.md");
+    let before = std::fs::read_to_string(&facts).expect("facts");
+    let day = "2026-11-14";
+
+    let refused = chat_fact(
+        &bench.root,
+        day,
+        "Unsourced.",
+        &["../secret.txt".to_owned()],
+    );
+    assert!(refused.is_err(), "a fact rests on a file of the project");
+    chat_fact(
+        &bench.root,
+        day,
+        "Tests run with make test.",
+        &["AGENTS.md".to_owned()],
+    )
+    .expect("proposed");
+    assert_eq!(std::fs::read_to_string(&facts).expect("facts"), before);
+    let waiting = crate::project_memory::proposals(&bench.root);
+    assert_eq!(waiting.len(), 1);
+    assert_eq!(waiting[0].source, "AGENTS.md");
+    assert_eq!(
+        crate::project_memory::aim(&waiting[0].text),
+        ("facts.md", "Tests run with make test.", None)
+    );
+
+    let kept = "Tests run with make test.";
+    crate::project_memory::decide(&bench.root, day, "AGENTS.md", kept, None, Some(kept))
+        .expect("approved");
+    let now = std::fs::read_to_string(&facts).expect("facts");
+    assert!(
+        now.contains("- 2026-11-14 · AGENTS.md · Tests run with make test."),
+        "{now}"
+    );
+}

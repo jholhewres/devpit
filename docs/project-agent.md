@@ -59,6 +59,22 @@ orchestrator linked to the project, as for a closed card.
   `.devpit/project-agent/`. A brief for a project without an agent goes as it
   was.
 
+## How the person reaches it
+
+Each project's sidebar has **Ask the project**, a chat with its agent: the
+same resident process the orchestrator asks, woken under the profile of an
+orchestrator linked to the project, read-only like every wake. Its first
+question writes the memory, as `devpit_project_agent_ask` does, and after an
+idle-out the next question resumes the same conversation.
+
+- **Answers name their files.** Each question asks the agent to name the
+  files its answer rests on, and the files of the project an answer names
+  show under it, each opening in a tab.
+- **Save as fact.** An answer that names files can be proposed as a fact,
+  edited first into one line, resting on those files. It waits in
+  `proposed.md` for Approve, Edit or Discard like any other proposal, and
+  `facts.md` changes only once the person approves it.
+
 ## The process
 
 The agent is a Claude Code process started in the project's folder, under

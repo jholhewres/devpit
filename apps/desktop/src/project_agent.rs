@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use devpit_agentcli::resident::{Heard, Resident};
 use devpit_agentcli::talk::Say;
-use devpit_rpc::{Part, Project};
+use devpit_rpc::{ErrorCode, LessonProposals, Part, Project, ProjectAgentAnswer, RpcError};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -32,6 +32,8 @@ const PROPOSAL_CHARS: usize = 1000;
 const PENDING: usize = 50;
 /// What a brief says about the project agent starts here.
 const NUDGE: &str = "## The project agent";
+/// The most files one answer is taken to cite.
+const CITED: usize = 12;
 /// How long an agent nobody asks keeps its process.
 const IDLE: Duration = Duration::from_secs(10 * 60);
 pub(crate) const NOT_STARTED: &str = "the project agent could not start";
@@ -598,6 +600,158 @@ pub(crate) fn respond(
         }
         _ => json!({ "project": project.name, "answer": answer.text, "woke": answer.woke }),
     })
+}
+
+/// The person's question from the "Ask the project" chat, asked so that its
+/// answer names the files it rests on.
+pub(crate) fn chat_prompt(question: &str) -> String {
+    format!(
+        "{question}\n\n(The person asks this in devpit's \"Ask the project\" chat. Name the files \
+         your answer rests on by their paths from the project's root.)"
+    )
+}
+
+/// The files of `root` that `answer` names, each once and in the order named:
+/// a path from the root, or an absolute one inside it, with any `:line` cut.
+pub(crate) fn cited(root: &Path, answer: &str) -> Vec<String> {
+    let Ok(base) = root.canonicalize() else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = Vec::new();
+    for word in answer.split(|c: char| c.is_whitespace() || "`'\"()[]<>{},;*|#".contains(c)) {
+        if found.len() == CITED {
+            break;
+        }
+        let word = word.split(':').next().unwrap_or_default();
+        let word = word.trim_end_matches('.').trim_start_matches("./");
+        if word.is_empty() || !word.contains(['/', '.']) {
+            continue;
+        }
+        let named = Path::new(word);
+        let path = match named
+            .strip_prefix(root)
+            .or_else(|_| named.strip_prefix(&base))
+        {
+            Ok(inside) => inside,
+            Err(_) if named.is_absolute() => continue,
+            Err(_) => named,
+        };
+        if let Some(path) = path.to_str().filter(|path| keeps(&base, path, &found)) {
+            found.push(path.to_owned());
+        }
+    }
+    found
+}
+
+/// Whether `path` is a file inside `base`, through its symlinks, not yet found.
+fn keeps(base: &Path, path: &str, found: &[String]) -> bool {
+    !path.is_empty()
+        && !found.iter().any(|one| one == path)
+        && base
+            .join(path)
+            .canonicalize()
+            .is_ok_and(|real| real.starts_with(base) && real.is_file())
+}
+
+/// The chat's question to `key`'s agent, the same resident process the
+/// orchestrator asks; and how many stale entries its wake proposed.
+pub(crate) fn chat(
+    agents: &Agents,
+    key: &str,
+    wake: &Wake,
+    question: &str,
+) -> Result<(ProjectAgentAnswer, usize), String> {
+    let answer = agents.ask(key, wake, &chat_prompt(question))?;
+    let cited = cited(wake.root, &answer.text);
+    Ok((
+        ProjectAgentAnswer {
+            answer: answer.text,
+            woke: answer.woke,
+            cited,
+        },
+        answer.proposed,
+    ))
+}
+
+/// An answer kept as a fact resting on the files it cited: a proposal, which
+/// changes the memory only once the person approves it.
+pub(crate) fn chat_fact(
+    root: &Path,
+    day: &str,
+    text: &str,
+    cited: &[String],
+) -> Result<(), String> {
+    let files = self::cited(root, &cited.join(" "));
+    if files.is_empty() {
+        return Err(
+            "a fact rests on the files its answer names, and this one names none".to_owned(),
+        );
+    }
+    propose_for_session(root, day, &files.join(", "), "fact", text).map(|_| ())
+}
+
+/// The project asked from its sidebar: never an orchestrator's.
+fn sidebar_project(projects: &[Project], project_id: &str) -> Result<Project, RpcError> {
+    projects
+        .iter()
+        .find(|one| one.id == project_id && one.orchestrator.is_none())
+        .cloned()
+        .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that project is gone"))
+}
+
+/// `project_agent.chat` — the person asks a project's agent from its sidebar.
+#[tauri::command]
+#[specta::specta]
+pub async fn project_agent_chat(
+    app: AppHandle,
+    project_id: String,
+    question: String,
+) -> Result<ProjectAgentAnswer, RpcError> {
+    crate::off_main::blocking(move || {
+        let refused = |why: String| RpcError::new(ErrorCode::Conflict, why);
+        let question = question.trim();
+        if question.is_empty() {
+            return Err(RpcError::new(ErrorCode::Invalid, "what to ask?"));
+        }
+        let listed = crate::projects::project_list_now()?;
+        let project = sidebar_project(&listed.projects, &project_id)?;
+        let profile = linked_profile(&listed.projects, &project.id).map_err(refused)?;
+        let (command, env, mcp) = waking(&profile).map_err(refused)?;
+        let wake = Wake {
+            command: &command,
+            env: &env,
+            root: Path::new(&project.root_path),
+            name: &project.name,
+            mcp_config: mcp.as_deref(),
+        };
+        let (answer, proposed) =
+            chat(&app.state::<Agents>(), &project.id, &wake, question).map_err(refused)?;
+        if proposed > 0 {
+            let _ = app.emit("lessons:proposed", &project.id);
+        }
+        Ok(answer)
+    })
+    .await
+}
+
+/// `project_agent.fact` — an answer proposed as a fact, waiting for the person.
+#[tauri::command]
+#[specta::specta]
+pub async fn project_agent_fact(
+    app: AppHandle,
+    project_id: String,
+    text: String,
+    cited: Vec<String>,
+) -> Result<LessonProposals, RpcError> {
+    crate::off_main::blocking(move || {
+        let listed = crate::projects::project_list_now()?;
+        let project = sidebar_project(&listed.projects, &project_id)?;
+        chat_fact(Path::new(&project.root_path), &today(), &text, &cited)
+            .map_err(|why| RpcError::new(ErrorCode::Invalid, why))?;
+        let _ = app.emit("lessons:proposed", &project.id);
+        crate::project_lessons::waiting()
+    })
+    .await
 }
 
 #[cfg(all(test, unix))]

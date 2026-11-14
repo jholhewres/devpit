@@ -503,6 +503,10 @@ export const commands = {
 	 *  proposal updates, or removes when `kept` is empty.
 	 */
 	lessonDecide: (projectId: string, source: string, text: string, replaces: string | null, kept: string | null) => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("lesson_decide", { projectId, source, text, replaces, kept })),
+	/**  `project_agent.chat` — the person asks a project's agent from its sidebar. */
+	projectAgentChat: (projectId: string, question: string) => typedError<ProjectAgentAnswer, RpcError>(__TAURI_INVOKE("project_agent_chat", { projectId, question })),
+	/**  `project_agent.fact` — an answer proposed as a fact, waiting for the person. */
+	projectAgentFact: (projectId: string, text: string, cited: string[]) => typedError<LessonProposals, RpcError>(__TAURI_INVOKE("project_agent_fact", { projectId, text, cited })),
 	/**  `devflow.screen` — a project's Devflow, read now. */
 	devflowScreen: (projectId: string) => typedError<DevflowScreen, RpcError>(__TAURI_INVOKE("devflow_screen", { projectId })),
 	/**  `devflow.preview` — what a setup would write; nothing is written. */
@@ -4995,6 +4999,15 @@ export type Project = {
 export type ProjectAccount = {
 	projectId: string,
 	account: string,
+};
+
+/**  What the project agent answered in the "Ask the project" chat. */
+export type ProjectAgentAnswer = {
+	answer: string,
+	/**  Whether this question started the agent's process. */
+	woke: boolean,
+	/**  The project's files the answer names, from the project's root. */
+	cited: string[],
 };
 
 export type ProjectChanges = {

@@ -288,7 +288,7 @@ fn close(app: &AppHandle, project_id: &str, card_id: &str) -> Result<(), String>
 
 /// Every proposal waiting for the person, and the decisions naming their
 /// cards, project by project.
-fn waiting() -> Result<LessonProposals, RpcError> {
+pub(crate) fn waiting() -> Result<LessonProposals, RpcError> {
     let listed = crate::projects::project_list_now()?;
     let projects = listed
         .projects

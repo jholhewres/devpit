@@ -2,6 +2,7 @@ import { Drawing } from '../plugins/excalidraw/Drawing'
 import { NotePane } from '../plugins/notes/NotePane'
 import { NotesList } from '../plugins/notes/NotesList'
 import { DrawingList } from '../plugins/excalidraw/DrawingList'
+import { AskPane } from './AskPane'
 import { BoardPane } from './BoardPane'
 import { BrowserPane } from './BrowserPane'
 import { ChatPane } from './ChatPane'
@@ -113,6 +114,24 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   { name: 'plugins', many: false, className: 'pane', render: () => <PluginsPane /> },
   { name: 'browser', many: true, className: 'pane pane--browser', render: (tab) => <BrowserPane tab={tab} /> },
   { name: 'schedules', many: false, className: 'pane', render: () => <SchedulesPane /> },
+  {
+    name: 'ask',
+    many: false,
+    className: 'pane',
+    render: (close) => (
+      <>
+        <div className="pane__bar">
+          <span className="pane__ico">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.7-2.5 2.3-2.5 3.8M12 17h.01" /></svg>
+          </span>
+          <span className="pane__t"><b>Ask the project</b></span>
+          <span className="drag"></span>
+          <button className="sq26" onClick={() => close('ask')} aria-label="Close Ask the project" title="Close Ask the project">{closeIcon}</button>
+        </div>
+        <AskPane />
+      </>
+    ),
+  },
   { name: 'files', many: false, className: 'pane', render: () => <FilesPane /> },
   { name: 'workspace', many: false, className: 'pane', render: () => <WorkspacePane /> },
   { name: 'chat', many: true, className: 'pane', render: (tab) => <ChatPane tab={tab} /> },
