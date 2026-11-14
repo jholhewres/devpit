@@ -67,6 +67,10 @@ pub(crate) fn wants_full(arguments: &Value) -> bool {
 /// The text a tool answers with: the whole answer when asked, else its
 /// summary, compact and within [`BUDGET`].
 pub(crate) fn said(tool: &str, arguments: &Value, answer: Value) -> String {
+    // Cut, a consult would be asked again, and spend another question.
+    if tool == "devpit_project_agent_consult" {
+        return answer.to_string();
+    }
     if wants_full(arguments) {
         return serde_json::to_string_pretty(&answer).unwrap_or_default();
     }

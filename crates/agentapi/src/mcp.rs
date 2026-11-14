@@ -564,7 +564,9 @@ fn call(
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    let arguments = crate::devflow::hooked(tool.name, arguments, &|name| std::env::var(name).ok());
+    let env = |name: &str| std::env::var(name).ok();
+    let arguments = crate::devflow::hooked(tool.name, arguments, &env);
+    let arguments = crate::consult::paned(tool.name, arguments, &env);
     let full = lean::wants_full(&arguments);
     match ask(tool.method, lean::asked(tool.name, arguments.clone())) {
         Ok(answer) if tool.name == crate::skills::TOOL && !full && given.again(&answer) => {
