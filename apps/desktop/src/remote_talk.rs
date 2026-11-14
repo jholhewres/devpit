@@ -386,7 +386,7 @@ fn refused(out: &Sender<RemoteOut>, project: String, conversation: String, why: 
     let _ = out.send(RemoteOut::ChatFrame {
         project,
         conversation,
-        frame: ended,
+        frame: Box::new(ended),
     });
     let _ = out.send(RemoteOut::Failed { why });
 }
@@ -442,7 +442,7 @@ fn forwarding(out: Sender<RemoteOut>, project: &str, conversation: &str) -> Chan
             let _ = out.send(RemoteOut::ChatFrame {
                 project: project.clone(),
                 conversation: conversation.clone(),
-                frame: frame_for_phone(frame),
+                frame: Box::new(frame_for_phone(frame)),
             });
         }
         Ok(())
