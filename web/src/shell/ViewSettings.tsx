@@ -38,6 +38,7 @@ const SIZE_CHOICES = SIZES.map((one) => [one, SIZE_LABELS[one]] as const)
 
 export function ChatKeySettings(): React.JSX.Element {
   const other = keysLabel('steerNow')
+  const { sendKey } = useViewPrefs()
   return (
     <>
       <Pick
@@ -52,7 +53,7 @@ export function ChatKeySettings(): React.JSX.Element {
       <Pick
         field="followUp"
         title="While a turn runs"
-        said={`What a message sent during a turn does: waits for the turn to end, or goes into it now. ${other} does the other, while Enter sends.`}
+        said={`What a message sent during a turn does: waits for the turn to end, or goes into it now.${sendKey === 'enter' ? ` ${other} does the other.` : ''}`}
         choices={[
           ['queue', 'Queue'],
           ['steer', 'Steer'],

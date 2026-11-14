@@ -57,7 +57,8 @@ vi.mock('./useStop', () => ({ useStop: () => false }))
 vi.mock('./useShell', () => ({
   useShell: () => ({ active: { id: 'conv_1' }, project: { id: 'p1', name: 'devpit' }, rename: vi.fn(), threads: [], tellDoing: vi.fn(), mark: vi.fn(), reload: vi.fn(), drafted: vi.fn() }),
 }))
-vi.mock('./shellStore', () => ({ useShellPick: () => () => undefined }))
+const shown = vi.fn()
+vi.mock('./shellStore', () => ({ useShellPick: () => shown }))
 vi.mock('./Asked', () => ({ Asked: () => null }))
 vi.mock('./Chips', () => ({ Chips: () => null }))
 vi.mock('./ChatThread', () => ({ ChatThread: () => null }))
@@ -216,6 +217,14 @@ describe('the send key and the follow-up, as Settings → Sessions set them', ()
     expect(chat.say).not.toHaveBeenCalled()
     fireEvent.keyDown(typed(), { key: 'Enter', ctrlKey: true })
     expect(chat.say).toHaveBeenCalledWith('two lines', expect.any(Function))
+  })
+
+  it('Mod+Alt+Enter sends what is typed and starts a new chat', () => {
+    render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
+    fireEvent.change(typed(), { target: { value: 'go on alone' } })
+    fireEvent.keyDown(typed(), { key: 'Enter', ctrlKey: true, altKey: true })
+    expect(chat.say).toHaveBeenCalledWith('go on alone', expect.any(Function))
+    expect(shown).toHaveBeenCalledWith('chat')
   })
 
   it('the stash key puts the draft aside, and brings it back into an empty composer', () => {
