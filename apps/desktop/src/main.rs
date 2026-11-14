@@ -82,6 +82,7 @@ mod channel_rules;
 mod channel_talk;
 mod channels;
 mod chat;
+mod chat_aside;
 mod chat_listening;
 mod chat_pace;
 mod chat_queue;

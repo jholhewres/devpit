@@ -29,10 +29,13 @@ export function matching(commands: readonly string[], query: string): readonly s
    its arguments can follow without another keystroke. */
 export const picked = (command: string): string => `/${command} `
 
+/* A side question, answered apart from the conversation (`SideAnswer`). */
+export const ASIDE = 'btw'
+
 /* Commands devpit answers itself, offered first. `/resume` is one: the CLI
    lists it as a terminal-only command, which the chat leaves out, so a chat
    had no way back into an earlier conversation from where you type. */
-export const OWN: readonly string[] = ['resume']
+export const OWN: readonly string[] = ['resume', ASIDE]
 
 /* An orchestrator's chat answers these from the sessions devpit already
    follows, without a turn. `/sessions`, not `/status`: that one is Claude
@@ -41,7 +44,7 @@ export const ORCHESTRATOR_OWN: readonly string[] = ['sessions', 'waiting', 'ende
 
 /* The only one of them that takes words: which ended session to reopen in a
    terminal of its project, where `/resume` brings a conversation into this chat. */
-const WITH_WORDS: readonly string[] = ['resume-session']
+const WITH_WORDS: readonly string[] = ['resume-session', ASIDE]
 
 /* devpit's own commands in a chat; an orchestrator's has its shortcuts too. */
 export const ownFor = (orchestrator: boolean): readonly string[] => (orchestrator ? [...OWN, ...ORCHESTRATOR_OWN] : OWN)

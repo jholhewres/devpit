@@ -146,7 +146,7 @@ export const Composer = memo(function Composer({
           <SkillPills picked={chat.skills} onChange={chat.setSkills} profile={chat.profiles.find((one) => one.id === chat.profileId)} />
           <SlashMenu slash={slash} />
           <MentionMenu menu={mention} />
-          <OwnCommand slash={slash} from={tab.id} profileId={chat.profileId} orchestrator={project?.orchestrator ?? null} onClose={() => (slash.closeOwn(), field.current?.focus())} />
+          <OwnCommand slash={slash} from={tab.id} projectId={project?.id ?? null} profileId={chat.profileId} orchestrator={project?.orchestrator ?? null} onClose={() => (slash.closeOwn(), field.current?.focus())} />
           <textarea
             className="composer__ph"
             aria-label="Message to the agent"

@@ -298,6 +298,7 @@ mod tests;
 mod live_tests;
 
 pub mod apps_host;
+pub mod aside;
 pub mod claude_lines;
 pub mod cli_config;
 pub mod config_edit;
