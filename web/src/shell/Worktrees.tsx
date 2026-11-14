@@ -7,6 +7,7 @@ import { ask, commands } from './live'
 import { useShell } from './useShell'
 import { Sources } from './Sources'
 import { WorktreeBase } from './WorktreeBase'
+import { WorktreeBranch } from './WorktreeBranch'
 import { WorktreeCleanup } from './WorktreeCleanup'
 
 /*
@@ -55,6 +56,7 @@ export function Worktrees(): React.JSX.Element {
       </div>
 
       <WorktreeBase />
+      <WorktreeBranch />
       <Sources />
 
       <p className="prefs__gt">Cleanup</p>

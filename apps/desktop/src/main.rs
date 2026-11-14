@@ -297,6 +297,7 @@ mod windows_bin;
 mod working;
 mod workspace;
 mod worktree_base;
+mod worktree_branch;
 mod worktree_cleanup;
 mod worktree_setup;
 mod worktree_sweep;

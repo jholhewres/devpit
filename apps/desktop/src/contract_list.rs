@@ -27,7 +27,8 @@ use crate::{
     runs_list, saves, search, session_cost, session_search, session_window, sessions, settings,
     shell_launch, sign_ins, skills, slash, sources, spend_history, staging, stall_watch, steering,
     steps, stop_asked, stopping, tab_opening, threads, transcribe, tray, update, watching,
-    workspace, worktree_base, worktree_cleanup, worktree_setup, worktrees, wsfiles,
+    workspace, worktree_base, worktree_branch, worktree_cleanup, worktree_setup, worktrees,
+    wsfiles,
 };
 
 /// Loads every command whose types are generated into TypeScript.
@@ -295,6 +296,8 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         worktrees::worktree_remove,
         worktree_base::worktree_base_read,
         worktree_base::worktree_base_write,
+        worktree_branch::worktree_branch_read,
+        worktree_branch::worktree_branch_write,
         worktree_cleanup::worktree_cleanup_read,
         worktree_cleanup::worktree_cleanup_write,
         worktree_cleanup::worktree_cleanup_now,
