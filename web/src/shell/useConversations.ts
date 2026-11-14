@@ -10,7 +10,7 @@ import type { Tab } from './strip'
  * read them: their marks, their folder, when they were last spoken in.
  */
 
-export const NO_MARKS: ConversationMarks = { name: null, pinned: false, settled: false, snoozedUntil: null, unread: false }
+export const NO_MARKS: ConversationMarks = { name: null, pinned: false, settled: false, snoozedUntil: null, unread: false, archived: false }
 
 export interface Talks {
   readonly threads: readonly Thread[]
@@ -44,7 +44,8 @@ export function useConversations(
   useEffect(() => {
     if (!projectId) return setThreads([])
     let live = true
-    void ask(() => commands.chatList(projectId)).then((answer) => live && setThreads(answer.data?.conversations ?? []))
+    /* Archived ones are out of every list; Settings → Archive reads them itself. */
+    void ask(() => commands.chatList(projectId)).then((answer) => live && setThreads((answer.data?.conversations ?? []).filter((one) => !one.marks?.archived)))
     return () => {
       live = false
     }

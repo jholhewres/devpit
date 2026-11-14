@@ -1,4 +1,6 @@
+import { AboutSettings } from './AboutSettings'
 import { ActivityDefault } from './ActivityPick'
+import { ArchiveSettings } from './ArchiveSettings'
 import { CalendarSettings } from './CalendarSettings'
 import { DeskSettings } from './DeskSettings'
 import { DiagnosticsPane } from './DiagnosticsPane'
@@ -92,6 +94,16 @@ export function GeneralPanes({
       <section className="prefs__in" hidden={pane !== 'diagnostics'}>
         <h1 className="prefs__h">Diagnostics</h1>
         {pane === 'diagnostics' && <DiagnosticsPane />}
+      </section>
+
+      <section className="prefs__in" hidden={pane !== 'about'}>
+        <h1 className="prefs__h">About</h1>
+        <AboutSettings />
+      </section>
+
+      <section className="prefs__in" hidden={pane !== 'archive'}>
+        <h1 className="prefs__h">Archive</h1>
+        {pane === 'archive' && <ArchiveSettings />}
       </section>
     </>
   )

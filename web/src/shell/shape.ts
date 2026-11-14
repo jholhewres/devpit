@@ -31,6 +31,8 @@ export type PrefsPane =
   | 'keyboard'
   | 'maintenance'
   | 'diagnostics'
+  | 'about'
+  | 'archive'
   | 'providers'
   | 'sessions'
   | 'skills'
