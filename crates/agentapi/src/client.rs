@@ -38,7 +38,7 @@ const ASKING: Duration = Duration::from_secs(15 * 60);
 /// How long devpit has to answer one question.
 pub fn wait_for(method: &str) -> Duration {
     match method {
-        "devflow_offer" | "devflow_session" | "methods" => GLANCE,
+        "devflow_offer" | "devflow_session" | "methods" | "status" => GLANCE,
         "start" | "resume" => STARTING,
         "decide" | "rubric_run" | "devflow_plan" => DECIDING,
         "devflow_gate" => GATING,
@@ -111,7 +111,8 @@ pub fn ask(root: &Path, method: &str, params: Value, cwd: &Path) -> Result<Value
     }
 }
 
-fn closed() -> String {
+/// What a question to a devpit that is not running is answered.
+pub fn closed() -> String {
     "devpit is not open: ask the person to open it, then ask again".to_owned()
 }
 

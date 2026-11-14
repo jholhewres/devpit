@@ -246,53 +246,55 @@ pub async fn remote_via(app: tauri::AppHandle, via: RemoteVia) -> Result<RemoteV
 #[tauri::command]
 #[specta::specta]
 pub async fn remote_pair(mcp: bool) -> Result<RemotePairing, RpcError> {
-    crate::off_main::blocking(move || {
-        let store = Store::open_default()?;
-        let relay = via(&store) == RemoteVia::Relay;
-        if mcp && !(relay && crate::remote_mcp::allowed(&store)) {
-            return Err(RpcError::new(
-                ErrorCode::Conflict,
-                "allow remote MCP through devpit.app first",
-            ));
-        }
-        let address = if relay {
-            crate::remote_relay::running().then_some(String::new())
-        } else {
-            crate::remote_host::address()
-        }
-        .ok_or_else(|| RpcError::new(ErrorCode::Conflict, "turn Remote on first"))?;
-        let offered = crate::remote_pairing::offer(now(), mcp)
-            .ok_or_else(|| RpcError::internal("no pairing code could be made"))?;
-        let url = if relay {
-            crate::remote_relay::pairing_url(
-                &Store::root()?,
-                &offered.secret,
-                &crate::remote_conn::machine_name(),
-                mcp,
-            )
-            .map_err(RpcError::internal)?
-        } else {
-            format!("{address}#pair={}", offered.code)
-        };
-        // A client on another machine is given the link, not a camera.
-        let qr_svg = (!mcp)
-            .then(|| qrcode::QrCode::new(url.as_bytes()).ok())
-            .flatten()
-            .map(|code| {
-                code.render::<qrcode::render::svg::Color>()
-                    .min_dimensions(200, 200)
-                    .quiet_zone(true)
-                    .build()
-            })
-            .unwrap_or_default();
-        Ok(RemotePairing {
-            code: offered.code,
-            url,
-            qr_svg,
-            expires_at: offered.expires_at,
+    crate::off_main::blocking(move || pair_now(mcp)).await
+}
+
+/// [`remote_pair`], for the window and for `devpit pair` in a terminal.
+pub(crate) fn pair_now(mcp: bool) -> Result<RemotePairing, RpcError> {
+    let store = Store::open_default()?;
+    let relay = via(&store) == RemoteVia::Relay;
+    if mcp && !(relay && crate::remote_mcp::allowed(&store)) {
+        return Err(RpcError::new(
+            ErrorCode::Conflict,
+            "allow remote MCP through devpit.app first",
+        ));
+    }
+    let address = if relay {
+        crate::remote_relay::running().then_some(String::new())
+    } else {
+        crate::remote_host::address()
+    }
+    .ok_or_else(|| RpcError::new(ErrorCode::Conflict, "turn Remote on first"))?;
+    let offered = crate::remote_pairing::offer(now(), mcp)
+        .ok_or_else(|| RpcError::internal("no pairing code could be made"))?;
+    let url = if relay {
+        crate::remote_relay::pairing_url(
+            &Store::root()?,
+            &offered.secret,
+            &crate::remote_conn::machine_name(),
+            mcp,
+        )
+        .map_err(RpcError::internal)?
+    } else {
+        format!("{address}#pair={}", offered.code)
+    };
+    // A client on another machine is given the link, not a camera.
+    let qr_svg = (!mcp)
+        .then(|| qrcode::QrCode::new(url.as_bytes()).ok())
+        .flatten()
+        .map(|code| {
+            code.render::<qrcode::render::svg::Color>()
+                .min_dimensions(200, 200)
+                .quiet_zone(true)
+                .build()
         })
+        .unwrap_or_default();
+    Ok(RemotePairing {
+        code: offered.code,
+        url,
+        qr_svg,
+        expires_at: offered.expires_at,
     })
-    .await
 }
 
 /// `remote.pair_cancel` — the pairing code is put away.

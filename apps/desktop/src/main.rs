@@ -97,6 +97,7 @@ mod checkpoint;
 mod checkpoint_findings;
 mod checkpoint_preview;
 mod checkpoint_tested;
+mod checkup;
 mod claude_accounts;
 mod claude_plugin;
 #[cfg(any(debug_assertions, test))]
@@ -281,6 +282,8 @@ mod transcribe;
 mod tap_file;
 mod telegram;
 mod telegram_devpit;
+mod terminal;
+mod terminal_run;
 #[cfg(test)]
 mod test_home;
 mod threads;
@@ -316,6 +319,10 @@ fn main() {
     devflow_dialect::pinned();
 
     if let Some(code) = agent_door() {
+        std::process::exit(code);
+    }
+    // `devpit` on a terminal: the menu, or a subcommand's plain lines.
+    if let Some(code) = terminal_run::from_args() {
         std::process::exit(code);
     }
 
