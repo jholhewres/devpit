@@ -247,7 +247,8 @@ pub enum RemoteOut {
     ChatFrame {
         project: String,
         conversation: String,
-        frame: Frame,
+        // Boxed: a frame is far larger than every other message here.
+        frame: Box<Frame>,
     },
     Session {
         profile: String,

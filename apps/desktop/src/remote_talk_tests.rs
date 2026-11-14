@@ -315,5 +315,5 @@ fn a_device_reading_a_conversation_is_sent_a_turn_started_elsewhere_and_no_other
         panic!("not a chat frame");
     };
     assert_eq!((project.as_str(), conversation.as_str()), ("p1", "c1"));
-    assert!(matches!(frame, devpit_rpc::Frame::Session { session_id } if session_id == "s1"));
+    assert!(matches!(*frame, devpit_rpc::Frame::Session { session_id } if session_id == "s1"));
 }
