@@ -98,7 +98,7 @@ pub async fn diagnostics_read() -> Result<Diagnostics, RpcError> {
         let root = devpit_core::Store::root()?;
         let sessions = crate::checkup::sessions_of(&crate::island_feed::now());
         let facts = crate::checkup::machine(&root, Some(sessions));
-        let log_path = root.join("logs").join("errors.jsonl");
+        let log = devpit_core::reports::ErrorLog::at(&root);
         Ok(Diagnostics {
             processes: processes(),
             checks: crate::checkup::checks(&facts, &root)
@@ -110,11 +110,8 @@ pub async fn diagnostics_read() -> Result<Diagnostics, RpcError> {
                     fix: check.fix,
                 })
                 .collect(),
-            log: log_tail(
-                &std::fs::read_to_string(&log_path).unwrap_or_default(),
-                LOG_LINES,
-            ),
-            log_path: log_path.display().to_string(),
+            log: log_tail(&log.read(), LOG_LINES),
+            log_path: log.path().display().to_string(),
         })
     })
     .await
@@ -198,24 +195,13 @@ fn name_of(pid: u32) -> String {
 
 /// The error log's newest `most` entries, one line each: what kind, where,
 /// and what it said.
-pub(crate) fn log_tail(log: &str, most: usize) -> Vec<String> {
-    let lines: Vec<&str> = log.lines().filter(|line| !line.trim().is_empty()).collect();
-    lines[lines.len().saturating_sub(most)..]
+pub(crate) fn log_tail(entries: &[devpit_core::reports::Entry], most: usize) -> Vec<String> {
+    entries[entries.len().saturating_sub(most)..]
         .iter()
-        .map(
-            |line| match serde_json::from_str::<serde_json::Value>(line) {
-                Ok(entry) => {
-                    let field = |name: &str| entry[name].as_str().unwrap_or_default().to_owned();
-                    format!(
-                        "{} · {}: {}",
-                        field("kind"),
-                        field("location"),
-                        field("message")
-                    )
-                }
-                Err(_) => (*line).to_owned(),
-            },
-        )
+        .map(|entry| match &entry.location {
+            Some(at) => format!("{} · {at}: {}", entry.kind, entry.message),
+            None => format!("{}: {}", entry.kind, entry.message),
+        })
         .collect()
 }
 
@@ -225,20 +211,29 @@ mod tests {
 
     #[test]
     fn the_log_shows_its_newest_entries_one_line_each() {
+        let entry = |location: Option<&str>, message: &str| devpit_core::reports::Entry {
+            fingerprint: String::new(),
+            kind: "background".to_owned(),
+            location: location.map(str::to_owned),
+            message: message.to_owned(),
+            stack: None,
+            count: 1,
+            first_seen: 0,
+            last_seen: 0,
+        };
         let log = [
-            r#"{"kind":"background","location":"one","message":"first"}"#,
-            r#"{"kind":"background","location":"stall_watch","message":"the page has not run for 14s"}"#,
-            "not json",
-        ]
-        .join("\n");
+            entry(Some("one"), "first"),
+            entry(Some("stall_watch"), "the page has not run for 14s"),
+            entry(None, "no place"),
+        ];
         assert_eq!(
             log_tail(&log, 2),
             vec![
                 "background · stall_watch: the page has not run for 14s".to_owned(),
-                "not json".to_owned(),
+                "background: no place".to_owned(),
             ]
         );
-        assert!(log_tail("", 20).is_empty());
+        assert!(log_tail(&[], 20).is_empty());
     }
 
     #[test]

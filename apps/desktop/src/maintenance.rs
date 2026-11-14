@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime};
 
+use devflow_engine::runs;
 use devpit_core::home::ProjectHome;
 use devpit_core::{preference, Store};
 use devpit_rpc::{ErrorCode, RpcError};
@@ -192,32 +193,59 @@ pub(crate) fn on_battery_in(dir: &Path) -> bool {
     })
 }
 
-/// What is older than `cutoff`: files in `logs`, and each `<group>/<time>`
-/// folder under `trees` but the newest of its group. Links are never followed.
+/// The files the gate and the card read from a run: the newest run holding
+/// each stays, or a card still open loses its evidence or its review.
+const READ: [&str; 4] = ["evidence.json", "findings.json", "gate.json", "review.json"];
+
+/// What is older than `cutoff`: files in `logs`, and in each `<group>` under
+/// `trees` the runs (folders named as Devflow names them) but the newest and
+/// the newest holding each of [`READ`]. Links are never followed, and a folder
+/// that is not a run is never touched.
 pub(crate) fn stale(logs: &Path, trees: &[PathBuf], cutoff: SystemTime) -> Vec<PathBuf> {
-    let older = |path: &Path| {
-        std::fs::symlink_metadata(path)
-            .and_then(|meta| meta.modified())
-            .is_ok_and(|at| at < cutoff)
-    };
+    let before = cutoff
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs());
     let mut found: Vec<PathBuf> = inside(logs, false)
         .into_iter()
-        .filter(|path| older(path))
+        .filter(|path| {
+            std::fs::symlink_metadata(path)
+                .and_then(|meta| meta.modified())
+                .is_ok_and(|at| at < cutoff)
+        })
         .collect();
     for tree in trees {
         for group in inside(tree, true) {
-            let mut times = inside(&group, true);
-            // Named by when they ran, so the last in order is the newest.
-            times.sort();
-            times.pop();
-            found.extend(times.into_iter().filter(|path| older(path)));
+            let runs: Vec<String> = inside(&group, true)
+                .iter()
+                .filter_map(|path| path.file_name()?.to_str().map(str::to_owned))
+                .filter(|name| runs::seconds_of(name).is_some())
+                .collect();
+            let mut kept: Vec<String> = READ
+                .iter()
+                .filter_map(|file| runs::newest_with(&group, file))
+                .collect();
+            kept.extend(
+                runs.iter()
+                    .max_by_key(|name| (runs::seconds_of(name), (*name).clone()))
+                    .cloned(),
+            );
+            found.extend(
+                runs.into_iter()
+                    .filter(|name| !kept.contains(name))
+                    .filter(|name| runs::seconds_of(name).is_some_and(|at| at < before))
+                    .map(|name| group.join(name)),
+            );
         }
     }
     found
 }
 
-/// The folders (`dirs`) or the files directly in `dir`, never a link.
+/// The folders (`dirs`) or the files directly in `dir`, never a link; nothing
+/// when `dir` is a link itself.
 fn inside(dir: &Path, dirs: bool) -> Vec<PathBuf> {
+    if std::fs::symlink_metadata(dir).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        return Vec::new();
+    }
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -232,17 +260,27 @@ fn inside(dir: &Path, dirs: bool) -> Vec<PathBuf> {
         .collect()
 }
 
-/// Deletes what [`stale`] found, each checked to be under `root`.
-pub(crate) fn delete(root: &Path, paths: &[PathBuf], at: f64) -> CleanRun {
+/// Deletes what [`stale`] found, each resolved through links and checked to
+/// be under the folder (of `bases`) it was found in.
+pub(crate) fn delete(bases: &[PathBuf], paths: &[PathBuf], at: f64) -> CleanRun {
     let mut run = CleanRun {
         at,
         ..CleanRun::default()
     };
-    let Ok(root) = std::fs::canonicalize(root) else {
-        return run;
-    };
+    let bases: Vec<PathBuf> = bases
+        .iter()
+        .filter(|base| {
+            !std::fs::symlink_metadata(base).is_ok_and(|meta| meta.file_type().is_symlink())
+        })
+        .filter_map(|base| std::fs::canonicalize(base).ok())
+        .collect();
     for path in paths {
-        if !std::fs::canonicalize(path).is_ok_and(|real| real.starts_with(&root)) {
+        let under = std::fs::canonicalize(path).is_ok_and(|real| {
+            bases
+                .iter()
+                .any(|base| real.starts_with(base) && &real != base)
+        });
+        if !under {
             continue;
         }
         let freed = if path.is_dir() {
@@ -274,8 +312,14 @@ fn clean_now(store: &Store) -> Result<(), RpcError> {
         }
     }
     let cutoff = SystemTime::now() - Duration::from_secs(u64::from(days) * 24 * 60 * 60);
-    let found = stale(&root.join("logs"), &trees, cutoff);
-    let run = delete(&root, &found, devpit_core::reports::now() as f64);
+    let logs = devpit_core::reports::ErrorLog::at(&root)
+        .path()
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| root.join("logs"));
+    let found = stale(&logs, &trees, cutoff);
+    trees.push(logs);
+    let run = delete(&trees, &found, devpit_core::reports::now() as f64);
     let json = serde_json::to_string(&run).map_err(|err| RpcError::internal(err.to_string()))?;
     store.set_preference(preference::MAINTENANCE_CLEAN_LAST, &json)?;
     Ok(())
