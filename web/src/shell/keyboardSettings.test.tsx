@@ -18,6 +18,18 @@ describe('Settings → Keyboard', () => {
     expect(within(row('Open the command palette')).getByText(keysLabel('palette'))).toBeTruthy()
   })
 
+  it('lists the keys that read a conversation, under Chat', () => {
+    render(<KeyboardSettings onGeneral={vi.fn()} />)
+    for (const [does, id] of [
+      ['Go to the next message', 'nextMessage'],
+      ['Go to the previous message', 'previousMessage'],
+      ['Go to the next tool that failed', 'nextFailed'],
+      ['Open or close the row you are on', 'toggleRow'],
+    ] as const) {
+      expect(within(row(does)).getByText(keysLabel(id))).toBeTruthy()
+    }
+  })
+
   it('finds a shortcut by what it does or by its keys', () => {
     render(<KeyboardSettings onGeneral={vi.fn()} />)
     const search = screen.getByLabelText('Search shortcuts')

@@ -1,0 +1,138 @@
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { memo, useEffect, useState } from 'react'
+
+import type { Context } from '../gen/bindings'
+import type { Activity } from './activity'
+import { ActivityPick } from './ActivityPick'
+import { money } from './chat'
+import { ChatCardChip } from './ChatCardChip'
+import type { Exported } from './chatMarkdown'
+import { ContextMeter } from './ContextMeter'
+import { AssistantToggle } from './AssistantToggle'
+import { CopySession } from './CopySession'
+import { Menu, MenuItem } from './Menu'
+import { SessionsChip } from './OrchestratorChat'
+import { PaneCorner } from './PaneCorner'
+import { RemoteToggle } from './RemoteToggle'
+import { Rename } from './Rename'
+import { SessionCost } from './SessionCost'
+import { COPIED_MS } from './useCopied'
+import type { ChatCard } from './useChat'
+
+/*
+ * A thin bar over the conversation: its name, renamed where it is, and what
+ * the corner used to float over the text — the card, the context, the cost
+ * and the pane's own actions.
+ */
+
+export const ChatHead = memo(function ChatHead({
+  tabId,
+  title,
+  onRename,
+  onExport,
+  card,
+  context,
+  session,
+  cost,
+  orchestrator,
+  projectId,
+  sending,
+  supervised,
+  activity,
+  onActivity,
+}: {
+  tabId: string
+  title: string
+  onRename: (title: string) => void
+  /** The conversation as markdown, or nothing when it could not be read. */
+  onExport: (what: Exported) => Promise<string | null>
+  card: ChatCard | null
+  context: Context | null
+  session: string | null
+  cost: number
+  orchestrator: string | null
+  projectId: string | null
+  sending: boolean
+  supervised: boolean
+  activity: Activity
+  onActivity: (activity: Activity) => void
+}): React.JSX.Element {
+  const [renaming, setRenaming] = useState(false)
+  return (
+    <div className="chead">
+      <PaneCorner tabId={tabId} what="chat">
+        {renaming ? (
+          <Rename
+            className="chead__t"
+            value={title}
+            editing
+            onDone={(next) => {
+              if (next) onRename(next)
+              setRenaming(false)
+            }}
+          />
+        ) : (
+          <button className="chead__t" title="Rename this conversation" onClick={() => setRenaming(true)}>
+            {title}
+          </button>
+        )}
+        <ActivityPick value={activity} onPick={onActivity} />
+        <ChatCardChip card={card} />
+        <ContextMeter context={context} />
+        {session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>}
+        <ChatExport onExport={onExport} />
+        {session && <CopySession id={session} />}
+        {orchestrator && <SessionsChip profileId={orchestrator} />}
+        {orchestrator && projectId && <AssistantToggle projectId={projectId} />}
+        {projectId && <RemoteToggle projectId={projectId} conversationId={tabId} sending={sending} supervised={supervised} />}
+      </PaneCorner>
+    </div>
+  )
+})
+
+/* Copies the conversation as markdown: what was said, or that and every tool it ran. */
+function ChatExport({ onExport }: { onExport: (what: Exported) => Promise<string | null> }): React.JSX.Element {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), COPIED_MS)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+  /* Through the app's clipboard, as the other copy menus go: the write comes
+     after the whole conversation is read, no longer inside the click. */
+  const pick = (what: Exported): void => {
+    setAt(null)
+    void onExport(what).then(async (text) => {
+      if (!text) return
+      await writeText(text)
+      setCopied(true)
+    })
+  }
+  return (
+    <>
+      <button
+        className="sq26"
+        aria-label={copied ? 'Copied as markdown' : 'Export as markdown'}
+        title="Export as markdown"
+        aria-haspopup="menu"
+        onClick={(event) => {
+          const box = event.currentTarget.getBoundingClientRect()
+          setAt(at ? null : { x: box.left, y: box.bottom + 4 })
+        }}
+      >
+        {copied ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+        )}
+      </button>
+      {at && (
+        <Menu at={at} label="Export as markdown" onClose={() => setAt(null)}>
+          <MenuItem label="Copy as markdown" onPick={() => pick('messages')} />
+          <MenuItem label="Copy as markdown, with tools" onPick={() => pick('tools')} />
+        </Menu>
+      )}
+    </>
+  )
+}

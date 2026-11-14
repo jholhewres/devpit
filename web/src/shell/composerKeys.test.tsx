@@ -38,7 +38,7 @@ vi.mock('./TurnApps', () => ({ TurnApps: () => (drawn.turns++, null) }))
 vi.mock('./useSlash', () => ({ useSlash: () => ({ keyDown: () => false, ran: () => false }) }))
 vi.mock('./useStop', () => ({ useStop: () => false }))
 vi.mock('./useShell', () => ({
-  useShell: () => ({ active: { id: 'conv_1' }, project: { id: 'p1', name: 'devpit' }, rename: nothing, drafted: nothing }),
+  useShell: () => ({ active: { id: 'conv_1' }, project: { id: 'p1', name: 'devpit' }, rename: nothing, threads: [], tellDoing: nothing, mark: nothing, reload: nothing, drafted: nothing }),
 }))
 vi.mock('./shellStore', () => ({ useShellPick: () => () => undefined }))
 vi.mock('./TurnDelegations', () => ({ TurnDelegations: () => null }))

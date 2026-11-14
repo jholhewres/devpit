@@ -51,7 +51,7 @@ const rowOf = (target: EventTarget | null): HTMLElement | null =>
   target instanceof Element ? target.closest<HTMLElement>('[data-ctx]') : null
 
 export function ContextMenu(): React.JSX.Element {
-  const { focus, close, sweep, join, open: tabs, setRenaming } = useShell()
+  const { focus, close, sweep, join, open: tabs, setRenaming, threads, mark } = useShell()
   const [at, setAt] = useState<At | null>(null)
   const actions = useFileActions(() => setAt(null))
 
@@ -60,11 +60,10 @@ export function ContextMenu(): React.JSX.Element {
   const menus: Record<string, readonly Item[]> = {
     ...STATIC,
     tab: tabMenu({ close, sweep, join: (from, into) => void join(from, into) }, at ? joinable(tabs, at.id) : []),
-    session: sessionMenu({
-      focus,
-      close,
-      rename: (id) => setRenaming({ id, where: 'sidebar' }),
-    }),
+    session: sessionMenu(
+      { focus, close, mark, rename: (id) => setRenaming({ id, where: 'sidebar' }) },
+      at ? (threads.find((one) => one.id === at.id)?.marks ?? undefined) : undefined,
+    ),
   }
 
   const pick = (item: Item, row: { id: string; path: string | null }): void => {

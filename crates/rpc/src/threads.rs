@@ -23,6 +23,31 @@ pub struct Thread {
     pub cost_usd: f64,
     /// Unix seconds, when it was last spoken in.
     pub last_at: f64,
+    /// The folder its turns run in, when it is not the project's own.
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default)]
+    pub marks: ConversationMarks,
+}
+
+/// What the person set on a conversation, apart from what was said in it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationMarks {
+    /// The name they gave it, over the first thing they said.
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub pinned: bool,
+    /// Done with for now: listed apart from what is in progress.
+    #[serde(default)]
+    pub settled: bool,
+    /// Unix seconds it stays out of the way until.
+    #[serde(default)]
+    pub snoozed_until: Option<f64>,
+    /// Marked unread by hand, until it is looked at again.
+    #[serde(default)]
+    pub unread: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

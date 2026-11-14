@@ -203,6 +203,14 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .chat__tries { margin: 18px auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .chat__try { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--orchestrate) 35%, var(--border)); border-radius: var(--radius-pill); background: color-mix(in srgb, var(--orchestrate) 8%, transparent); color: var(--text-2); font-size: var(--fs-sm); }
 .chat__try:hover { color: var(--text); border-color: var(--orchestrate); }
+.chat__try--project { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.chat__try--project:hover { border-color: var(--accent); }
+.chat__recent { width: 100%; max-width: 420px; margin: 28px auto 0; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.chat__recent-h { padding: 0 10px 4px; font-size: var(--fs-xs); color: var(--ghost); }
+.chat__again { display: flex; align-items: baseline; gap: 10px; padding: 6px 10px; border-radius: var(--radius-sm); color: var(--text-2); font-size: var(--fs-md); text-align: left; }
+.chat__again:hover { background: var(--overlay); color: var(--text); }
+.chat__again-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat__again-w { flex: none; font-size: var(--fs-xs); color: var(--ghost); }
 
 /* A control reached by the keyboard says so. `:where` keeps it below any
    control that draws its own ring. */

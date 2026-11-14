@@ -10,6 +10,7 @@ import type { Doing } from './useAgents'
 import type { Closing } from './useClosing'
 import type { Panel, Widths } from './sizing'
 import type { Renaming } from './useTabs'
+import type { Talks } from './useConversations'
 
 /*
  * What the window has, in one shape.
@@ -52,7 +53,7 @@ export type PrefsPane =
  *   previous  what a split would pair with — recency, which is a different
  *             order from the strip and the reason these are two lists.
  */
-export interface Shell {
+export interface Shell extends Talks {
   readonly open: readonly Tab[]
   readonly active: Tab | null
   /** Opens a new one of a kind you can have several of; focuses the rest. */

@@ -106,6 +106,11 @@ export const commands = {
 	 *  left a file nobody could reach again.
 	 */
 	chatList: (projectId: string) => typedError<Conversations, RpcError>(__TAURI_INVOKE("chat_list", { projectId })),
+	/**
+	 *  `chat.mark` — keeps what the person set on a conversation: its name, a
+	 *  pin, settled, snoozed or unread. Answers the marks as kept.
+	 */
+	chatMark: (projectId: string, conversationId: string, marks: ConversationMarks) => typedError<ConversationMarks, RpcError>(__TAURI_INVOKE("chat_mark", { projectId, conversationId, marks })),
 	/**  `chat.outside` — sessions of this project started outside devpit. */
 	chatOutside: (projectId: string) => typedError<OutsideSession[], RpcError>(__TAURI_INVOKE("chat_outside", { projectId })),
 	/**
@@ -238,8 +243,11 @@ export const commands = {
 	 */
 	chatEditFrom: (projectId: string, conversationId: string, turnId: string, putBack: boolean) => typedError<string, RpcError>(__TAURI_INVOKE("chat_edit_from", { projectId, conversationId, turnId, putBack })),
 	runsList: (query: RunsQuery) => typedError<RunsPage, RpcError>(__TAURI_INVOKE("runs_list", { query })),
-	/**  `sessions.search` — hits in this project's conversations for a query. */
-	sessionsSearch: (projectId: string, query: string) => typedError<SessionHit[], RpcError>(__TAURI_INVOKE("sessions_search", { projectId, query })),
+	/**
+	 *  `sessions.search` — hits for a query in one project's conversations, or in
+	 *  every project's when none is named.
+	 */
+	sessionsSearch: (projectId: string | null, query: string) => typedError<SessionHit[], RpcError>(__TAURI_INVOKE("sessions_search", { projectId, query })),
 	/**
 	 *  `chat.cancel` — stops the turn in flight, keeping what already arrived.
 	 * 
@@ -2906,6 +2914,19 @@ export type ConversationHead = {
 	rewindable: string[],
 	costUsd: number | null,
 	context: Context | null,
+};
+
+/**  What the person set on a conversation, apart from what was said in it. */
+export type ConversationMarks = {
+	/**  The name they gave it, over the first thing they said. */
+	name?: string | null,
+	pinned?: boolean,
+	/**  Done with for now: listed apart from what is in progress. */
+	settled?: boolean,
+	/**  Unix seconds it stays out of the way until. */
+	snoozedUntil?: number | null,
+	/**  Marked unread by hand, until it is looked at again. */
+	unread?: boolean,
 };
 
 /**  What the person said in a conversation, for the rail beside it. */
@@ -5707,6 +5728,8 @@ export type SessionCost = {
 
 export type SessionHit = {
 	sessionId: string,
+	/**  The project whose conversation it is. */
+	projectId: string,
 	/**  `user` or `assistant`. */
 	role: string,
 	/**  The words around the match, the matched ones between `[` and `]`. */
@@ -6306,6 +6329,9 @@ export type Thread = {
 	costUsd: number | null,
 	/**  Unix seconds, when it was last spoken in. */
 	lastAt: number | null,
+	/**  The folder its turns run in, when it is not the project's own. */
+	cwd?: string | null,
+	marks?: ConversationMarks,
 };
 
 /**  Tokens by kind. */

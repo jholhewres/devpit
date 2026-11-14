@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use crate::head::{read_head, Head};
+use crate::head::{marks_path, read_head, read_marks, Head};
 
 /// One conversation, as a row in a list.
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +19,8 @@ pub struct Summary {
     pub cost_usd: f64,
     /// Unix seconds, from the file's own mtime — when it was last spoken in.
     pub last_at: f64,
+    pub cwd: Option<String>,
+    pub marks: devpit_rpc::ConversationMarks,
 }
 
 /// A conversation's name, from the first thing the person said.
@@ -106,18 +108,26 @@ pub fn conversations(dir: &Path) -> Vec<Summary> {
                 cwd: None,
                 context: None,
             });
+            let marks = read_marks(&marks_path(dir, &id));
             Some(Summary {
-                // The person's own words first — the decision above — and the
-                // CLI's title only for a session that has none of them.
-                title: opened_with(&path)
-                    .filter(|said| !said.trim().is_empty())
-                    .map(|said| title_of(&said))
+                // A name they gave it, then their own words — the decision
+                // above — and the CLI's title only for a session with neither.
+                title: marks
+                    .name
+                    .clone()
+                    .or_else(|| {
+                        opened_with(&path)
+                            .filter(|said| !said.trim().is_empty())
+                            .map(|said| title_of(&said))
+                    })
                     .or_else(|| head.title.clone())
                     .unwrap_or_else(|| "Untitled".to_owned()),
                 last_at: seconds(&path),
                 profile: head.profile,
                 model: head.model,
                 cost_usd: head.cost_usd,
+                cwd: head.cwd,
+                marks,
                 id,
             })
         })

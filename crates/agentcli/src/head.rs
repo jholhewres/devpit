@@ -120,6 +120,34 @@ pub fn write_head(path: &Path, head: &Head) -> std::io::Result<()> {
     file.write_all(serde_json::to_string(head)?.as_bytes())
 }
 
+/// The person's marks on a conversation, in a file of their own: the head is
+/// written again at the end of every turn, from what it held when it began.
+pub fn marks_path(sessions: &Path, conversation_id: &str) -> PathBuf {
+    sessions.join(format!("{conversation_id}.marks"))
+}
+
+/// None set is the same as none kept, so a transcript from before marks opens as it did.
+pub fn read_marks(path: &Path) -> devpit_rpc::ConversationMarks {
+    File::open(path)
+        .ok()
+        .and_then(|file| serde_json::from_reader(file).ok())
+        .unwrap_or_default()
+}
+
+/// Answers the marks as kept: a blank name is no name, and the row goes back
+/// to the person's first words.
+pub fn write_marks(
+    path: &Path,
+    mut marks: devpit_rpc::ConversationMarks,
+) -> std::io::Result<devpit_rpc::ConversationMarks> {
+    marks.name = marks
+        .name
+        .map(|name| name.trim().to_owned())
+        .filter(|name| !name.is_empty());
+    File::create(path)?.write_all(serde_json::to_string(&marks)?.as_bytes())?;
+    Ok(marks)
+}
+
 /// Whether this turn may run under the profile it names.
 ///
 /// A conversation keeps the profile it opened with. Switching account

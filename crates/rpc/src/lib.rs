@@ -165,7 +165,7 @@ pub use spend::{
 };
 pub use sync::{SyncMachine, SyncOffer, SyncRecovery, SyncStatus};
 pub use tested::{FailedTest, Tested, MOST_FAILURES_KEPT, TESTS_EVIDENCE};
-pub use threads::{Conversations, Thread};
+pub use threads::{ConversationMarks, Conversations, Thread};
 pub use tile::{
     Card, CardHappening, CardRef, CardSession, Criterion, Doing, Progress, SessionKind,
     UnreadCriteria,

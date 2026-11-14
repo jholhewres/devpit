@@ -82,6 +82,8 @@
 .card__lane { flex: none; font-size: 10.5px; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); padding: 1px 5px; border-radius: 4px; }
 .card__task { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); }
 .card__loose { color: var(--ghost); font-family: var(--mono); font-size: 11px; }
+.card__facts { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card__pin { flex: none; color: var(--accent); }
 
 /* Status is a word, not only a colour: a dot alone makes you learn a
    legend, and this is the one thing you read the row for. */

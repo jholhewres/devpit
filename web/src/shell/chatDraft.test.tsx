@@ -38,7 +38,7 @@ vi.mock('./useChat', () => ({ useChat: () => chat }))
 vi.mock('./useSlash', () => ({ useSlash: () => ({ keyDown: () => false }) }))
 vi.mock('./useStop', () => ({ useStop: () => false }))
 vi.mock('./useShell', () => ({
-  useShell: () => ({ active: { id: 'conv_1' }, project: { id: 'p1', name: 'devpit' }, rename: vi.fn(), drafted: taken }),
+  useShell: () => ({ active: { id: 'conv_1' }, project: { id: 'p1', name: 'devpit' }, rename: vi.fn(), threads: [], tellDoing: vi.fn(), mark: vi.fn(), reload: vi.fn(), drafted: taken }),
 }))
 vi.mock('./Asked', () => ({ Asked: () => null }))
 vi.mock('./Chips', () => ({ Chips: () => null }))

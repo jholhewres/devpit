@@ -1,35 +1,28 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-import type { Context } from '../gen/bindings'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ActivityContext, activityOf, keepActivity, seen, type Activity } from './activity'
-import { ActivityPick } from './ActivityPick'
-import { AssistantToggle } from './AssistantToggle'
-import { ASKS, CONTINUE, money, putBackFrom } from './chat'
+import { ASKS, CONTINUE, putBackFrom } from './chat'
+import { ChatHead } from './ChatHead'
+import { markdownOf, type Exported } from './chatMarkdown'
 import type { Extras } from './queueing'
 import { titleOf, type Tab } from './strip'
-import { ChatCardChip } from './ChatCardChip'
 import { ChatFind } from './ChatFind'
 import { useMessagesPick } from './chatMessages'
 import { ChatThread } from './ChatThread'
 import { Composer, type ComposerHandle } from './Composer'
-import { ContextMeter } from './ContextMeter'
-import { CopySession } from './CopySession'
 import { DocPeek } from './DocPeek'
 import { AppsScopeContext } from './mcpApps'
 import { WholeFrom } from './WholeFrom'
 import { DropTarget } from './DropTarget'
 import { EditFrom } from './EditFrom'
-import { PaneCorner } from './PaneCorner'
 import { PromptRail } from './PromptRail'
 import { Quoting } from './Quoting'
 import { useTaking } from './useTaking'
 import { useThread } from './useOlder'
 import { ChatBlank } from './ChatBlank'
-import { RemoteToggle } from './RemoteToggle'
-import { SessionsChip } from './OrchestratorChat'
-import { SessionCost } from './SessionCost'
-import { useChat, type ChatCard } from './useChat'
+import { ask, commands } from './live'
+import { useThreadKeys } from './threadKeys'
+import { useChat } from './useChat'
 import { useJump, type Reveal } from './useJump'
 import { useShell } from './useShell'
 import { useShortcut } from './useShortcut'
@@ -50,7 +43,7 @@ const NONE: Extras = { files: [], skills: [] }
  */
 
 export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
-  const { active, project, rename, drafted, finished } = useShell()
+  const { active, project, rename, drafted, finished, show, threads, mark, reload, tellDoing } = useShell()
   const chat = useChat(tab.id)
   const { pasted, dropped } = useTaking(chat)
   const follow = useThread(project?.id ?? null, tab.id, chat)
@@ -96,30 +89,65 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     if (tab.draft !== undefined) drafted(tab.id)
   }, [tab.draft, tab.id, drafted])
 
-  /* Named once after the first thing you said in it; a tab you renamed keeps your name. */
+  const talk = threads.find((one) => one.id === tab.id)
+  /* A name kept on the conversation wins; otherwise named once after the first thing you said. */
+  const named = talk?.marks?.name
   useEffect(() => {
+    if (named) {
+      if (named !== tab.title) rename(tab.id, named)
+      return
+    }
     if (tab.title !== undefined || !said) return
     const name = titleOf(said.parts.map((part) => ('text' in part ? part.text : '')).join(''))
     if (name) rename(tab.id, name)
-  }, [rename, said, tab.id, tab.title])
+  }, [rename, said, tab.id, tab.title, named])
 
   /* A turn that ends while this tab is behind another marks the tab. */
   const wasSending = useRef(chat.sending)
   useEffect(() => {
-    if (wasSending.current && !chat.sending) finished(tab.id)
+    if (wasSending.current && !chat.sending) {
+      finished(tab.id)
+      reload()
+    }
     wasSending.current = chat.sending
-  }, [chat.sending, finished, tab.id])
+  }, [chat.sending, finished, reload, tab.id])
+
+  /* What the sidebar row says: working, or waiting on you. */
+  const doingNow = chat.asked.length > 0 ? 'waiting' : chat.sending ? 'working' : null
+  useEffect(() => tellDoing(tab.id, doingNow), [tellDoing, tab.id, doingNow])
+  useEffect(() => () => tellDoing(tab.id, null), [tellDoing, tab.id])
+
+  /* Marked unread by hand: read again once you come back to it. */
+  const markedUnread = Boolean(talk?.marks?.unread)
+  const wasMine = useRef(false)
+  useEffect(() => {
+    if (mine && !wasMine.current && markedUnread) mark(tab.id, { unread: false })
+    wasMine.current = mine
+  }, [mine, markedUnread, mark, tab.id])
+
+  useThreadKeys(mine, chat.messages, follow.box, reveal)
+  const title = tab.title ?? 'New chat'
+  const renamed = useCallback((next: string) => {
+    rename(tab.id, next)
+    mark(tab.id, { name: next })
+  }, [rename, mark, tab.id])
+  /* The whole conversation, not the pages drawn so far. */
+  const exported = useCallback(async (what: Exported): Promise<string | null> => {
+    if (!project) return null
+    const whole = await ask(() => commands.chatHistory(project.id, tab.id, null, null))
+    return whole.data ? markdownOf(title, whole.data.messages, what) : null
+  }, [project, tab.id, title])
 
   const empty = count === 0 && !chat.error
 
   return (
     <>
-      <ChatCorner tabId={tab.id} card={chat.card} context={chat.context} session={chat.session} cost={chat.cost} orchestrator={project?.orchestrator ?? null} projectId={project?.id ?? null} sending={chat.sending} supervised={ASKS(chat.permission)} activity={activity} onActivity={pickActivity} />
+      <ChatHead tabId={tab.id} title={title} onRename={renamed} onExport={exported} card={chat.card} context={chat.context} session={chat.session} cost={chat.cost} orchestrator={project?.orchestrator ?? null} projectId={project?.id ?? null} sending={chat.sending} supervised={ASKS(chat.permission)} activity={activity} onActivity={pickActivity} />
 
       <DropTarget mine={mine} onDrop={dropped} />
       <div className="scroll" ref={follow.box}>
         {empty ? (
-          <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => composer.current?.put(text)} />
+          <ChatBlank project={project} account={chat.profiles.find((one) => one.id === project?.orchestrator)?.label} onTry={(text) => composer.current?.put(text)} recent={threads.filter((one) => one.id !== tab.id).slice(0, 3)} onOpen={(one) => show('chat', { id: one.id, title: one.title })} />
         ) : (
           <AppsScopeContext.Provider value={scope}>
             <ActivityContext.Provider value={seen(activity, finding)}>
@@ -141,43 +169,3 @@ export function ChatPane({ tab }: { tab: Tab }): React.JSX.Element {
     </>
   )
 }
-
-/* The pane's corner, drawn again only when what it shows changed. */
-const ChatCorner = memo(function ChatCorner({
-  tabId,
-  card,
-  context,
-  session,
-  cost,
-  orchestrator,
-  projectId,
-  sending,
-  supervised,
-  activity,
-  onActivity,
-}: {
-  tabId: string
-  card: ChatCard | null
-  context: Context | null
-  session: string | null
-  cost: number
-  orchestrator: string | null
-  projectId: string | null
-  sending: boolean
-  supervised: boolean
-  activity: Activity
-  onActivity: (activity: Activity) => void
-}): React.JSX.Element {
-  return (
-    <PaneCorner tabId={tabId} what="chat">
-      <ActivityPick value={activity} onPick={onActivity} />
-      <ChatCardChip card={card} />
-      <ContextMeter context={context} />
-      {session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>}
-      {session && <CopySession id={session} />}
-      {orchestrator && <SessionsChip profileId={orchestrator} />}
-      {orchestrator && projectId && <AssistantToggle projectId={projectId} />}
-      {projectId && <RemoteToggle projectId={projectId} conversationId={tabId} sending={sending} supervised={supervised} />}
-    </PaneCorner>
-  )
-})
