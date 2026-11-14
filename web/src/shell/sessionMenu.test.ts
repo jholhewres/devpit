@@ -17,6 +17,7 @@ describe('a session row’s menu', () => {
       'Snooze for an hour',
       'Snooze until tomorrow',
       'Mark unread',
+      'Archive',
       'Close session',
     ])
     expect(labels(sessionMenu(hands()))).toEqual(['Open', 'Rename', 'Close session'])
@@ -36,6 +37,13 @@ describe('a session row’s menu', () => {
       ['c1', { snoozedUntil: new Date(2026, 10, 14, 9).getTime() / 1000 }],
       ['c1', { unread: true }],
     ])
+  })
+
+  it('archives a conversation and closes its tab', () => {
+    const held = hands()
+    sessionMenu(held, NO_MARKS, EVENING).find((one) => one.label === 'Archive')?.run?.('c1')
+    expect(held.mark).toHaveBeenCalledWith('c1', { archived: true })
+    expect(held.close).toHaveBeenCalledWith('c1')
   })
 
   it('brings a settled or snoozed one back to in progress, and unpins a pinned one', () => {

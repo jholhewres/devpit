@@ -25,6 +25,7 @@ export const ROWS: Partial<Record<PrefsPane, readonly string[]>> = {
   remote: ['Remote', 'Allow remote MCP (read-only)', 'Calendar'],
   maintenance: ['Power saver', 'Keep logs and run artifacts', 'Project agent', 'Canvas'],
   diagnostics: ['Processes'],
+  about: ['Version', 'Privacy', 'Licence', 'Open-source notices'],
 }
 
 /** The pane an address opens: General's old rows are found where they went. */

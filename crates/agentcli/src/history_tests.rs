@@ -174,6 +174,7 @@ fn marks_kept_beside_a_conversation_come_back_with_it() {
             settled: true,
             snoozed_until: Some(1_800_000_000.0),
             unread: true,
+            archived: true,
         },
     )
     .expect("marks");
@@ -191,6 +192,20 @@ fn a_conversation_from_before_marks_lists_with_none_set() {
     let listed = conversations(home.path());
     assert_eq!(listed[0].title, "Fix the parser");
     assert_eq!(listed[0].marks, ConversationMarks::default());
+}
+
+#[test]
+fn marks_kept_before_archiving_existed_read_as_not_archived() {
+    let home = tempfile::tempdir().expect("tempdir");
+    conversation(home.path(), "conv_c", "Fix the parser", "claude", 0.1);
+    std::fs::write(
+        marks_path(home.path(), "conv_c"),
+        r#"{"name":null,"pinned":true,"settled":false,"snoozedUntil":null,"unread":false}"#,
+    )
+    .expect("old marks");
+    let listed = conversations(home.path());
+    assert!(listed[0].marks.pinned);
+    assert!(!listed[0].marks.archived);
 }
 
 #[test]

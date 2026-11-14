@@ -48,6 +48,9 @@ pub struct ConversationMarks {
     /// Marked unread by hand, until it is looked at again.
     #[serde(default)]
     pub unread: bool,
+    /// Put away: kept on disk, out of the lists until restored.
+    #[serde(default)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

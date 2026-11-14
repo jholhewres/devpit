@@ -26,7 +26,7 @@ export interface SessionHands {
 
 /* Offered only on a conversation that has been spoken in: a terminal, or a
    chat with nothing said yet, has nothing to keep them on. */
-const marking = (mark: SessionHands['mark'], marks: ConversationMarks, now: Date): readonly SessionEntry[] => [
+const marking = ({ mark, close }: SessionHands, marks: ConversationMarks, now: Date): readonly SessionEntry[] => [
   { rule: true },
   { label: marks.pinned ? 'Unpin' : 'Pin', run: (id) => mark(id, { pinned: !marks.pinned }) },
   isSettled(marks, now.getTime() / 1000)
@@ -35,13 +35,15 @@ const marking = (mark: SessionHands['mark'], marks: ConversationMarks, now: Date
   { label: 'Snooze for an hour', run: (id) => mark(id, { snoozedUntil: snoozeUntil('hour', now) }) },
   { label: 'Snooze until tomorrow', run: (id) => mark(id, { snoozedUntil: snoozeUntil('tomorrow', now) }) },
   { label: 'Mark unread', run: (id) => mark(id, { unread: true }) },
+  /* Out of every list, and its tab closes; Settings → Archive brings it back. */
+  { label: 'Archive', run: (id) => (mark(id, { archived: true }), close(id)) },
 ]
 
 export const sessionMenu = (hands: SessionHands, marks?: ConversationMarks, now = new Date()): readonly SessionEntry[] => [
   { label: 'Open', key: '↵', run: hands.focus },
   { rule: true },
   { label: 'Rename', shortcut: 'rename', run: hands.rename },
-  ...(marks ? marking(hands.mark, marks, now) : []),
+  ...(marks ? marking(hands, marks, now) : []),
   { rule: true },
   { label: 'Close session', bad: true, run: hands.close },
 ]
