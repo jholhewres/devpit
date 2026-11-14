@@ -43,3 +43,14 @@ pub struct LessonProposals {
     pub proposals: Vec<LessonProposal>,
     pub decisions: Vec<MemoryDecision>,
 }
+
+/// What the project agent answered in the "Ask the project" chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectAgentAnswer {
+    pub answer: String,
+    /// Whether this question started the agent's process.
+    pub woke: bool,
+    /// The project's files the answer names, from the project's root.
+    pub cited: Vec<String>,
+}

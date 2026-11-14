@@ -451,3 +451,37 @@ fn a_consult_names_its_sessions_pane_and_only_that() {
         other
     );
 }
+
+#[test]
+fn the_project_agents_orchestrator_tools_keep_their_shapes() {
+    let shape = |name: &str| {
+        let schema = (TOOLS
+            .iter()
+            .find(|tool| tool.name == name)
+            .expect(name)
+            .input)();
+        let mut properties: Vec<(String, Value)> = schema["properties"]
+            .as_object()
+            .expect("properties")
+            .iter()
+            .map(|(key, value)| (key.clone(), value["type"].clone()))
+            .collect();
+        properties.sort_by(|one, other| one.0.cmp(&other.0));
+        (properties, schema["required"].clone())
+    };
+    let string = || json!("string");
+    assert_eq!(
+        shape("devpit_project_agent_ask"),
+        (
+            vec![("project".into(), string()), ("question".into(), string())],
+            json!(["project", "question"])
+        )
+    );
+    assert_eq!(
+        shape("devpit_project_agent_brief"),
+        (
+            vec![("cardId".into(), string()), ("project".into(), string())],
+            json!(["project", "cardId"])
+        )
+    );
+}

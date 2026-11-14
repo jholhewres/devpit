@@ -1,0 +1,136 @@
+import { useEffect, useRef, useState } from 'react'
+
+import type { ProjectAgentAnswer } from '../gen/bindings'
+import { ask, commands } from './live'
+import { Markdown } from './MarkdownView'
+import { useShellPick } from './shellStore'
+import { composing } from './typing'
+import { useShell } from './useShell'
+
+/*
+ * "Ask the project": a chat with the project's own agent, the resident
+ * read-only process the orchestrator asks. An answer names its files; it
+ * becomes a fact only as a proposal the person approves under the top bar.
+ */
+
+interface Turn {
+  readonly question: string
+  readonly answer?: ProjectAgentAnswer
+  readonly error?: string
+  readonly proposed?: boolean
+}
+
+/* Per project, while the window lives: the agent keeps its own conversation. */
+const kept = new Map<string, readonly Turn[]>()
+
+const oneLine = (text: string): string => text.split(/\s+/).filter(Boolean).join(' ')
+
+export function AskPane(): React.JSX.Element {
+  const { project } = useShell()
+  const here = project && !project.orchestrator ? project : null
+  const hereId = here?.id ?? null
+  const show = useShellPick((shell) => shell.show)
+  const [, redraw] = useState(0)
+  const [draft, setDraft] = useState('')
+  const [waiting, setWaiting] = useState(false)
+  const [editing, setFact] = useState<{ projectId: string; at: number; text: string } | null>(null)
+  const end = useRef<HTMLDivElement>(null)
+  const turns = hereId ? (kept.get(hereId) ?? []) : []
+  const fact = editing?.projectId === hereId ? editing : null
+
+  const last = turns.at(-1)
+  useEffect(() => end.current?.scrollIntoView?.({ block: 'end' }), [last])
+
+  if (!here) return <p className="acc__note">Ask the project belongs to a project.</p>
+  const put = (projectId: string, change: (was: readonly Turn[]) => readonly Turn[]): void => {
+    kept.set(projectId, change(kept.get(projectId) ?? []))
+    redraw((n) => n + 1)
+  }
+  const send = (): void => {
+    const question = draft.trim()
+    if (!question || waiting) return
+    const projectId = here.id
+    setDraft('')
+    setWaiting(true)
+    put(projectId, (was) => [...was, { question }])
+    void ask(() => commands.projectAgentChat(projectId, question)).then((said) => {
+      setWaiting(false)
+      put(projectId, (was) => was.map((turn, at) => (at === was.length - 1 ? { question, answer: said.data ?? undefined, error: said.error ?? undefined } : turn)))
+    })
+  }
+  const propose = (at: number, text: string, cited: readonly string[]): void => {
+    const projectId = here.id
+    void ask(() => commands.projectAgentFact(projectId, text, [...cited])).then((said) => {
+      if (said.error) return put(projectId, (was) => was.map((turn, i) => (i === at ? { ...turn, error: said.error ?? undefined } : turn)))
+      setFact(null)
+      put(projectId, (was) => was.map((turn, i) => (i === at ? { ...turn, proposed: true, error: undefined } : turn)))
+    })
+  }
+
+  return (
+    <div className="pask">
+      <div className="pask__log scroll" aria-live="polite">
+        {turns.length === 0 && (
+          <p className="acc__note">
+            Ask {here.name}&apos;s agent about its code and its memory. It reads and never writes; an answer becomes a fact only once you approve it.
+          </p>
+        )}
+        {turns.map((turn, at) => (
+          <div key={at} className="pask__turn">
+            <p className="pask__q">{turn.question}</p>
+            {turn.answer && (
+              <div className="pask__a">
+                <Markdown source={turn.answer.answer} />
+                {turn.answer.cited.length > 0 && (
+                  <div className="pask__cited" aria-label="Files it cites">
+                    {turn.answer.cited.map((path) => (
+                      <button key={path} className="pask__path" onClick={() => show('file', { id: `file:${path}`, path })}>
+                        {path}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {turn.proposed ? (
+                  <p className="acc__note">Proposed as a fact: it waits for your approval under the top bar.</p>
+                ) : fact?.at === at ? (
+                  <div className="pask__fact">
+                    <textarea aria-label="Fact" value={fact.text} onChange={(event) => setFact({ projectId: here.id, at, text: event.target.value })} />
+                    <button className="btn btn--sm" onClick={() => setFact(null)}>Cancel</button>
+                    <button className="btn btn--sm btn--go" disabled={!fact.text.trim()} onClick={() => propose(at, fact.text, turn.answer?.cited ?? [])}>
+                      Propose
+                    </button>
+                  </div>
+                ) : (
+                  turn.answer.cited.length > 0 && (
+                    <button className="btn btn--sm" onClick={() => setFact({ projectId: here.id, at, text: oneLine(turn.answer?.answer ?? '') })}>
+                      Save as fact
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+            {turn.error && <p className="acc__note voice__bad" role="alert">{turn.error}</p>}
+            {!turn.answer && !turn.error && <p className="acc__note">Reading…</p>}
+          </div>
+        ))}
+        <div ref={end} />
+      </div>
+      <div className="pask__compose">
+        <textarea
+          aria-label="Ask the project"
+          placeholder={`Ask ${here.name}…`}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey || composing(event)) return
+            event.preventDefault()
+            send()
+          }}
+        />
+        <button className="btn btn--sm btn--go" disabled={waiting || !draft.trim()} onClick={send}>
+          Ask
+        </button>
+      </div>
+    </div>
+  )
+}
