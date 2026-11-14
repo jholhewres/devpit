@@ -256,3 +256,51 @@ fn an_interrupt_ends_the_turn_and_the_same_process_takes_the_next() {
     assert!(until_ended().contains(&pid), "the same process answered");
     resident.close();
 }
+
+/// The CLI's result counts what the whole process has spent, measured on
+/// 2.1.325: 0.0038, then 0.0076, then 0.0080 over three turns.
+#[test]
+fn each_turn_costs_what_it_added_to_the_process() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let command = script(
+        dir.path(),
+        r#"#!/bin/sh
+for total in 0.5 0.75; do
+  read -r _next
+  printf '{"type":"result","subtype":"success","session_id":"s-1","total_cost_usd":%s}\n' "$total"
+done
+"#,
+    );
+    let (tell, heard) = mpsc::channel();
+    let resident = (0..5)
+        .find_map(|_| {
+            let tell = tell.clone();
+            match Resident::start(
+                driver("claude").expect("driver"),
+                &turn(&command),
+                Arc::new(|_: &str| {}),
+                move |one| {
+                    if let Heard::Ended(said) = one {
+                        let _ = tell.send(said.end.cost_usd);
+                    }
+                },
+            ) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    None
+                }
+                other => Some(other.expect("started")),
+            }
+        })
+        .expect("the stand-in started within five tries");
+    let cost = || {
+        heard
+            .recv_timeout(Duration::from_secs(5))
+            .expect("heard in time")
+    };
+    assert!(resident.say("one"));
+    assert_eq!(cost(), Some(0.5));
+    assert!(resident.say("two"));
+    assert_eq!(cost(), Some(0.25));
+    resident.close();
+}

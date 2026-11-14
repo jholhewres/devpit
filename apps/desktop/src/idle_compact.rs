@@ -219,6 +219,10 @@ pub(crate) fn compact(
         on_session: None,
         ..*turn
     };
+    // Only through a process already running: one started here would keep
+    // this turn's lack of a window to ask in.
+    let staying = staying
+        .filter(|staying| crate::chat_resident::running(&staying.app, &staying.conversation_id));
     let said = crate::chat_resident::or_say(staying, driver, &compacting, || {}, |_| {}, |_| true);
     let said = match said {
         Ok(said) if !said.end.is_error => said,

@@ -13,7 +13,10 @@ release notes are taken from here when a version is tagged.
   the answer the way it does in an orchestrator's chat. After ten minutes with
   nothing said the agent stops, and your next message resumes the
   conversation. If it ends on its own before answering, your message goes to a
-  new one. The supervised mode still starts the agent for each message.
+  new one. While it runs it also hears your account's other sessions and its
+  own background tasks, as an orchestrator does: what it says then appears in
+  the chat, marked as not in answer to you. The supervised mode still starts
+  the agent for each message.
 
 ### Fixes
 

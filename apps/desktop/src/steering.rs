@@ -53,13 +53,19 @@ impl Steering {
 #[tauri::command]
 #[specta::specta]
 pub fn chat_stop_task(
+    app: tauri::AppHandle,
     steering: State<'_, Steering>,
     conversation_id: String,
     task_id: String,
 ) -> Result<bool, RpcError> {
-    Ok(steering
-        .get(&conversation_id)
-        .is_some_and(|control| control.stop_task(&task_id)))
+    // A process that stays has its own input; a turn's own is attached to its process.
+    Ok(
+        crate::chat_resident::stop_task(&app, &conversation_id, &task_id).unwrap_or_else(|| {
+            steering
+                .get(&conversation_id)
+                .is_some_and(|control| control.stop_task(&task_id))
+        }),
+    )
 }
 
 /// `chat.steer` — hands the turn in flight one more message, without waiting

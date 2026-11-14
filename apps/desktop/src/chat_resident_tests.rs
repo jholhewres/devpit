@@ -59,16 +59,26 @@ mod with_a_process {
     use devpit_rpc::Part;
     use serde_json::Value;
 
-    use super::super::{answered, started_as, Live, Residents};
+    use super::super::{answered, started_as, to_switch, Live, Residents};
 
-    /// Writes down its arguments and every line it is given, and answers
-    /// each message with its pid.
+    /// Writes down its arguments and every line it is given, and answers each
+    /// message with its pid. Refuses a switch to Full access, as the CLI does
+    /// for a process not started in it.
     const WRITES_DOWN: &str = r#"#!/bin/sh
 printf '%s\n' "$@" > "$DIR/argv"
 n=0
 while read -r line; do
   printf '%s\n' "$line" >> "$DIR/stdin"
-  case "$line" in *control_request*) continue ;; esac
+  case "$line" in
+    *control_request*)
+      id=$(printf '%s' "$line" | sed 's/.*"request_id":"\([^"]*\)".*/\1/')
+      case "$line" in
+        *bypassPermissions*) answer=error ;;
+        *) answer=success ;;
+      esac
+      printf '{"type":"control_response","response":{"subtype":"%s","request_id":"%s"}}\n' "$answer" "$id"
+      continue ;;
+  esac
   n=$((n+1))
   printf '{"type":"system","subtype":"init","session_id":"s-1"}\n'
   printf '{"type":"assistant","message":{"id":"m-%s","role":"assistant","content":[{"type":"text","text":"%s"}]},"session_id":"s-1"}\n' "$n" "$$"
@@ -107,16 +117,23 @@ done
 
     /// A chat's process, as `start` keeps it, with what it says sent to `tell`.
     fn live(turn: &Say<'_>, tell: mpsc::Sender<Heard>) -> Live {
+        let switching = Arc::new(Mutex::new(None));
         // A script written a moment ago can be "text file busy" to exec.
         let resident = (0..5)
             .find_map(|_| {
                 let tell = tell.clone();
+                let answering = switching.clone();
                 match Resident::start(
                     driver("claude").expect("driver"),
                     turn,
                     Arc::new(|_: &str| {}),
-                    move |heard| {
-                        let _ = tell.send(heard);
+                    move |heard| match heard {
+                        Heard::Control(said) => {
+                            to_switch(&answering, said);
+                        }
+                        heard => {
+                            let _ = tell.send(heard);
+                        }
                     },
                 ) {
                     Err(AgentError::NotInstalled) => {
@@ -132,6 +149,7 @@ done
             started_as: started_as(turn),
             model: turn.model.map(str::to_owned),
             permission: turn.permission.map(str::to_owned),
+            switching,
             project_id: "api".to_owned(),
             listens: false,
             turn: 0,
@@ -184,7 +202,8 @@ done
             ..first
         };
         assert_eq!(started_as(&switched), live.started_as, "no new process");
-        assert!(live.switched(&switched));
+        let (answers, count) = live.switch(&switched).expect("asked of it");
+        assert!(super::super::switched(&answers, count), "the CLI took both");
         assert!(live.resident.say("hello"));
         assert_eq!(next(&heard), pid.to_string(), "the same process answered");
         assert_eq!(next(&heard), "<ended>");
@@ -208,11 +227,24 @@ done
         assert_eq!(lines[0]["request"]["model"], "opus");
         assert_eq!(lines[1]["request"]["mode"], "plan");
 
-        // Back to the CLI's own default model, and a new effort, take a new one.
-        assert!(!live.switched(&Say {
-            model: None,
-            ..switched
-        }));
+        // Full access the CLI refuses, back to no model, and a new effort take a new one.
+        let (answers, count) = live
+            .switch(&Say {
+                permission: Some("bypassPermissions"),
+                ..switched
+            })
+            .expect("asked of it");
+        assert!(!super::super::switched(&answers, count));
+        assert!(
+            live.resident.stop_task("t-1"),
+            "a later turn's stop reaches it"
+        );
+        assert!(live
+            .switch(&Say {
+                model: None,
+                ..switched
+            })
+            .is_none());
         assert_ne!(
             started_as(&Say {
                 effort: Some("high"),
@@ -240,9 +272,14 @@ done
             .expect("residents")
             .insert("c1".to_owned(), idle);
 
-        assert!(residents.idled("c1", 6).is_none(), "a turn came since");
-        let idle = residents.idled("c1", 7).expect("idle since its turn");
-        idle.resident.close();
+        let wait = Duration::from_millis(10);
+        residents.idle_out("c1", 6, wait, |_| false);
+        residents.idle_out("c1", 7, wait, |_| true);
+        assert!(
+            residents.0.lock().expect("residents").contains_key("c1"),
+            "a turn came since, or it is reachable"
+        );
+        residents.idle_out("c1", 7, wait, |_| false);
         assert_eq!(next(&heard), "<gone>");
         assert!(
             !devpit_pty::process::alive(pid as i32),
@@ -282,7 +319,7 @@ done
             .expect("residents")
             .insert("orch".to_owned(), listening);
 
-        assert!(residents.idled("orch", 7).is_none());
+        residents.idle_out("orch", 7, Duration::from_millis(10), |_| false);
         let kept = residents.0.lock().expect("residents").remove("orch");
         kept.expect("still there").resident.close();
     }
