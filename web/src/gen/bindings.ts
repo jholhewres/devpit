@@ -1285,6 +1285,13 @@ export const commands = {
 	 *  field that silently rewrites what was typed is a field nobody trusts twice.
 	 */
 	worktreeBaseWrite: (projectId: string | null, typed: string) => typedError<WorktreeBase, RpcError>(__TAURI_INVOKE("worktree_base_write", { projectId, typed })),
+	/**  `worktree.branch_read` */
+	worktreeBranchRead: () => typedError<WorktreeBranch, RpcError>(__TAURI_INVOKE("worktree_branch_read")),
+	/**
+	 *  `worktree.branch_write` — chooses it, or clears it back to the default.
+	 *  Refused, never corrected, when it cannot name a branch.
+	 */
+	worktreeBranchWrite: (typed: string) => typedError<WorktreeBranch, RpcError>(__TAURI_INVOKE("worktree_branch_write", { typed })),
 	/**  `worktree.cleanup_read` */
 	worktreeCleanupRead: () => typedError<WorktreeCleanup, RpcError>(__TAURI_INVOKE("worktree_cleanup_read")),
 	/**  `worktree.cleanup_write` — turns deleting merged worktrees on or off. */
@@ -6424,6 +6431,15 @@ export type WorktreeBase = {
 	example: string,
 	/**  True while nothing has been chosen and the workspace default is in use. */
 	isDefault: boolean,
+};
+
+/**  The chosen pattern, and the branch it would give a card. */
+export type WorktreeBranch = {
+	/**  Exactly what was typed; empty while the default is in use. */
+	typed: string,
+	default: string,
+	/**  The branch a card titled "Fix the login redirect", numbered 42, gets. */
+	example: string,
 };
 
 /**  The cleanup as Settings shows it. */
