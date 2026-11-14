@@ -67,11 +67,30 @@ pub(crate) fn waits(said: &Said, name: &str) -> Value {
 }
 
 /// Sends the draft for `name` when the person's last word in the log of the
-/// orchestrator of `project`, standing in `root`, asks for it.
-pub(crate) fn send(project: &str, profile: &str, root: &Path, name: &str) -> Result<Value, String> {
+/// orchestrator of `project`, standing in `root`, asks for it, or at once
+/// when its guardrail does not ask now (`unasked`).
+pub(crate) fn send(
+    project: &str,
+    profile: &str,
+    root: &Path,
+    name: &str,
+    unasked: bool,
+) -> Result<Value, String> {
     let drafted = crate::reply_drafts::drafted(profile, name).ok_or_else(|| {
         format!("no draft waits for {name}: write it with devpit_draft_reply first")
     })?;
+    if unasked {
+        crate::live_sessions::reply_now(profile, name, &drafted, Some("the orchestrator"))
+            .map_err(|err| err.message)?;
+        let sent = json!({ "sent": name, "from": "orchestrator", "words": drafted });
+        let did = format!("Sent the draft to {name}");
+        return Ok(crate::guardrails::reported(
+            root,
+            devpit_rpc::Guardrail::SendDraft,
+            &did,
+            sent,
+        ));
+    }
     let press = crate::channels::Action::SendDraft {
         profile: profile.to_owned(),
         session: name.to_owned(),

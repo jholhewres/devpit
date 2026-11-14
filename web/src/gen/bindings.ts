@@ -606,6 +606,13 @@ export const commands = {
 	orchestratorStopsConfirm: (profileId: string, stops: StopAsked[]) => typedError<StopsConfirmed, RpcError>(__TAURI_INVOKE("orchestrator_stops_confirm", { profileId, stops })),
 	/**  `orchestrator.stops_drop` — the person keeps `names` running. */
 	orchestratorStopsDrop: (profileId: string, names: string[]) => __TAURI_INVOKE<void>("orchestrator_stops_drop", { profileId, names }),
+	/**  `orchestrator.guardrails` — an orchestrator's guardrails and their modes. */
+	orchestratorGuardrails: (projectId: string) => typedError<Guardrails, RpcError>(__TAURI_INVOKE("orchestrator_guardrails", { projectId })),
+	/**
+	 *  `orchestrator.guardrail_set` — one guardrail's mode, as the person chose
+	 *  it; the change is kept in the orchestrator's sessions log.
+	 */
+	orchestratorGuardrailSet: (projectId: string, guardrail: Guardrail, mode: GuardrailMode) => typedError<Guardrails, RpcError>(__TAURI_INVOKE("orchestrator_guardrail_set", { projectId, guardrail, mode })),
 	/**  `island.draft` — the reply drafted for a session the island shows, if any. */
 	islandDraft: (sessionId: string) => typedError<string | null, RpcError>(__TAURI_INVOKE("island_draft", { sessionId })),
 	/**  `island.draft_send` — sends that draft into the session's terminal, as the person. */
@@ -3846,6 +3853,30 @@ export type Front = {
 export type GitStatus = "clean" | "modified" | "added" | "deleted" | "untracked" | 
 /**  Matched by an ignore rule: not a change, a thing git is not watching. */
 "ignored";
+
+/**  A confirmation an orchestrator needs from the person before it acts. */
+export type Guardrail = 
+/**  Stopping a session. */
+"stop" | 
+/**  A forced stop, or one that loses work. */
+"forceStop" | 
+/**  Sending a drafted reply as the person. */
+"sendDraft";
+
+/**  When a guardrail waits for the person. */
+export type GuardrailMode = 
+/**  Asks unless the orchestrator's chat runs in Full access. */
+"follow" | "always" | "never";
+
+export type GuardrailRow = {
+	guardrail: Guardrail,
+	mode: GuardrailMode,
+};
+
+/**  An orchestrator's guardrails, each with its mode. */
+export type Guardrails = {
+	rows: GuardrailRow[],
+};
 
 /**  The payload of `terminal:happening`. */
 export type Happening = {

@@ -11,7 +11,9 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use devpit_agentcli::person::{From, Said};
-use devpit_rpc::{LiveSession, RemoteStop, RpcError, StopAsked, StopsAsked, StopsConfirmed};
+use devpit_rpc::{
+    Guardrail, LiveSession, RemoteStop, RpcError, StopAsked, StopsAsked, StopsConfirmed,
+};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter as _};
 
@@ -71,6 +73,16 @@ pub(crate) fn allowed(asked: &Request<'_>) -> Result<(), String> {
     match &asked.losing {
         Some(losing) if !asked.force => Err(format!("{name}: {losing}")),
         _ => Ok(()),
+    }
+}
+
+/// The guardrail a stop answers to: a forced one, or one that loses work,
+/// has its own.
+pub(crate) fn guardrail(force: bool, losing: Option<&str>) -> Guardrail {
+    if force || losing.is_some() {
+        Guardrail::ForceStop
+    } else {
+        Guardrail::Stop
     }
 }
 

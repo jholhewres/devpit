@@ -40,6 +40,7 @@ export type PrefsPane =
   | 'accounts'
   | 'decisions'
   | 'devflow'
+  | 'orchestrator'
   | 'assistant'
   | 'channels'
   | 'voice'
