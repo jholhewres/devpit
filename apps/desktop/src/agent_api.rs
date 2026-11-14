@@ -1023,11 +1023,11 @@ fn resolved(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-/// What a tool acting on a session says when it was not told which.
 /// What the project agent's tools say while Labs has it off.
 pub(crate) const LABS_OFF: &str =
     "the project agent is off: Settings → Maintenance → Labs turns it on";
 
+/// What a tool acting on a session says when it was not told which.
 const WHICH_SESSION: &str = "which session? pass `name` as devpit_sessions gives it";
 
 /// The card, if it is on this project's board. A card id from another
