@@ -207,22 +207,35 @@ export type Span =
   | { readonly kind: 'em'; readonly text: string }
   | { readonly kind: 'link'; readonly text: string; readonly href: string }
   | { readonly kind: 'image'; readonly alt: string; readonly src: string }
+  | { readonly kind: 'math'; readonly text: string; readonly display: boolean }
 
 const INLINE =
   /(`[^`]+`)|(!\[[^\]]*\]\([^)]+\))|(\[[^\]]+\]\([^)]+\))|(\*\*[^*]+\*\*)|(\*[^*]+\*)/
 
-/* One pass, longest markers first, so `**bold**` is not read as two italics. */
-export function spans(text: string): Span[] {
+/* `$$…$$` and `\[…\]` on their own, `$…$` and `\(…\)` in a line. A single `$`
+   opens only before a non-space and closes only after one, not before a digit,
+   so "costs $5 and $10" stays prose. */
+const MATH = /(\$\$[\s\S]+?\$\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))|(\$(?=[^\s$])[^$\n]*?[^\s$\\]\$(?!\d))/
+const WITH_MATH = new RegExp(`${MATH.source}|${INLINE.source}`)
+
+/* One pass, longest markers first, so `**bold**` is not read as two italics.
+   Maths is read only when asked: off, a `$` is the character it always was. */
+export function spans(text: string, math = false): Span[] {
   const out: Span[] = []
   let rest = text
 
   while (rest.length > 0) {
-    const found = INLINE.exec(rest)
+    const found = (math ? WITH_MATH : INLINE).exec(rest)
     if (!found || found.index === undefined) break
     if (found.index > 0) out.push({ kind: 'text', text: rest.slice(0, found.index) })
     const token = found[0]
 
-    if (token.startsWith('`')) {
+    if (math && /^(\$\$|\\\[)/.test(token)) {
+      out.push({ kind: 'math', text: token.slice(2, -2).trim(), display: true })
+    } else if (math && /^(\$|\\\()/.test(token)) {
+      const inner = token.startsWith('$') ? token.slice(1, -1) : token.slice(2, -2)
+      out.push({ kind: 'math', text: inner.trim(), display: false })
+    } else if (token.startsWith('`')) {
       out.push({ kind: 'code', text: token.slice(1, -1) })
     } else if (token.startsWith('![')) {
       const [, alt, src] = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(token) ?? []

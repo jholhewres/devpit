@@ -100,13 +100,14 @@
   --chat-max: 896px;
   --files-w: 340px;
 
-  /* The scales. A size between two steps is a step nobody chose. */
-  --fs-2xs: 10.5px;
-  --fs-xs: 11.5px;
-  --fs-sm: 12px;
-  --fs-md: 13px;
-  --fs-lg: 14px;
-  --fs-xl: 20px;
+  /* The scales. A size between two steps is a step nobody chose. The text
+     scale is Settings → Appearance's text size, 1 unless chosen. */
+  --fs-2xs: calc(10.5px * var(--text-scale, 1));
+  --fs-xs: calc(11.5px * var(--text-scale, 1));
+  --fs-sm: calc(12px * var(--text-scale, 1));
+  --fs-md: calc(13px * var(--text-scale, 1));
+  --fs-lg: calc(14px * var(--text-scale, 1));
+  --fs-xl: calc(20px * var(--text-scale, 1));
 
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -230,4 +231,22 @@
     --dots: hsla(30, 12%, 20%, 0.10);
     color-scheme: light;
   }
+}
+
+/* More contrast: secondary text and borders move toward the primary text, in
+   whichever theme is painted. Last, so it wins over the theme's own values. */
+:root[data-contrast='more'] {
+  --text-2: color-mix(in srgb, var(--text) 90%, var(--canvas));
+  --text-3: color-mix(in srgb, var(--text) 80%, var(--canvas));
+  --ghost: color-mix(in srgb, var(--text) 72%, var(--canvas));
+  --border: color-mix(in srgb, var(--text) 22%, transparent);
+  --border-strong: color-mix(in srgb, var(--text) 38%, transparent);
+}
+
+/* Diff colours a red-green colour blindness tells apart: blue for what was
+   added, orange for what was taken out. Unset, a diff paints with
+   --success and --danger. */
+:root[data-diff-colours='safe'] {
+  --diff-add: #3d8fd9;
+  --diff-del: #e08a1e;
 }

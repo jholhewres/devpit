@@ -1,6 +1,7 @@
-import { parse } from './diff'
+import { ignoringWhitespace, parse } from './diff'
 import { falsePositiveOf, newLines, SHAPE, type Note } from './diffNotes'
 import { severityWord } from './found'
+import { useViewPrefs } from './viewPrefs'
 
 /*
  * A unified diff, one folded section per file: what a card's changes and a
@@ -16,14 +17,17 @@ export function DiffFiles({
   notes?: readonly Note[]
   onDismiss?: (note: Note, dismissed: boolean) => void
 }): React.JSX.Element {
+  const prefs = useViewPrefs()
+  const ignore = prefs.diffWhitespace === 'ignore'
   return (
     <>
-      {parse(diff).map((file) => {
+      {parse(diff).map((parsed) => {
+        const file = ignore ? { ...parsed, hunks: ignoringWhitespace(parsed.hunks) } : parsed
         const here = notes.filter((note) => note.finding.file === file.path)
         const shown = new Set(file.hunks.flatMap(newLines))
         const elsewhere = here.filter((note) => note.finding.line === null || !shown.has(note.finding.line))
         return (
-          <details className="cdiff__f" key={file.path}>
+          <details className="cdiff__f" key={file.path} open={!prefs.diffCollapsed || undefined}>
             <summary className="cdiff__s">
               <span className="cdiff__p">{file.path}</span>
               <span className="cdiff__n">

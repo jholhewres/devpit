@@ -20,6 +20,7 @@ import { SkillsPane } from './SkillsPane'
 import { SyncSettings } from './SyncSettings'
 import { TerminalContrast } from './TerminalContrast'
 import { Usage } from './Usage'
+import { LookSettings } from './ViewSettings'
 import { Worktrees } from './Worktrees'
 import { onEvent } from './window'
 
@@ -139,7 +140,6 @@ export function Settings({
           <section className="prefs__in" hidden={pane !== 'worktrees'}>
             <Worktrees />
           </section>
-
           <section className="prefs__in" hidden={pane !== 'appearance'}>
             <h1 className="prefs__h">Appearance</h1>
             <div className="thm" role="radiogroup" aria-label="Theme">
@@ -173,6 +173,7 @@ export function Settings({
                 )
               }
             />
+            <LookSettings />
           </section>
 
           <section className="prefs__in" hidden={pane !== 'keyboard'}>

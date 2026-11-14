@@ -150,9 +150,9 @@
    letting it widen the pane would move everything else on the card. */
 .cdiff__body { max-height: 340px; overflow: auto; border-top: 1px solid var(--border); }
 .cdiff__hh { padding: 5px 16px; background: var(--inset); font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
-.cdiff__r { padding: 0 16px; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; white-space: pre; color: var(--text-2); }
-.cdiff__r[data-kind='add'] { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--text); }
-.cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); }
+.cdiff__r { padding: 0 16px; font-family: var(--mono); font-size: calc(11.5px * var(--code-scale, 1)); line-height: 1.55; white-space: pre; color: var(--text-2); }
+.cdiff__r[data-kind='add'] { background: color-mix(in srgb, var(--diff-add, var(--success)) 14%, transparent); color: var(--text); }
+.cdiff__r[data-kind='del'] { background: color-mix(in srgb, var(--diff-del, var(--danger)) 14%, transparent); color: var(--text); }
 /* A review's finding, on the line it names. */
 .cdiff__fd { margin: 2px 16px 4px; padding: 4px 10px; border-left: 2px solid var(--border); background: var(--inset); border-radius: 6px; font-size: 11.5px; }
 .cdiff__fd > summary { display: flex; gap: 10px; align-items: baseline; list-style: none; }

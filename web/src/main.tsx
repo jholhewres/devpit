@@ -13,6 +13,7 @@ import { watchCsp } from './shell/csp'
 import { reportPresence } from './shell/presence'
 import { loadRebound } from './shell/rebound'
 import { reportUncaught } from './shell/uncaught'
+import { applyLooks, viewPrefs } from './shell/viewPrefs'
 import { onEvent } from './shell/window'
 import './index.css'
 
@@ -50,6 +51,8 @@ if (!isAside) void loadRebound()
 if (!isAside) onEvent('sync:written', () => void loadRebound())
 // And that its calls still get through, which the app logs when they stop.
 if (!isAside) beat()
+// Sizes, contrast and diff colours from Settings → Appearance, before the first paint.
+applyLooks(viewPrefs())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>{isIsland ? <IslandWindow /> : isMenu ? <BrowserMenuWindow /> : <App />}</StrictMode>

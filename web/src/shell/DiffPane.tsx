@@ -5,6 +5,7 @@ import { ask, commands } from './live'
 import { PatchView } from './PatchView'
 import type { Tab } from './strip'
 import { useShell } from './useShell'
+import { viewPrefs } from './viewPrefs'
 
 /* The merge editor is CodeMirror and its merge view: loaded with the first
    file diff opened, not with the window. */
@@ -64,7 +65,7 @@ function CommitDiff({
 }): React.JSX.Element {
   const [raw, setRaw] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [split, setSplit] = useState(false)
+  const [split, setSplit] = useState(() => viewPrefs().diffLayout === 'split')
   /* Off by default: most diffs are read for what changed, and a page of dots
      is noise until the change *is* the whitespace. */
   const [spaces, setSpaces] = useState(false)

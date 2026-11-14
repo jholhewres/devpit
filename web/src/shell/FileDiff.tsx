@@ -6,6 +6,7 @@ import { ask, commands } from './live'
 import { mergeInto, toChange, type Merged, type Sides } from './mergeEditor'
 import { reason } from './reason'
 import { matches } from './shortcuts'
+import { viewPrefs } from './viewPrefs'
 
 /*
  * One file's change against HEAD, the whole file lined up.
@@ -29,7 +30,7 @@ export function FileDiff({
   const [sides, setSides] = useState<Sides | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editable, setEditable] = useState(false)
-  const [split, setSplit] = useState(true)
+  const [split, setSplit] = useState(() => viewPrefs().diffLayout !== 'stacked')
   const [folded, setFolded] = useState(true)
   const [wrap, setWrap] = useState(false)
   const [dirty, setDirty] = useState(false)

@@ -72,7 +72,7 @@ export const PREFS_NAV: readonly NavGroup[] = [
       {
         id: 'appearance',
         label: 'Appearance',
-        about: 'theme dark light system colours terminal',
+        about: 'theme dark light system colours terminal text font size code contrast latex maths math formula diffs side by side stacked whitespace colour blind folded collapsed',
         icon: (
           <svg {...stroke}><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /></svg>
         ),
