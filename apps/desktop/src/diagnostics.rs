@@ -81,7 +81,7 @@ pub struct DiagnosticCheck {
 pub struct Diagnostics {
     pub processes: Vec<DevpitProcess>,
     pub checks: Vec<DiagnosticCheck>,
-    /// The error log's newest lines, newest last.
+    /// The error log's most recent entries, newest first.
     pub log: Vec<String>,
     pub log_path: String,
 }
@@ -193,11 +193,14 @@ fn name_of(pid: u32) -> String {
         .unwrap_or_else(|_| pid.to_string())
 }
 
-/// The error log's newest `most` entries, one line each: what kind, where,
-/// and what it said.
+/// The error log's `most` most recently seen entries, newest first, one
+/// line each: what kind, where, and what it said.
 pub(crate) fn log_tail(entries: &[devpit_core::reports::Entry], most: usize) -> Vec<String> {
-    entries[entries.len().saturating_sub(most)..]
-        .iter()
+    let mut newest: Vec<&devpit_core::reports::Entry> = entries.iter().collect();
+    newest.sort_by_key(|entry| std::cmp::Reverse(entry.last_seen));
+    newest
+        .into_iter()
+        .take(most)
         .map(|entry| match &entry.location {
             Some(at) => format!("{} · {at}: {}", entry.kind, entry.message),
             None => format!("{}: {}", entry.kind, entry.message),
@@ -211,20 +214,22 @@ mod tests {
 
     #[test]
     fn the_log_shows_its_newest_entries_one_line_each() {
-        let entry = |location: Option<&str>, message: &str| devpit_core::reports::Entry {
-            fingerprint: String::new(),
-            kind: "background".to_owned(),
-            location: location.map(str::to_owned),
-            message: message.to_owned(),
-            stack: None,
-            count: 1,
-            first_seen: 0,
-            last_seen: 0,
-        };
+        let entry =
+            |location: Option<&str>, message: &str, seen: u64| devpit_core::reports::Entry {
+                fingerprint: String::new(),
+                kind: "background".to_owned(),
+                location: location.map(str::to_owned),
+                message: message.to_owned(),
+                stack: None,
+                count: 1,
+                first_seen: seen,
+                last_seen: seen,
+            };
+        // As ErrorLog keeps them: the most recently seen first.
         let log = [
-            entry(Some("one"), "first"),
-            entry(Some("stall_watch"), "the page has not run for 14s"),
-            entry(None, "no place"),
+            entry(Some("stall_watch"), "the page has not run for 14s", 300),
+            entry(None, "no place", 200),
+            entry(Some("one"), "first", 100),
         ];
         assert_eq!(
             log_tail(&log, 2),
@@ -233,6 +238,9 @@ mod tests {
                 "background: no place".to_owned(),
             ]
         );
+        let mut shuffled = log.clone();
+        shuffled.reverse();
+        assert_eq!(log_tail(&shuffled, 2), log_tail(&log, 2));
         assert!(log_tail(&[], 20).is_empty());
     }
 
