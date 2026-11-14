@@ -214,7 +214,7 @@ pub(crate) fn or_say(
     loop {
         match heard.recv() {
             Ok(Heard::Part(part)) => on_part(part),
-            Ok(Heard::Ended(said)) => return Ok(said),
+            Ok(Heard::Ended(said)) => return Ok(*said),
             // Control answers are taken before they get here.
             Ok(Heard::Control(_)) => {}
             Ok(Heard::Gone) | Err(_) => {

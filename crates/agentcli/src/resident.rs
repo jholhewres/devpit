@@ -48,8 +48,8 @@ fn still_running(pid: u32) -> bool {
 /// What the process says, a turn at a time.
 pub enum Heard {
     Part(Part),
-    /// A turn is over, whoever started it.
-    Ended(Said),
+    /// A turn is over, whoever started it. Boxed: it is the largest by far.
+    Ended(Box<Said>),
     /// The process is gone: exited, killed, or its stream closed.
     Gone,
     /// The CLI's answer to a control request, as it wrote it.
@@ -123,7 +123,7 @@ impl Resident {
                     |part| tell(Heard::Part(part)),
                 );
                 if let Some(ending) = heard.ended {
-                    tell(Heard::Ended(Said {
+                    tell(Heard::Ended(Box::new(Said {
                         end: TurnEnd {
                             turn_id: String::new(),
                             cost_usd: ending.cost_usd,
@@ -131,12 +131,13 @@ impl Resident {
                             stop_reason: ending.stop_reason,
                             is_error: ending.is_error,
                             context: ending.context,
+                            limit: heard.limit,
                             ..Default::default()
                         },
                         session_id: heard.session_id,
                         init: heard.init,
                         anchor: heard.anchor,
-                    }));
+                    })));
                 }
                 if !whole {
                     break;

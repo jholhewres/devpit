@@ -82,3 +82,57 @@ fn a_steer_the_cli_echoed_is_heard_and_one_it_never_took_in_is_not() {
     let _ = sink.kill();
     let _ = sink.wait();
 }
+
+fn heard_of(lines: &[&str]) -> Heard {
+    let driver = crate::driver::driver("claude").expect("claude");
+    follow(
+        driver.as_ref(),
+        lines.iter().map(|line| line.to_string()),
+        &Control::default(),
+        None,
+        |_| {},
+    )
+}
+
+/// As Claude Code 2.1.325 streams a turn its account's limit refused: the
+/// reset on its own line, then the error, then a failed result.
+#[test]
+fn a_turn_refused_by_a_rate_limit_ends_with_when_it_resets() {
+    let heard = heard_of(&[
+        r#"{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1795143600,"rateLimitType":"five_hour"}}"#,
+        r#"{"type":"assistant","error":"rate_limit","session_id":"s1","message":{"content":[{"type":"text","text":"You've hit your session limit · resets 3:50pm"}]}}"#,
+        r#"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your session limit · resets 3:50pm"}"#,
+    ]);
+    assert_eq!(
+        heard.limit,
+        Some(devpit_rpc::Limit {
+            kind: devpit_rpc::LimitKind::RateLimit,
+            resets_at: Some(1_795_143_600.0),
+        })
+    );
+}
+
+#[test]
+fn a_provider_failing_ends_the_turn_as_an_outage_with_no_reset() {
+    let heard = heard_of(&[
+        r#"{"type":"assistant","error":"server_error","session_id":"s1","message":{"content":[{"type":"text","text":"API Error: 529 Overloaded"}]}}"#,
+        r#"{"type":"result","subtype":"success","is_error":true,"result":"API Error: 529 Overloaded"}"#,
+    ]);
+    assert_eq!(
+        heard.limit,
+        Some(devpit_rpc::Limit {
+            kind: devpit_rpc::LimitKind::Outage,
+            resets_at: None,
+        })
+    );
+}
+
+/// Every turn hears where its window stands; only a refusal is a limit.
+#[test]
+fn a_window_that_still_allows_the_turn_is_no_limit() {
+    let heard = heard_of(&[
+        r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1795143600,"rateLimitType":"seven_day"}}"#,
+        r#"{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01}"#,
+    ]);
+    assert_eq!(heard.limit, None);
+}

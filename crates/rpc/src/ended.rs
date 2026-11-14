@@ -21,6 +21,26 @@ pub struct TurnEnd {
     pub model: Option<String>,
     #[serde(default)]
     pub effort: Option<String>,
+    #[serde(default)]
+    pub limit: Option<Limit>,
+}
+
+/// Why the provider would not answer: the account's limit, or the service
+/// itself failing.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum LimitKind {
+    RateLimit,
+    Outage,
+}
+
+/// A turn the provider refused, and when it may answer again.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Limit {
+    pub kind: LimitKind,
+    /// Unix seconds, when the CLI said.
+    pub resets_at: Option<f64>,
 }
 
 /// When an answer ended and why: the facts, read into words by the screen.
@@ -51,6 +71,9 @@ pub struct Ended {
     /// How full the context was when it ended.
     #[serde(default)]
     pub tokens: Option<u32>,
+    /// As [`TurnEnd::limit`]. Absent from a line written before it existed.
+    #[serde(default)]
+    pub limit: Option<Limit>,
 }
 
 impl Ended {
@@ -66,6 +89,7 @@ impl Ended {
             cost_usd: end.cost_usd,
             duration_ms: end.duration_ms.map(|ms| ms as u32),
             tokens: end.context.map(|context| context.used),
+            limit: end.limit,
         }
     }
 }
