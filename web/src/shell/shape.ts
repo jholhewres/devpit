@@ -29,6 +29,8 @@ export type PrefsPane =
   | 'remote'
   | 'appearance'
   | 'keyboard'
+  | 'maintenance'
+  | 'diagnostics'
   | 'providers'
   | 'sessions'
   | 'skills'

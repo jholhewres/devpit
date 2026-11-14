@@ -1371,6 +1371,12 @@ export const commands = {
 	 *  whatever the switch says, since the switch is about going on their own.
 	 */
 	worktreeCleanupNow: () => typedError<WorktreeCleanup, RpcError>(__TAURI_INVOKE("worktree_cleanup_now")),
+	/**  `maintenance.read` */
+	maintenanceRead: () => typedError<Maintenance, RpcError>(__TAURI_INVOKE("maintenance_read")),
+	/**  `maintenance.write` — what is given changes; what is not stays. */
+	maintenanceWrite: (powerSaver: boolean | null, keepDays: number | null, projectAgent: boolean | null, canvas: boolean | null) => typedError<Maintenance, RpcError>(__TAURI_INVOKE("maintenance_write", { powerSaver, keepDays, projectAgent, canvas })),
+	/**  `maintenance.clean_now` — the Delete now button, at the days chosen. */
+	maintenanceCleanNow: () => typedError<Maintenance, RpcError>(__TAURI_INVOKE("maintenance_clean_now")),
 	/**  `worktree.sources` — the kinds this project has, and which are shown. */
 	worktreeSources: (projectId: string | null) => typedError<Source[], RpcError>(__TAURI_INVOKE("worktree_sources", { projectId })),
 	/**  `worktree.source_show` — shows or hides one kind. */
@@ -2015,6 +2021,7 @@ export const commands = {
 	checkpointPreview: (cardId: string, stepId: string) => typedError<WouldRun, RpcError>(__TAURI_INVOKE("checkpoint_preview", { cardId, stepId })),
 	checkpointTested: (runId: string) => typedError<Tested, RpcError>(__TAURI_INVOKE("checkpoint_tested", { runId })),
 	diagnosticsEnvironment: () => typedError<EnvironmentReport, RpcError>(__TAURI_INVOKE("diagnostics_environment")),
+	diagnosticsRead: () => typedError<Diagnostics, RpcError>(__TAURI_INVOKE("diagnostics_read")),
 	/**  `plugin.list` — the catalogue, and what this project has on. */
 	pluginList: (projectId: string) => typedError<PluginList, RpcError>(__TAURI_INVOKE("plugin_list", { projectId })),
 	/**
@@ -2714,6 +2721,14 @@ export type ClaudePluginInstallation = {
 export type ClaudePluginState = "missing" | 
 /**  Installed from an earlier build of the plugin. */
 "outdated" | "current";
+
+/**  What one cleaning deleted. */
+export type CleanRun = {
+	/**  Seconds since the epoch. */
+	at: number | null,
+	removed: number,
+	freedBytes: number | null,
+};
 
 /**  What one cleanup did. */
 export type CleanupRun = {
@@ -3464,6 +3479,32 @@ export type DevflowTeamChange = {
 /**  Response of `devflow.team_fetch`: each layer's change, nothing applied. */
 export type DevflowTeamChanges = {
 	changes: DevflowTeamChange[],
+};
+
+/**  One of devpit's own processes, as the Diagnostics page lists it. */
+export type DevpitProcess = {
+	pid: number,
+	name: string,
+	/**  Tenths of a percent of one core, over the page's two looks. */
+	cpuTenths: number,
+	memoryBytes: number | null,
+};
+
+/**  A check and its fix, as `devpit diagnostics` prints it. */
+export type DiagnosticCheck = {
+	name: string,
+	ok: boolean,
+	detail: string,
+	fix: string | null,
+};
+
+/**  `diagnostics.read` — the Diagnostics page. */
+export type Diagnostics = {
+	processes: DevpitProcess[],
+	checks: DiagnosticCheck[],
+	/**  The error log's newest lines, newest last. */
+	log: string[],
+	logPath: string,
 };
 
 /**
@@ -4237,6 +4278,17 @@ export type LiveSession = {
 /**  A list, so tomorrow's field has somewhere to go. */
 export type LiveSessions = {
 	sessions: LiveSession[],
+};
+
+/**  Maintenance as Settings shows it. */
+export type Maintenance = {
+	powerSaver: boolean,
+	onBattery: boolean,
+	/**  Days logs and run artifacts are kept; 0 keeps them until deleted. */
+	keepDays: number,
+	projectAgent: boolean,
+	canvas: boolean,
+	last: CleanRun | null,
 };
 
 export type McpAppPage = {

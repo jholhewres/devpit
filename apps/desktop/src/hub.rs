@@ -120,7 +120,7 @@ pub(crate) fn reach() -> Option<Reach> {
 pub(crate) fn listen() {
     tauri::async_runtime::spawn(async {
         loop {
-            tokio::time::sleep(EVERY).await;
+            tokio::time::sleep(crate::maintenance::stretch(EVERY)).await;
             // Only a machine that linked devpit's bot takes what its chat wrote.
             let bot = crate::telegram_devpit::linked();
             if connected().is_none() && !bot {

@@ -486,6 +486,10 @@ fn respond_in(
         return crate::project_agent::from_session(app, here, projects, asked);
     }
     if crate::project_agent::METHODS.contains(&asked.method.as_str()) {
+        let store = devpit_core::Store::open_default().map_err(|err| said(err.into()))?;
+        if !crate::maintenance::project_agent_on(&store) {
+            return Err(LABS_OFF.to_owned());
+        }
         return crate::project_agent::respond(
             app,
             &asked.method,
@@ -1020,6 +1024,10 @@ fn resolved(path: &Path) -> PathBuf {
 }
 
 /// What a tool acting on a session says when it was not told which.
+/// What the project agent's tools say while Labs has it off.
+pub(crate) const LABS_OFF: &str =
+    "the project agent is off: Settings → Maintenance → Labs turns it on";
+
 const WHICH_SESSION: &str = "which session? pass `name` as devpit_sessions gives it";
 
 /// The card, if it is on this project's board. A card id from another

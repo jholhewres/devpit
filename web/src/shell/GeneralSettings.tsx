@@ -1,9 +1,11 @@
 import { ActivityDefault } from './ActivityPick'
 import { CalendarSettings } from './CalendarSettings'
 import { DeskSettings } from './DeskSettings'
+import { DiagnosticsPane } from './DiagnosticsPane'
 import { DisplaySettings } from './DisplaySettings'
 import { ErrorReportsPreview } from './ErrorReportsPreview'
 import { IslandSettings } from './IslandSettings'
+import { MaintenanceSettings } from './MaintenanceSettings'
 import { OpenApps } from './OpenApps'
 import { PauseSettings } from './PauseSettings'
 import { PrefSwitch } from './PrefSwitch'
@@ -76,6 +78,16 @@ export function GeneralPanes({
         <h1 className="prefs__h">Remote</h1>
         <RemoteSettings />
         <CalendarSettings />
+      </section>
+
+      <section className="prefs__in" hidden={pane !== 'maintenance'}>
+        <h1 className="prefs__h">Maintenance</h1>
+        <MaintenanceSettings />
+      </section>
+
+      <section className="prefs__in" hidden={pane !== 'diagnostics'}>
+        <h1 className="prefs__h">Diagnostics</h1>
+        {pane === 'diagnostics' && <DiagnosticsPane />}
       </section>
     </>
   )

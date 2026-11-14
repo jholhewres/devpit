@@ -23,6 +23,8 @@ export const ROWS: Partial<Record<PrefsPane, readonly string[]>> = {
   sessions: ['Open the next card on its own', 'Hand off a full session', 'Chat activity', 'Ask before stopping a terminal'],
   voice: ['Voice messages'],
   remote: ['Remote', 'Allow remote MCP (read-only)', 'Calendar'],
+  maintenance: ['Power saver', 'Keep logs and run artifacts', 'Project agent', 'Canvas'],
+  diagnostics: ['Processes'],
 }
 
 /** The pane an address opens: General's old rows are found where they went. */

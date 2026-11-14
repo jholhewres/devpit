@@ -41,7 +41,7 @@ fn before() -> &'static Mutex<HashMap<u32, (u64, Instant)>> {
 /// together, because one tick of rounding is then a whole core. And a counter
 /// that went backwards, which is a pid reused between samples: an unsigned
 /// subtraction there would wrap to something enormous.
-fn tenths(was: u64, now_ticks: u64, elapsed: f64) -> u32 {
+pub(crate) fn tenths(was: u64, now_ticks: u64, elapsed: f64) -> u32 {
     if elapsed <= 0.05 || now_ticks < was {
         return 0;
     }

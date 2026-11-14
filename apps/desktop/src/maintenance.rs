@@ -1,0 +1,301 @@
+//! Settings → Maintenance: how hard devpit works in the background, how long
+//! its logs and run artifacts stay, and Labs, the switches for what is still
+//! in beta.
+
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, SystemTime};
+
+use devpit_core::home::ProjectHome;
+use devpit_core::{preference, Store};
+use devpit_rpc::{ErrorCode, RpcError};
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri::Manager as _;
+
+/// Maintenance as Settings shows it.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Maintenance {
+    pub power_saver: bool,
+    pub on_battery: bool,
+    /// Days logs and run artifacts are kept; 0 keeps them until deleted.
+    pub keep_days: u32,
+    pub project_agent: bool,
+    pub canvas: bool,
+    pub last: Option<CleanRun>,
+}
+
+/// What one cleaning deleted.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanRun {
+    /// Seconds since the epoch.
+    pub at: f64,
+    pub removed: u32,
+    pub freed_bytes: f64,
+}
+
+/// The choices Settings offers; 0 is never.
+pub(crate) const KEEP_DAYS: [u32; 5] = [0, 7, 14, 30, 90];
+/// How much less often a probe runs while power is being saved.
+pub(crate) const SLOWER: u32 = 4;
+const POWER_SUPPLY: &str = "/sys/class/power_supply";
+const FIRST_AFTER: Duration = Duration::from_secs(10 * 60);
+const EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+
+static SAVER: AtomicBool = AtomicBool::new(false);
+static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+/// One cleaning at a time: the schedule and the button never race.
+static CLEANING: Mutex<()> = Mutex::new(());
+
+fn store() -> Result<Store, RpcError> {
+    Ok(Store::open_default()?)
+}
+
+fn flag(store: &Store, key: &str) -> bool {
+    store.preference_flag(key).ok().flatten().unwrap_or(false)
+}
+
+/// A Labs flag: on unless turned off, as everything in it was before Labs.
+fn beta(store: &Store, key: &str) -> bool {
+    store.preference_flag(key).ok().flatten().unwrap_or(true)
+}
+
+pub(crate) fn project_agent_on(store: &Store) -> bool {
+    beta(store, preference::LABS_PROJECT_AGENT)
+}
+
+pub(crate) fn canvas_on(store: &Store) -> bool {
+    beta(store, preference::LABS_CANVAS)
+}
+
+fn keep_days(store: &Store) -> u32 {
+    store
+        .preference(preference::MAINTENANCE_KEEP_DAYS)
+        .ok()
+        .flatten()
+        .and_then(|days| days.parse().ok())
+        .filter(|days| KEEP_DAYS.contains(days))
+        .unwrap_or(0)
+}
+
+fn read(store: &Store) -> Result<Maintenance, RpcError> {
+    Ok(Maintenance {
+        power_saver: flag(store, preference::MAINTENANCE_POWER_SAVER),
+        on_battery: on_battery_in(Path::new(POWER_SUPPLY)),
+        keep_days: keep_days(store),
+        project_agent: project_agent_on(store),
+        canvas: canvas_on(store),
+        last: store
+            .preference(preference::MAINTENANCE_CLEAN_LAST)?
+            .and_then(|raw| serde_json::from_str(&raw).ok()),
+    })
+}
+
+/// `maintenance.read`
+#[tauri::command]
+#[specta::specta]
+pub async fn maintenance_read() -> Result<Maintenance, RpcError> {
+    crate::off_main::blocking(|| read(&store()?)).await
+}
+
+/// `maintenance.write` — what is given changes; what is not stays.
+#[tauri::command]
+#[specta::specta]
+pub async fn maintenance_write(
+    power_saver: Option<bool>,
+    keep_days: Option<u32>,
+    project_agent: Option<bool>,
+    canvas: Option<bool>,
+) -> Result<Maintenance, RpcError> {
+    crate::off_main::blocking(move || {
+        let store = store()?;
+        if let Some(days) = keep_days {
+            if !KEEP_DAYS.contains(&days) {
+                return Err(RpcError::new(
+                    ErrorCode::Invalid,
+                    format!("keep logs for one of {KEEP_DAYS:?} days"),
+                ));
+            }
+            store.set_preference(preference::MAINTENANCE_KEEP_DAYS, &days.to_string())?;
+        }
+        if let Some(on) = power_saver {
+            store.set_preference_flag(preference::MAINTENANCE_POWER_SAVER, on)?;
+            SAVER.store(on, Ordering::Relaxed);
+        }
+        if let Some(on) = project_agent {
+            store.set_preference_flag(preference::LABS_PROJECT_AGENT, on)?;
+        }
+        if let Some(on) = canvas {
+            store.set_preference_flag(preference::LABS_CANVAS, on)?;
+        }
+        read(&store)
+    })
+    .await
+}
+
+/// `maintenance.clean_now` — the Delete now button, at the days chosen.
+#[tauri::command]
+#[specta::specta]
+pub async fn maintenance_clean_now() -> Result<Maintenance, RpcError> {
+    crate::off_main::blocking(|| {
+        let store = store()?;
+        clean_now(&store)?;
+        read(&store)
+    })
+    .await
+}
+
+/// Power saver as it was left, and the app the probes ask about the window.
+pub(crate) fn restore(app: &tauri::AppHandle, store: &Store) {
+    let _ = APP.set(app.clone());
+    SAVER.store(
+        flag(store, preference::MAINTENANCE_POWER_SAVER),
+        Ordering::Relaxed,
+    );
+}
+
+/// How long a probe waits before its next look: `every`, or longer while
+/// power is saved and nobody is at the window or the machine is on battery.
+pub(crate) fn stretch(every: Duration) -> Duration {
+    if !SAVER.load(Ordering::Relaxed) {
+        return every;
+    }
+    slower(every, away() || on_battery_in(Path::new(POWER_SUPPLY)))
+}
+
+pub(crate) fn slower(every: Duration, saving: bool) -> Duration {
+    if saving {
+        every * SLOWER
+    } else {
+        every
+    }
+}
+
+fn away() -> bool {
+    APP.get()
+        .and_then(|app| app.try_state::<crate::error_sender::Presence>())
+        .is_some_and(|presence| presence.away(devpit_core::reports::now()))
+}
+
+/// Whether a battery under `dir` (Linux's power supply class) is discharging.
+pub(crate) fn on_battery_in(dir: &Path) -> bool {
+    let Ok(supplies) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    supplies.flatten().any(|supply| {
+        let said =
+            |name: &str| std::fs::read_to_string(supply.path().join(name)).unwrap_or_default();
+        said("type").trim() == "Battery" && said("status").trim() == "Discharging"
+    })
+}
+
+/// What is older than `cutoff`: files in `logs`, and each `<group>/<time>`
+/// folder under `trees` but the newest of its group. Links are never followed.
+pub(crate) fn stale(logs: &Path, trees: &[PathBuf], cutoff: SystemTime) -> Vec<PathBuf> {
+    let older = |path: &Path| {
+        std::fs::symlink_metadata(path)
+            .and_then(|meta| meta.modified())
+            .is_ok_and(|at| at < cutoff)
+    };
+    let mut found: Vec<PathBuf> = inside(logs, false)
+        .into_iter()
+        .filter(|path| older(path))
+        .collect();
+    for tree in trees {
+        for group in inside(tree, true) {
+            let mut times = inside(&group, true);
+            // Named by when they ran, so the last in order is the newest.
+            times.sort();
+            times.pop();
+            found.extend(times.into_iter().filter(|path| older(path)));
+        }
+    }
+    found
+}
+
+/// The folders (`dirs`) or the files directly in `dir`, never a link.
+fn inside(dir: &Path, dirs: bool) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter(|entry| {
+            entry
+                .file_type()
+                .is_ok_and(|kind| !kind.is_symlink() && kind.is_dir() == dirs)
+        })
+        .map(|entry| entry.path())
+        .collect()
+}
+
+/// Deletes what [`stale`] found, each checked to be under `root`.
+pub(crate) fn delete(root: &Path, paths: &[PathBuf], at: f64) -> CleanRun {
+    let mut run = CleanRun {
+        at,
+        ..CleanRun::default()
+    };
+    let Ok(root) = std::fs::canonicalize(root) else {
+        return run;
+    };
+    for path in paths {
+        if !std::fs::canonicalize(path).is_ok_and(|real| real.starts_with(&root)) {
+            continue;
+        }
+        let freed = if path.is_dir() {
+            crate::worktree_sweep::drop_dir(path)
+        } else {
+            let bytes = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
+            std::fs::remove_file(path).ok().map(|()| bytes)
+        };
+        if let Some(bytes) = freed {
+            run.removed += 1;
+            run.freed_bytes += bytes as f64;
+        }
+    }
+    run
+}
+
+fn clean_now(store: &Store) -> Result<(), RpcError> {
+    let days = keep_days(store);
+    if days == 0 {
+        return Ok(());
+    }
+    let _one = CLEANING.lock().unwrap_or_else(|held| held.into_inner());
+    let root = Store::root()?;
+    let mut trees = Vec::new();
+    for project in store.projects()? {
+        if let Ok(home) = ProjectHome::of(store, &root, &project.id) {
+            trees.push(home.devflow_runs());
+            trees.push(home.devflow_reviews());
+        }
+    }
+    let cutoff = SystemTime::now() - Duration::from_secs(u64::from(days) * 24 * 60 * 60);
+    let found = stale(&root.join("logs"), &trees, cutoff);
+    let run = delete(&root, &found, devpit_core::reports::now() as f64);
+    let json = serde_json::to_string(&run).map_err(|err| RpcError::internal(err.to_string()))?;
+    store.set_preference(preference::MAINTENANCE_CLEAN_LAST, &json)?;
+    Ok(())
+}
+
+/// Cleans a while after start, then a few times a day, when days are set.
+pub(crate) fn watch() {
+    let _ = std::thread::Builder::new()
+        .name("maintenance".to_owned())
+        .spawn(|| {
+            std::thread::sleep(FIRST_AFTER);
+            loop {
+                if let Err(err) = store().and_then(|store| clean_now(&store)) {
+                    devpit_core::reports::background("maintenance", &err.message);
+                }
+                std::thread::sleep(EVERY);
+            }
+        });
+}
+
+#[cfg(test)]
+#[path = "maintenance_tests.rs"]
+mod tests;

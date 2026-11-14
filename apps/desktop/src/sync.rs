@@ -117,7 +117,7 @@ pub(crate) fn keep_synced(app: &AppHandle) {
 
 fn work(asked: &Receiver<Ask>) {
     loop {
-        let mut waiting = match asked.recv_timeout(EVERY) {
+        let mut waiting = match asked.recv_timeout(crate::maintenance::stretch(EVERY)) {
             Ok(ask) => vec![ask],
             Err(RecvTimeoutError::Timeout) => Vec::new(),
             Err(RecvTimeoutError::Disconnected) => return,

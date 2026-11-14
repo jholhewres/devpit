@@ -131,3 +131,13 @@ fn a_plugin_folder_linked_out_is_forbidden_to_delete_and_stays_installed() {
     assert_eq!(kept, "not the plugin's");
     assert_eq!(store.installed_plugins(&id).expect("read"), [PLUGIN]);
 }
+
+#[test]
+fn labs_offers_the_canvas_plugin_until_canvas_is_turned_off() {
+    let ids = |canvas: bool| -> Vec<String> {
+        offered_with(canvas).into_iter().map(|one| one.id).collect()
+    };
+    assert!(ids(true).contains(&CANVAS.to_owned()));
+    assert!(!ids(false).contains(&CANVAS.to_owned()));
+    assert_eq!(ids(false).len() + 1, ids(true).len());
+}
