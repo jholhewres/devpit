@@ -20,9 +20,13 @@ pub struct ReminderRow {
     /// Whether `due_at` is a moment somebody chose rather than a day.
     pub timed: bool,
     pub reminded_at: Option<i64>,
+    /// When the person dealt with it.
+    pub handled_at: Option<i64>,
+    /// The card's number in its project, `#42`.
+    pub number: Option<u32>,
 }
 
-const COLUMNS: &str = "id, project_id, title, due_at, due_time, reminded_at";
+const COLUMNS: &str = "id, project_id, title, due_at, due_time, reminded_at, handled_at, number";
 
 fn row(found: &rusqlite::Row<'_>) -> rusqlite::Result<ReminderRow> {
     Ok(ReminderRow {
@@ -32,6 +36,8 @@ fn row(found: &rusqlite::Row<'_>) -> rusqlite::Result<ReminderRow> {
         due_at: found.get(3)?,
         timed: found.get(4)?,
         reminded_at: found.get(5)?,
+        handled_at: found.get(6)?,
+        number: found.get(7)?,
     })
 }
 
@@ -91,6 +97,20 @@ impl Store {
         ))?;
         let rows = stmt
             .query_map([project_id], row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Every date not yet dealt with, and those dealt with since `since`,
+    /// soonest first: what the orchestrator's Schedules list.
+    pub fn reminders_listed(&self, since: i64) -> Result<Vec<ReminderRow>, StoreError> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM card \
+             WHERE due_at IS NOT NULL AND archived_at IS NULL \
+             AND (handled_at IS NULL OR handled_at >= ?1) ORDER BY due_at"
+        ))?;
+        let rows = stmt
+            .query_map([since], row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }

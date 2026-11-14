@@ -45,7 +45,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 51] = [
+pub(crate) const METHODS: [&str; 53] = [
     "context",
     "board",
     "card",
@@ -97,6 +97,8 @@ pub(crate) const METHODS: [&str; 51] = [
     "devflow_stage",
     "project_agent_ask",
     "project_agent_brief",
+    "schedules",
+    "schedule_propose",
 ];
 
 /// The methods that change the board, and so tell the window.
@@ -482,6 +484,16 @@ fn respond_in(
     }
     if crate::agent_reminders::METHODS.contains(&asked.method.as_str()) {
         return crate::agent_reminders::respond(
+            app,
+            &asked.method,
+            here,
+            project,
+            projects,
+            &asked.params,
+        );
+    }
+    if crate::assistant::METHODS.contains(&asked.method.as_str()) {
+        return crate::assistant::respond(
             app,
             &asked.method,
             here,

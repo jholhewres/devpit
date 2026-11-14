@@ -44,6 +44,7 @@ pub mod remote;
 pub mod remote_view;
 pub mod review;
 pub mod runs;
+pub mod schedule;
 pub mod search;
 pub mod session;
 pub mod session_regroup;
@@ -147,6 +148,10 @@ pub use review::{
     Standing, REVIEW_EVIDENCE,
 };
 pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
+pub use schedule::{
+    AssistantMode, ProposedReminder, Routine, RoutineKind, Schedule, ScheduleKind,
+    ScheduleProposal, ScheduleState, Schedules,
+};
 pub use search::{SearchFile, SearchHits, SearchLine};
 pub use session::{
     AgentPresence, KnownAgent, LayoutNode, PaneInTmux, PaneKind, PaneRunning, PaneSize,

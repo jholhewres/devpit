@@ -4,6 +4,7 @@ import type { Context } from '../gen/bindings'
 
 import { ActivityContext, activityOf, keepActivity, seen, type Activity } from './activity'
 import { ActivityPick } from './ActivityPick'
+import { AssistantToggle } from './AssistantToggle'
 import { ASKS, CONTINUE, money, putBackFrom } from './chat'
 import type { Extras } from './queueing'
 import { titleOf, type Tab } from './strip'
@@ -175,6 +176,7 @@ const ChatCorner = memo(function ChatCorner({
       {session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>}
       {session && <CopySession id={session} />}
       {orchestrator && <SessionsChip profileId={orchestrator} />}
+      {orchestrator && projectId && <AssistantToggle projectId={projectId} />}
       {projectId && <RemoteToggle projectId={projectId} conversationId={tabId} sending={sending} supervised={supervised} />}
     </PaneCorner>
   )

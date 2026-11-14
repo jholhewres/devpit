@@ -84,7 +84,9 @@ pub async fn orchestrator_refresh(project_id: String) -> Result<(), RpcError> {
     crate::off_main::blocking(move || {
         let store = crate::projects::store()?;
         let (_, root) = crate::projects::locate(&store, &project_id)?;
-        seed(&root).map_err(|err| RpcError::internal(err.to_string()))
+        seed(&root)
+            .and_then(|()| crate::assistant::brief_in(&root, crate::assistant::on(&store, &root)))
+            .map_err(|err| RpcError::internal(err.to_string()))
     })
     .await
 }
@@ -273,6 +275,9 @@ pub(crate) fn seed_all(store: &Store, root: &Path) -> Vec<(String, std::io::Erro
         .filter(|folder| devpit_core::home::orchestrator_of(store, root, folder).is_some())
         .filter_map(|folder| {
             seed(&folder)
+                .and_then(|()| {
+                    crate::assistant::brief_in(&folder, crate::assistant::on(store, &folder))
+                })
                 .err()
                 .map(|err| (folder.display().to_string(), err))
         })

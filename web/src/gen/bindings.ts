@@ -672,6 +672,35 @@ export const commands = {
 	 *  slept may have passed a reminder, and the thread's clock slept with it.
 	 */
 	remindersRearm: () => __TAURI_INVOKE<void>("reminders_rearm"),
+	/**  `assistant.mode` — whether this orchestrator's Assistant mode is on. */
+	assistantMode: (projectId: string) => typedError<AssistantMode, RpcError>(__TAURI_INVOKE("assistant_mode", { projectId })),
+	/**
+	 *  `assistant.mode_set` — Assistant mode on or off, as the person clicked it.
+	 *  The MCP servers are told to look again, so the running chat gains or loses
+	 *  the assistant's tools; its brief is read when the chat next starts.
+	 */
+	assistantModeSet: (projectId: string, on: boolean) => typedError<AssistantMode, RpcError>(__TAURI_INVOKE("assistant_mode_set", { projectId, on })),
+	/**
+	 *  `schedules.list` — the orchestrator's Schedules, as the window in `zone`,
+	 *  `offset_minutes` from UTC, reads them.
+	 */
+	schedulesList: (projectId: string, zone: string, offsetMinutes: number) => typedError<Schedules, RpcError>(__TAURI_INVOKE("schedules_list", { projectId, zone, offsetMinutes })),
+	/**  `schedule.routine_save` — a routine the person set, new or changed. */
+	scheduleRoutineSave: (projectId: string, id: string | null, routine: Routine) => typedError<Schedules, RpcError>(__TAURI_INVOKE("schedule_routine_save", { projectId, id, routine })),
+	/**  `schedule.routine_pause` — a routine paused or resumed. */
+	scheduleRoutinePause: (projectId: string, id: string, pause: boolean) => typedError<Schedules, RpcError>(__TAURI_INVOKE("schedule_routine_pause", { projectId, id, pause })),
+	/**  `schedule.routine_delete` — a routine gone. */
+	scheduleRoutineDelete: (projectId: string, id: string) => typedError<Schedules, RpcError>(__TAURI_INVOKE("schedule_routine_delete", { projectId, id })),
+	/**
+	 *  `schedule.remind` — a reminder the person made by hand, on `target`: the
+	 *  orchestrator itself or a project linked to it.
+	 */
+	scheduleRemind: (projectId: string, target: string, title: string, at: number | null) => typedError<Schedules, RpcError>(__TAURI_INVOKE("schedule_remind", { projectId, target, title, at })),
+	/**
+	 *  `schedule.proposal` — the person adds what the orchestrator proposed, as
+	 *  the window in `zone` sees it, or drops it.
+	 */
+	scheduleProposal: (projectId: string, id: string, add: boolean, zone: string, offsetMinutes: number) => typedError<Schedules, RpcError>(__TAURI_INVOKE("schedule_proposal", { projectId, id, add, zone, offsetMinutes })),
 	/**
 	 *  `orchestrator.answer` — the person's pick on the question a session is
 	 *  stopped on: arrows to the choice and Enter, or Escape when `choice` is
@@ -2241,6 +2270,11 @@ export type Ask = {
 	effort: string | null,
 	/**  Where the person sent it from, when not the composer: the agent is told. */
 	from?: TurnFrom | null,
+};
+
+/**  Assistant mode for one orchestrator. */
+export type AssistantMode = {
+	on: boolean,
 };
 
 /**
@@ -4927,6 +4961,14 @@ export type PromptOption = {
 	hint: string | null,
 };
 
+/**  A reminder the orchestrator proposed. */
+export type ProposedReminder = {
+	title: string,
+	at: number | null,
+	projectId: string,
+	project: string | null,
+};
+
 /**  What the agent wants to do, as the screen puts it. */
 export type Question = {
 	/**  This question, so the answer can name it. */
@@ -5348,6 +5390,33 @@ export type Removed = {
 /**  Who said it. */
 export type Role = "user" | "assistant" | "system";
 
+/**  A routine as the person set it. */
+export type Routine = {
+	kind: RoutineKind,
+	/**  Minutes since midnight, local time. */
+	minute: number,
+	/**  Days it runs, 0 = Sunday. Empty is every day. */
+	days: number[],
+	/**  The zone the time is in, as the window named it. */
+	zone: string,
+	/**
+	 *  That zone's offset from UTC in minutes, as the window last saw it:
+	 *  the process has no time zone database, the window does.
+	 */
+	offsetMinutes: number,
+};
+
+/**  What a routine tells when it runs. */
+export type RoutineKind = 
+/**  The comeback briefing: sessions, merged pull requests, decisions waiting. */
+"morning" | 
+/**  Open pull requests whose checks fail. */
+"ci" | 
+/**  Open pull requests. */
+"prs" | 
+/**  Cards waiting in a lane whose role is check. */
+"review";
+
 export type RpcError = {
 	code: ErrorCode,
 	message: string,
@@ -5435,6 +5504,57 @@ export type RunsQuery = {
 	/**  Unix seconds, exclusive. */
 	until: number | null,
 	after: RunCursor | null,
+};
+
+/**  One row of Schedules. */
+export type Schedule = {
+	/**  The routine's id, or the reminder's card id. */
+	id: string,
+	kind: ScheduleKind,
+	title: string,
+	/**  When it goes off next, or went off; seconds since the epoch. */
+	at: number | null,
+	projectId: string | null,
+	project: string | null,
+	/**  A reminder's card, `#42`. */
+	cardNumber: number | null,
+	/**  A routine's settings; none for a reminder, which goes off once. */
+	routine: Routine | null,
+	state: ScheduleState,
+	/**  When a routine last ran. */
+	lastRun: number | null,
+};
+
+/**  What a row is: a card's date, or a routine. */
+export type ScheduleKind = "reminder" | "routine";
+
+/**
+ *  A schedule the orchestrator proposed: nothing is scheduled until the
+ *  person adds it.
+ */
+export type ScheduleProposal = {
+	id: string,
+	routine: Routine | null,
+	reminder: ProposedReminder | null,
+	/**  Why, in the orchestrator's words. */
+	why: string,
+};
+
+/**  Where a row stands. */
+export type ScheduleState = 
+/**  Still to go off. */
+"waiting" | 
+/**  Went off, and waits on the person. */
+"due" | 
+/**  Dealt with. */
+"done" | 
+/**  A routine the person paused. */
+"paused";
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type Schedules = {
+	schedules: Schedule[],
+	proposed: ScheduleProposal[],
 };
 
 export type SearchFile = {

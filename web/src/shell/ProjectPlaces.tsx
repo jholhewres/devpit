@@ -5,11 +5,18 @@ import { useShell } from './useShell'
  * The project's own places in the sidebar: its board, and its Devflow beside
  * it — set up, switched on or not, every project has one to look at. An
  * orchestrator has neither: its folder is notes, and the projects' boards
- * are in its right panel.
+ * are in its right panel. It has its Schedules instead.
  */
 export function ProjectPlaces({ open, showing }: { open: (kind: PaneName) => void; showing: (kind: PaneName) => boolean }): React.JSX.Element | null {
   const shell = useShell()
-  if (shell.project?.orchestrator) return null
+  if (shell.project?.orchestrator) {
+    return (
+      <button className="act" onClick={() => open('schedules')} aria-pressed={showing('schedules')}>
+        <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M12 14v3l2 1" /></svg></span>
+        <span className="act__label">Schedules</span>
+      </button>
+    )
+  }
   return (
     <>
       <button className="act" onClick={() => open('board')} aria-pressed={showing('board')}>

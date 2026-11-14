@@ -354,3 +354,24 @@ fn a_logged_preference_goes_where_the_call_says() {
     assert!(log(json!({ "log": "preferences", "text": "x", "project": "nowhere" })).is_err());
     assert!(log(json!({ "log": "preferences", "text": "x", "section": "other" })).is_err());
 }
+
+/// The assistant's tools answer only an orchestrator whose Assistant mode is
+/// on: a project's session asking by name is refused, and writes nothing.
+#[test]
+fn the_assistants_methods_refuse_without_assistant_mode() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let projects = vec![project("prj_app", &dir.path().join("app"), &[])];
+    for method in crate::assistant::METHODS {
+        assert!(METHODS.contains(&method), "{method}");
+        assert!(!WRITES.contains(&method), "{method}");
+        let asked: Asked = serde_json::from_value(json!({
+            "method": method, "params": { "why": "x", "routine": "ci", "time": "08:00" }, "cwd": "",
+        }))
+        .expect("asked");
+        let refused = respond_in(None, &projects, &projects[0], &asked).expect_err(method);
+        assert!(
+            refused.contains("Assistant mode is off"),
+            "{method}: {refused}"
+        );
+    }
+}

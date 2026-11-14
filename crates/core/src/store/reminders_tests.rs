@@ -43,6 +43,23 @@ fn a_reminder_goes_off_once_and_waits_to_be_dealt_with() {
     );
 }
 
+/// Schedules list a reminder still to come or waiting, and one dealt with
+/// lately, with its card's number; one dealt with long ago is gone.
+#[test]
+fn schedules_list_the_open_reminders_and_those_dealt_with_since() {
+    let (_dir, store, card) = store_with_card();
+    store.set_card_due(&card, Some(1_000), true).expect("due");
+    let listed = store.reminders_listed(0).expect("listed");
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].handled_at, None);
+    assert_eq!(listed[0].number, Some(1));
+
+    assert!(store.handle_reminder(&card, 2_000).expect("handled"));
+    let listed = store.reminders_listed(1_500).expect("listed");
+    assert_eq!(listed[0].handled_at, Some(2_000));
+    assert!(store.reminders_listed(2_001).expect("listed").is_empty());
+}
+
 /// Moving the date — a snooze — reminds again: the bell's own record would
 /// have remembered the card as told, forever.
 #[test]
