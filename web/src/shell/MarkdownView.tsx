@@ -175,7 +175,7 @@ function TeX({ tex, display }: { tex: string; display: boolean }): React.JSX.Ele
     let live = true
     void import('katex').then(({ default: katex }) => {
       if (!live || !host.current) return
-      katex.render(tex, host.current, { displayMode: display, output: 'mathml', throwOnError: false, trust: false })
+      katex.render(tex, host.current, { displayMode: display, output: 'mathml', throwOnError: false, trust: false, maxSize: 20, maxExpand: 1000 })
     })
     return () => {
       live = false

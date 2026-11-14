@@ -42,7 +42,7 @@ export function PatchView({
         </div>
       )}
       {binary && <div className="exempty__t">This file is binary; there is nothing to line up.</div>}
-      {!binary && hunks.length === 0 && <div className="exempty__t">{empty}</div>}
+      {!binary && hunks.length === 0 && <div className="exempty__t">{ignore && files.some((file) => file.hunks.length > 0) ? 'Only whitespace changed, and Settings → Appearance hides it.' : empty}</div>}
 
       {hunks.slice(0, shown).map((hunk, at) =>
         split ? <Split key={at} hunk={hunk} spaces={spaces} /> : <Unified key={at} hunk={hunk} spaces={spaces} />,
