@@ -6,6 +6,7 @@ import type { Activity } from './activity'
 import { ActivityPick } from './ActivityPick'
 import { money } from './chat'
 import { ChatCardChip } from './ChatCardChip'
+import { useDetails, useDetailsMenu } from './chatDetails'
 import type { Exported } from './chatMarkdown'
 import { ContextMeter } from './ContextMeter'
 import { AssistantToggle } from './AssistantToggle'
@@ -58,8 +59,11 @@ export const ChatHead = memo(function ChatHead({
   onActivity: (activity: Activity) => void
 }): React.JSX.Element {
   const [renaming, setRenaming] = useState(false)
+  const shows = useDetails()
+  const details = useDetailsMenu()
   return (
-    <div className="chead">
+    <div className="chead" onContextMenu={details.open}>
+      {details.menu}
       <PaneCorner tabId={tabId} what="chat">
         {renaming ? (
           <Rename
@@ -77,9 +81,9 @@ export const ChatHead = memo(function ChatHead({
           </button>
         )}
         <ActivityPick value={activity} onPick={onActivity} />
-        <ChatCardChip card={card} />
-        <ContextMeter context={context} />
-        {session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>}
+        {shows('card') && <ChatCardChip card={card} />}
+        {shows('context') && <ContextMeter context={context} />}
+        {shows('cost') && (session ? <SessionCost sessionId={session} className="pcorner__cost scost" /> : money(cost) && <span className="pcorner__cost">{money(cost)}</span>)}
         <ChatExport onExport={onExport} />
         {session && <CopySession id={session} />}
         {orchestrator && <SessionsChip profileId={orchestrator} />}

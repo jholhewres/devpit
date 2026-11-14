@@ -3,7 +3,7 @@
 //! Nothing here happens on its own. Staging is a click, committing is a
 //! click, and the message is written by the person or by an agent they asked.
 
-use devpit_rpc::{Commit, ErrorCode, ProjectChanges, RemoteAct, RpcError};
+use devpit_rpc::{Commit, CommitDraft, ErrorCode, ProjectChanges, RemoteAct, RpcError};
 
 use crate::projects::project_changes_now;
 use crate::roots::root_of;
@@ -93,6 +93,28 @@ pub(crate) fn changes_commit_now(
 ) -> Result<Commit, RpcError> {
     let root = root_of(&project_id, worktree_id.as_deref())?;
     devpit_git::commit(&root, &message).map_err(git_error)
+}
+
+/// Past this many paths a draft names only how many: the list comes from the window.
+const DRAFTED_PATHS: usize = 10_000;
+
+/// `changes.draft` — a first commit message for `paths`, written the way this
+/// checkout's own history writes its subjects. Never committed from here.
+#[tauri::command]
+#[specta::specta]
+pub async fn changes_draft(
+    project_id: String,
+    worktree_id: Option<String>,
+    paths: Vec<String>,
+) -> Result<CommitDraft, RpcError> {
+    crate::off_main::blocking(move || {
+        let root = root_of(&project_id, worktree_id.as_deref())?;
+        let paths = &paths[..paths.len().min(DRAFTED_PATHS)];
+        Ok(CommitDraft {
+            message: devpit_git::draft_for(&root, paths),
+        })
+    })
+    .await
 }
 
 /// `changes.remote` — fetch, pull, push or sync this checkout's branch.
