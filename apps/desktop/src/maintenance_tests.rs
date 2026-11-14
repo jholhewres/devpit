@@ -232,3 +232,25 @@ fn days_that_settings_does_not_offer_keep_everything() {
         .expect("days");
     assert_eq!(keep_days(&store), 0);
 }
+
+#[test]
+fn an_old_run_holding_the_only_stage_record_of_an_open_card_survives_the_cleaning() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let card = dir.path().join("runs/card_a");
+    let (stage, checks) = (run_name(60 * DAY), run_name(40 * DAY));
+    for (name, file) in [
+        (&stage, "stage-ticket.json"),
+        (&checks, "evidence.json"),
+        (&checks, "gate.json"),
+    ] {
+        std::fs::create_dir_all(card.join(name)).expect("run");
+        std::fs::write(card.join(name).join(file), "{}").expect("write");
+    }
+
+    let found = stale(
+        &dir.path().join("logs"),
+        &[dir.path().join("runs")],
+        SystemTime::now() - 7 * DAY,
+    );
+    assert!(found.is_empty(), "{found:?}");
+}
