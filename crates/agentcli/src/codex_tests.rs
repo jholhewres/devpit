@@ -640,8 +640,18 @@ fn edit_answered_alone(
     path: &Path,
     grant: Option<&str>,
 ) -> bool {
-    let item = format!("exec-{id}");
     let change = json!({ "path": path, "kind": { "type": "add" }, "diff": "x\n" });
+    change_answered_alone(codex, wire, id, change, grant)
+}
+
+fn change_answered_alone(
+    codex: &Codex,
+    wire: &dyn crate::wire::Wire,
+    id: u64,
+    change: Value,
+    grant: Option<&str>,
+) -> bool {
+    let item = format!("exec-{id}");
     let started = json!({ "method": "item/started", "params": {
         "item": { "type": "fileChange", "id": item, "changes": [change], "status": "inProgress" } } });
     codex.read(&started.to_string());
@@ -699,6 +709,65 @@ fn accept_edits_answers_alone_only_an_edit_that_stays_in_the_project() {
         ),
         "a wider root waits for the person"
     );
+}
+
+#[test]
+fn an_edit_that_climbs_or_moves_out_of_the_project_waits_for_the_person() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let project = dir.path().join("project");
+    std::fs::create_dir_all(&project).expect("project");
+    let (codex, wire) = opened(&project, "acceptEdits");
+    let climbs = project
+        .join("missing")
+        .join("..")
+        .join("..")
+        .join("outside.txt");
+    assert!(!edit_answered_alone(
+        &codex,
+        wire.as_ref(),
+        0,
+        &climbs,
+        None
+    ));
+    let moves = json!({ "path": project.join("a.txt"), "diff": "",
+        "kind": { "type": "update", "move_path": dir.path().join("outside.txt") } });
+    assert!(!change_answered_alone(
+        &codex,
+        wire.as_ref(),
+        1,
+        moves,
+        None
+    ));
+    let stays = json!({ "path": project.join("a.txt"), "diff": "",
+        "kind": { "type": "update", "move_path": project.join("b.txt") } });
+    assert!(change_answered_alone(&codex, wire.as_ref(), 2, stays, None));
+}
+
+/// A link that points nowhere yet is written through all the same.
+#[cfg(unix)]
+#[test]
+fn an_edit_through_a_dangling_link_out_of_the_project_waits_for_the_person() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let project = dir.path().join("project");
+    std::fs::create_dir_all(&project).expect("project");
+    std::os::unix::fs::symlink(dir.path().join("outside.txt"), project.join("notes.txt"))
+        .expect("link");
+    std::os::unix::fs::symlink(dir.path().join("later"), project.join("cache")).expect("link");
+    let (codex, wire) = opened(&project, "acceptEdits");
+    assert!(!edit_answered_alone(
+        &codex,
+        wire.as_ref(),
+        0,
+        &project.join("notes.txt"),
+        None
+    ));
+    assert!(!edit_answered_alone(
+        &codex,
+        wire.as_ref(),
+        1,
+        &project.join("cache/x.txt"),
+        None
+    ));
 }
 
 #[cfg(unix)]

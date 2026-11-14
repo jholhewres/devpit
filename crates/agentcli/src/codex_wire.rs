@@ -90,11 +90,12 @@ fn allowed(
     }
 }
 
-/// Whether `path` stays under `root` once symlinks are resolved: the part of
-/// it that exists is resolved, and any `..` counts as leaving.
+/// Whether `path` stays under `root` once symlinks are resolved. A path not
+/// even written under `root` is out before the disk is read; any `..`, and a
+/// link that resolves nowhere, count as leaving.
 fn inside(root: &Path, path: &Path) -> bool {
     let path = root.join(path);
-    if path.components().any(|part| part == Component::ParentDir) {
+    if !path.starts_with(root) || path.components().any(|part| part == Component::ParentDir) {
         return false;
     }
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
@@ -103,6 +104,10 @@ fn inside(root: &Path, path: &Path) -> bool {
     let resolved = loop {
         if let Ok(real) = known.canonicalize() {
             break real;
+        }
+        // There, but not resolvable: a dangling link, written through all the same.
+        if known.symlink_metadata().is_ok() {
+            return false;
         }
         match (known.file_name(), known.parent()) {
             (Some(name), Some(parent)) => {
