@@ -294,6 +294,15 @@ export function useChat(conversationId: string): Chat {
   /* Answered from the island, or timed out: the card goes either way. */
   useEffect(() => onPermissionSettled((id) => setAsked((was) => was.filter((one) => one.id !== id))), [])
 
+  const choosePermission = useCallback(
+    (mode: string) => {
+      setPermission(mode)
+      remember(conversationKey(conversationId), { permission: mode })
+      if (profileId) remember(profileId, { permission: mode })
+    },
+    [conversationId, profileId],
+  )
+
   const answer = useCallback(
     (id: string, said: Said, chosen?: Chosen, reason?: string) => {
       const question = asked.find((one) => one.id === id)
@@ -302,6 +311,8 @@ export function useChat(conversationId: string): Chat {
       /* Taken off the list first: the question is answered either way, and a
          row that lingers invites a second click that has nothing to answer. */
       setAsked((was) => was.filter((one) => one.id !== id))
+      /* An approved plan moves the session to Supervised; the next turns follow it. */
+      if (allow && question?.tool === 'ExitPlanMode' && permission === 'plan') choosePermission(MODES[0].id)
       /* The answer is in the thread already, as the tool's result. */
       if (chosen && allow) return void ask(() => commands.permissionPick(id, chosen.map((one) => [...one])))
       const call =
@@ -320,7 +331,7 @@ export function useChat(conversationId: string): Chat {
         )
       })
     },
-    [asked, project, conversationId, setMessages],
+    [asked, project, conversationId, setMessages, permission, choosePermission],
   )
 
   /* Picked for one message, like the attachments: a skill left on would
@@ -542,14 +553,6 @@ export function useChat(conversationId: string): Chat {
       setProfileId(next)
     },
     [profileId],
-  )
-  const choosePermission = useCallback(
-    (mode: string) => {
-      setPermission(mode)
-      remember(conversationKey(conversationId), { permission: mode })
-      if (profileId) remember(profileId, { permission: mode })
-    },
-    [conversationId, profileId],
   )
   const chooseEffort = useCallback(
     (next: string) => {

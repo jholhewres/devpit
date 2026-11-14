@@ -113,6 +113,8 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .asking__more > summary { font-size: var(--fs-xs); color: var(--text-3); }
 .asking__more > .asking__in { margin-top: 6px; }
 .asking__plan { max-height: 320px; overflow: auto; padding: 4px 10px; border-radius: var(--radius-md); background: var(--inset); font-size: var(--fs-md); }
+.asking__edit { min-height: 160px; max-height: 320px; resize: vertical; padding: var(--space-2); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--inset); font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.5; color: var(--text); }
+.asking__edit:focus { outline: none; border-color: var(--border-strong); }
 .asking__h { padding: 1px 6px; border-radius: var(--radius-xs); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); background: var(--inset); }
 .asking__step { margin-left: 6px; font-size: var(--fs-xs); color: var(--text-3); }
 .asking__q { margin: 0; font-size: var(--fs-lg); line-height: 1.45; color: var(--text); }

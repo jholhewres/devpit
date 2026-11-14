@@ -117,17 +117,37 @@ describe('a request to run something', () => {
     typing.remove()
   })
 
-  it('shows a plan to approve as markdown, with the words for what each answer does', () => {
+})
+
+describe('a plan the agent asks to go ahead with', () => {
+  const plan: Question = { ...question, tool: 'ExitPlanMode', input: '{"plan":"# Steps\\n1. read"}', touch: { kind: 'plan', plan: '# Steps\n1. read' } }
+
+  it('is a card of its own, its plan drawn as markdown, approved as written', () => {
     const answered = vi.fn()
-    const plan: Question = { ...question, tool: 'ExitPlanMode', input: '{"plan":"# Steps\\n1. read"}', touch: { kind: 'plan', plan: '# Steps\n1. read' } }
     render(<Asked questions={[plan]} onAnswer={answered} />)
+    expect(screen.getByRole('region', { name: 'Plan' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Steps' })).toBeTruthy()
-    fireEvent.click(screen.getByText('Approve'))
-    fireEvent.click(screen.getByText('Keep planning'))
-    expect(answered.mock.calls).toEqual([
-      ['q1', 'allow'],
-      ['q1', 'deny'],
-    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    expect(answered.mock.calls).toEqual([['q1', 'allow']])
+  })
+
+  it('is edited in place, then approved as the person wrote it', () => {
+    const answered = vi.fn()
+    render(<Asked questions={[plan]} onAnswer={answered} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    const field = screen.getByRole('textbox', { name: 'The plan, as the agent will follow it' }) as HTMLTextAreaElement
+    expect(field.value).toBe('# Steps\n1. read')
+    fireEvent.change(field, { target: { value: '# Steps\n1. read\n2. test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    expect(answered.mock.calls).toEqual([['q1', 'allow', [['# Steps\n1. read\n2. test']]]])
+  })
+
+  it('is refused with what to change, for the agent to keep planning on', () => {
+    const answered = vi.fn()
+    render(<Asked questions={[plan]} onAnswer={answered} />)
+    fireEvent.change(screen.getByPlaceholderText(/What to change/), { target: { value: 'split step 1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Refuse' }))
+    expect(answered.mock.calls).toEqual([['q1', 'deny', undefined, 'split step 1']])
   })
 })
 

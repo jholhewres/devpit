@@ -17,12 +17,26 @@ use std::sync::{Arc, Mutex};
 
 use devpit_rpc::Part;
 
+/// A permission prompt the CLI put to its host on stdout.
+pub struct Prompt {
+    pub request_id: String,
+    pub tool: String,
+    pub input: serde_json::Value,
+    /// The session it came from, once the stream named one.
+    pub session_id: Option<String>,
+}
+
+/// Takes a prompt to answer later with [`Control::answer`], or leaves it to
+/// be refused (false).
+pub type Asker = Arc<dyn Fn(Prompt, &Control) -> bool + Send + Sync>;
+
 /// A running turn's stdin, shared with whoever may need to steer it.
 #[derive(Clone, Default)]
 pub struct Control {
     stdin: Arc<Mutex<Option<ChildStdin>>>,
     /// Steers written and not echoed back yet: the uuid sent, and devpit's id for it.
     awaiting: Arc<Mutex<Vec<(String, String)>>>,
+    asker: Arc<Mutex<Option<Asker>>>,
 }
 
 impl Control {
@@ -95,6 +109,41 @@ impl Control {
         self.write(&interrupt_request())
     }
 
+    /// Who answers the permission prompts this turn would otherwise refuse.
+    pub fn asks_with(&self, asker: Asker) {
+        if let Ok(mut held) = self.asker.lock() {
+            *held = Some(asker);
+        }
+    }
+
+    /// Answers the prompt sent under `request_id`, in the CLI's own shape:
+    /// `{behavior: "allow", updatedInput}` or `{behavior: "deny", message}`.
+    pub fn answer(&self, request_id: &str, response: serde_json::Value) -> bool {
+        self.write(
+            &serde_json::json!({
+                "type": "control_response",
+                "response": { "subtype": "success", "request_id": request_id, "response": response },
+            })
+            .to_string(),
+        )
+    }
+
+    /// A permission prompt on `line`, handed to the asker or refused. False
+    /// when the line is not one.
+    pub(crate) fn prompted(&self, line: &str, session_id: Option<&str>) -> bool {
+        let Some(refused) = refusal(line) else {
+            return false;
+        };
+        let asker = self.asker.lock().ok().and_then(|held| held.clone());
+        let taken = asker
+            .zip(prompt_of(line, session_id))
+            .is_some_and(|(ask, prompt)| ask(prompt, self));
+        if !taken {
+            self.write(&refused);
+        }
+        true
+    }
+
     /// Lets go of stdin, which is what lets the CLI exit.
     pub(crate) fn close(&self) {
         if let Ok(mut held) = self.stdin.lock() {
@@ -142,6 +191,18 @@ pub fn stop_task_request(task_id: &str) -> String {
         "request": { "subtype": "stop_task", "task_id": task_id },
     })
     .to_string()
+}
+
+/// A permission prompt's request, read off the line [`refusal`] answers.
+fn prompt_of(line: &str, session_id: Option<&str>) -> Option<Prompt> {
+    let asked: serde_json::Value = serde_json::from_str(line).ok()?;
+    let request = asked.get("request")?;
+    Some(Prompt {
+        request_id: asked.get("request_id")?.as_str()?.to_owned(),
+        tool: request.get("tool_name")?.as_str()?.to_owned(),
+        input: request.get("input").cloned().unwrap_or_default(),
+        session_id: session_id.map(str::to_owned),
+    })
 }
 
 /// The answer to a permission prompt no hook decided: refused in the CLI's

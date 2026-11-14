@@ -474,3 +474,84 @@ fn a_cli_that_floods_stderr_still_finishes_its_turn() {
         "the turn ended as an error"
     );
 }
+
+/// What a stand-in CLI read back after putting a plan to its host on the
+/// stdio prompt, when `asker` answers it.
+#[cfg(unix)]
+fn plan_answered_with(asker: crate::control::Asker) -> String {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let cli = dir.path().join("fake-claude");
+    std::fs::write(
+        &cli,
+        "#!/bin/sh\nread -r _prompt\n\
+         printf '%s\\n' '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s-plan\"}'\n\
+         printf '%s\\n' '{\"type\":\"control_request\",\"request_id\":\"r-plan\",\"request\":{\"subtype\":\"can_use_tool\",\"tool_name\":\"ExitPlanMode\",\"input\":{\"plan\":\"# Steps\\n1. read\"},\"tool_use_id\":\"toolu_p\"}}'\n\
+         read -r reply\nprintf '%s\\n' \"$reply\" > \"$(dirname \"$0\")/reply\"\n\
+         printf '{\"type\":\"result\",\"subtype\":\"success\",\"session_id\":\"s-plan\",\"total_cost_usd\":0}\\n'\n",
+    )
+    .expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let command = cli.to_string_lossy().into_owned();
+    let cwd = dir.path().to_path_buf();
+    let control = crate::control::Control::new();
+    control.asks_with(asker);
+    let (tell, hear) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let turn = Say {
+            command: &command,
+            cwd: &cwd,
+            control: Some(&control),
+            ..turn(None)
+        };
+        let said = (0..5).find_map(|_| {
+            match crate::talk::say(&crate::driver::Claude::default(), &turn, |_| {}, |_| {}) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                }
+                other => Some(other.is_ok()),
+            }
+        });
+        let _ = tell.send(said);
+    });
+    let said = hear
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("the plan was never answered");
+    assert_eq!(said, Some(true));
+    std::fs::read_to_string(dir.path().join("reply")).expect("a reply")
+}
+
+/// The host that takes a plan answers it later, from another thread, on the
+/// same stdin the CLI asked on; until then the turn waits.
+#[cfg(unix)]
+#[test]
+fn a_plan_is_approved_and_refused_on_the_stdio_permission_prompt() {
+    let answering = |response: serde_json::Value| -> crate::control::Asker {
+        std::sync::Arc::new(
+            move |asked: crate::control::Prompt, control: &crate::control::Control| {
+                assert_eq!(asked.tool, "ExitPlanMode");
+                assert_eq!(asked.session_id.as_deref(), Some("s-plan"));
+                assert_eq!(asked.input["plan"], "# Steps\n1. read");
+                let (control, response) = (control.clone(), response.clone());
+                std::thread::spawn(move || control.answer(&asked.request_id, response));
+                true
+            },
+        )
+    };
+    let approved = plan_answered_with(answering(
+        serde_json::json!({ "behavior": "allow", "updatedInput": { "plan": "# Steps" } }),
+    ));
+    let approved: serde_json::Value = serde_json::from_str(&approved).expect("json");
+    assert_eq!(approved["type"], "control_response");
+    assert_eq!(approved["response"]["request_id"], "r-plan");
+    assert_eq!(approved["response"]["response"]["behavior"], "allow");
+
+    let refused = plan_answered_with(answering(
+        serde_json::json!({ "behavior": "deny", "message": "Keep planning" }),
+    ));
+    let refused: serde_json::Value = serde_json::from_str(&refused).expect("json");
+    assert_eq!(refused["response"]["response"]["behavior"], "deny");
+    assert_eq!(refused["response"]["response"]["message"], "Keep planning");
+}

@@ -184,6 +184,7 @@ export const MODES: readonly Mode[] = [
   { id: 'manual', label: 'Supervised', what: 'Ask before commands and file changes' },
   { id: 'acceptEdits', label: 'Accept edits', what: 'Edits go through; ask before anything else' },
   { id: 'bypassPermissions', label: 'Full access', what: 'Commands and edits without asking' },
+  { id: 'plan', label: 'Plan', what: 'Read and propose a plan; nothing changes until you approve it' },
 ]
 
 export const modeName = (id: string): string =>

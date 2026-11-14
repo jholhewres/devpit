@@ -72,8 +72,7 @@ fn one_turn(
     let mut result_seen = false;
 
     for line in lines {
-        if let Some(refused) = crate::control::refusal(&line) {
-            control.write(&refused);
+        if control.prompted(&line, heard.session_id.as_deref()) {
             continue;
         }
         if let Some(seen) = driver.session(&line) {
