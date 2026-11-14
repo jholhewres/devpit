@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChatQueue, Message } from '../gen/bindings'
 import { chatMessages } from './chatMessages'
 import { ChatPane } from './ChatPane'
+import { rereadViewPrefs, setViewPref } from './viewPrefs'
 
 /* What a step started — the queue read from disk, a steer's answer, a write —
    is settled before the next step looks, instead of polled for under a time
@@ -29,6 +30,7 @@ const chat = {
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  rereadViewPrefs()
   chat.sending = false
   chat.files = []
   vi.clearAllMocks()
@@ -184,5 +186,45 @@ describe('a paste of a megabyte of text', () => {
     const event = fireEvent.paste(field(), { clipboardData })
     expect(event).toBe(true)
     expect(chat.paste).not.toHaveBeenCalled()
+  })
+})
+
+describe('the send key and the follow-up, as Settings → Sessions set them', () => {
+  const typed = (): HTMLTextAreaElement => screen.getByRole('textbox', { name: 'Message to the agent' }) as HTMLTextAreaElement
+
+  it('with steer as the default, Enter steers what is typed and Mod+Enter queues it', async () => {
+    setViewPref('followUp', 'steer')
+    chat.sending = true
+    disk.queue = { items: [], paused: false }
+    render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
+    fireEvent.change(typed(), { target: { value: 'now please' } })
+    fireEvent.keyDown(typed(), { key: 'Enter' })
+    expect(chat.steer).toHaveBeenCalledWith('now please', { files: [], skills: [] })
+
+    fireEvent.change(typed(), { target: { value: 'after it' } })
+    fireEvent.keyDown(typed(), { key: 'Enter', ctrlKey: true })
+    await settled()
+    expect(chat.steer).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('after it')).toBeTruthy()
+  })
+
+  it('set to Mod+Enter, Enter leaves the field to write a new line and Mod+Enter sends', () => {
+    setViewPref('sendKey', 'modEnter')
+    render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
+    fireEvent.change(typed(), { target: { value: 'two lines' } })
+    expect(fireEvent.keyDown(typed(), { key: 'Enter' })).toBe(true)
+    expect(chat.say).not.toHaveBeenCalled()
+    fireEvent.keyDown(typed(), { key: 'Enter', ctrlKey: true })
+    expect(chat.say).toHaveBeenCalledWith('two lines', expect.any(Function))
+  })
+
+  it('the stash key puts the draft aside, and brings it back into an empty composer', () => {
+    render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
+    fireEvent.change(typed(), { target: { value: 'half a thought' } })
+    fireEvent.keyDown(typed(), { key: 'S', code: 'KeyS', ctrlKey: true, shiftKey: true })
+    expect(typed().value).toBe('')
+    expect(typed().placeholder).toMatch(/^A draft is put aside/)
+    fireEvent.keyDown(typed(), { key: 'S', code: 'KeyS', ctrlKey: true, shiftKey: true })
+    expect(typed().value).toBe('half a thought')
   })
 })

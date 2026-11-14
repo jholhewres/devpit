@@ -12,6 +12,15 @@ import { keepRebound, rebound } from './rebound'
 
 export type Scope = 'global' | 'board' | 'terminal' | 'chat' | 'file' | 'browser'
 
+/** What must hold, besides the scope, for a key to act. */
+export type When = 'composerFocus' | 'terminalFocus' | 'turnRunning'
+
+export const WHEN: Readonly<Record<When, string>> = {
+  composerFocus: 'the composer has focus',
+  terminalFocus: 'a terminal has focus',
+  turnRunning: 'a turn is running',
+}
+
 interface PerPlatform {
   readonly mac: readonly string[]
   readonly other: readonly string[]
@@ -28,6 +37,7 @@ interface Definition {
   readonly inTerminal: boolean
   /** Listed, never rebound: what a focused control does with Enter or Escape. */
   readonly fixed?: true
+  readonly when?: readonly When[]
 }
 
 const LIST = [
@@ -40,6 +50,8 @@ const LIST = [
   { id: 'focus', does: 'Turn focus mode on or off', scope: 'global', keys: ['Mod+Shift+F'], inTerminal: true },
   { id: 'shortcuts', does: 'Show the keyboard shortcuts', scope: 'global', keys: ['Mod+/', '?'], inTerminal: true },
   { id: 'rename', does: 'Rename the focused card, file or session', scope: 'global', keys: ['F2'], inTerminal: false },
+  { id: 'goToTab', does: 'Go to the tab in that place, 1 to 9', scope: 'global', keys: ['Mod+1', 'Mod+2', 'Mod+3', 'Mod+4', 'Mod+5', 'Mod+6', 'Mod+7', 'Mod+8', 'Mod+9'], inTerminal: false, fixed: true },
+  { id: 'reopenTab', does: 'Reopen the tab closed last', scope: 'global', keys: ['Mod+Shift+T'], inTerminal: false },
 
   { id: 'openCard', does: 'Open the focused card', scope: 'board', keys: ['Enter', 'Space'], inTerminal: false, fixed: true },
   { id: 'moveCard', does: 'Move the focused card to another column', scope: 'board', keys: ['Mod+M'], inTerminal: false },
@@ -54,20 +66,22 @@ const LIST = [
   { id: 'paste', does: 'Paste', scope: 'terminal', keys: { mac: ['Mod+V'], other: ['Ctrl+Shift+V', 'Shift+Insert'] }, inTerminal: true },
   /* Ctrl on a Mac too, as in Warp, whose key this is. */
   { id: 'compose', does: 'Write the next message to the agent in an editor', scope: 'terminal', keys: ['Ctrl+G'], inTerminal: true },
-  { id: 'previousCommand', does: 'Jump to the previous command', scope: 'terminal', keys: ['Alt+ArrowUp'], inTerminal: true },
-  { id: 'nextCommand', does: 'Jump to the next command', scope: 'terminal', keys: ['Alt+ArrowDown'], inTerminal: true },
+  { id: 'previousCommand', does: 'Jump to the previous command', scope: 'terminal', keys: ['Alt+ArrowUp'], inTerminal: true, when: ['terminalFocus'] },
+  { id: 'nextCommand', does: 'Jump to the next command', scope: 'terminal', keys: ['Alt+ArrowDown'], inTerminal: true, when: ['terminalFocus'] },
   /* The command line under a terminal answers to the shell's own keys. */
   { id: 'clearBlocks', does: 'Clear the blocks, from the command line', scope: 'terminal', keys: ['Ctrl+L'], inTerminal: false },
   { id: 'searchHistory', does: 'Search the command history, from the command line', scope: 'terminal', keys: ['Ctrl+R'], inTerminal: false },
   { id: 'clearLine', does: 'Clear the command line', scope: 'terminal', keys: ['Ctrl+C'], inTerminal: false },
 
   { id: 'attach', does: 'Attach files to the message', scope: 'chat', keys: ['Mod+Shift+A'], inTerminal: false },
-  { id: 'stopTurn', does: 'Stop the agent’s turn — press it twice', scope: 'chat', keys: ['Escape'], inTerminal: false, fixed: true },
+  { id: 'stopTurn', does: 'Stop the agent’s turn — press it twice', scope: 'chat', keys: ['Escape'], inTerminal: false, fixed: true, when: ['turnRunning'] },
   { id: 'findChat', does: 'Find in the conversation', scope: 'chat', keys: ['Mod+F'], inTerminal: false },
-  { id: 'steerNow', does: 'Send into the running turn now, instead of after it', scope: 'chat', keys: ['Mod+Enter'], inTerminal: false },
-  { id: 'steerQueued', does: 'Send the first queued message into the running turn', scope: 'chat', keys: ['Mod+Shift+Enter'], inTerminal: false },
-  { id: 'recallPrompt', does: 'Bring back an earlier prompt, in an empty composer', scope: 'chat', keys: ['ArrowUp'], inTerminal: false, fixed: true },
-  { id: 'recallNext', does: 'Go forward through the earlier prompts, back to an empty composer', scope: 'chat', keys: ['ArrowDown'], inTerminal: false, fixed: true },
+  { id: 'steerNow', does: 'Send the other way: into the running turn, or after it', scope: 'chat', keys: ['Mod+Enter'], inTerminal: false, when: ['composerFocus'] },
+  { id: 'steerQueued', does: 'Send the first queued message into the running turn', scope: 'chat', keys: ['Mod+Shift+Enter'], inTerminal: false, when: ['composerFocus', 'turnRunning'] },
+  { id: 'stashDraft', does: 'Put the draft aside, or bring it back', scope: 'chat', keys: ['Mod+Shift+S'], inTerminal: false, when: ['composerFocus'] },
+  { id: 'sendBackground', does: 'Send, and start a new chat while this one works', scope: 'chat', keys: ['Mod+Alt+Enter'], inTerminal: false, when: ['composerFocus'] },
+  { id: 'recallPrompt', does: 'Bring back an earlier prompt, in an empty composer', scope: 'chat', keys: ['ArrowUp'], inTerminal: false, fixed: true, when: ['composerFocus'] },
+  { id: 'recallNext', does: 'Go forward through the earlier prompts, back to an empty composer', scope: 'chat', keys: ['ArrowDown'], inTerminal: false, fixed: true, when: ['composerFocus'] },
   { id: 'nextMessage', does: 'Go to the next message', scope: 'chat', keys: ['Alt+ArrowDown'], inTerminal: false },
   { id: 'previousMessage', does: 'Go to the previous message', scope: 'chat', keys: ['Alt+ArrowUp'], inTerminal: false },
   { id: 'nextFailed', does: 'Go to the next tool that failed', scope: 'chat', keys: ['Alt+Shift+ArrowDown'], inTerminal: false },
@@ -83,6 +97,10 @@ export type ShortcutId = (typeof LIST)[number]['id']
 export type Shortcut = Definition & { readonly id: ShortcutId }
 
 export const SHORTCUT_LIST: readonly Shortcut[] = LIST
+
+/** When it acts, past its scope: "When the composer has focus.", or null. */
+export const whenOf = (one: Shortcut): string | null =>
+  one.when?.length ? `When ${one.when.map((need) => WHEN[need]).join(' and ')}.` : null
 
 export const SCOPES: readonly { readonly scope: Scope; readonly title: string }[] = [
   { scope: 'global', title: 'Anywhere' },

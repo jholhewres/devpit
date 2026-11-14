@@ -67,3 +67,25 @@ export function useDraft(conversationId: string, given: string | undefined): [st
   useEffect(() => () => keepDraft(conversationId, latest.current), [conversationId])
   return [text, setText]
 }
+
+const STASH = (conversationId: string): string => `devpit.chatStash.${conversationId}`
+
+export function keptStash(conversationId: string): string | null {
+  try {
+    return localStorage.getItem(STASH(conversationId))
+  } catch {
+    return null
+  }
+}
+
+/** The stash key swaps what is typed with what was put aside: either may be empty. */
+export function swapStash(conversationId: string, typed: string): string {
+  const back = keptStash(conversationId) ?? ''
+  try {
+    if (typed.trim()) localStorage.setItem(STASH(conversationId), typed)
+    else localStorage.removeItem(STASH(conversationId))
+  } catch {
+    return typed
+  }
+  return back
+}

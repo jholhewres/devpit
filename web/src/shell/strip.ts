@@ -82,6 +82,13 @@ export function closed(strip: Strip, id: string): Strip {
   }
 }
 
+/* The closed tabs a reopen can bring back, newest last. A terminal's shells
+   ended with its tab, so there is nothing of it to come back to. */
+export function kept(gone: readonly Tab[], tab: Tab, most = 20): Tab[] {
+  if (tab.kind === 'term') return [...gone]
+  return [...gone.filter((one) => one.id !== tab.id), tab].slice(-most)
+}
+
 /* `from`'s panes now live in `into`'s tree, so `from` leaves the strip
    without the close that would end its shells, and `into` reads its tree again. */
 export function joined(strip: Strip, from: string, into: string): Strip {
