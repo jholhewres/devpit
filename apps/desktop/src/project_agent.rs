@@ -28,6 +28,8 @@ pub(crate) const SESSION_METHODS: [&str; 2] = ["project_agent_consult", "project
 pub(crate) const QUESTIONS: u32 = 10;
 /// The longest proposal a session makes: one line of the memory.
 const PROPOSAL_CHARS: usize = 1000;
+/// The most proposals that wait at once, well within what the memory reads.
+const PENDING: usize = 50;
 /// What a brief says about the project agent starts here.
 const NUDGE: &str = "## The project agent";
 /// How long an agent nobody asks keeps its process.
@@ -36,7 +38,7 @@ pub(crate) const NOT_STARTED: &str = "the project agent could not start";
 /// Read-only whatever mode the profile's own settings choose.
 const READ_ONLY: &str = "plan";
 /// Plan mode keeps the profile's Bash allow rules; a deny rule wins over them.
-const DENIED: [&str; 8] = [
+const DENIED: [&str; 10] = [
     "Edit",
     "Write",
     "NotebookEdit",
@@ -45,6 +47,9 @@ const DENIED: [&str; 8] = [
     "Bash(git commit *)",
     "Bash(git push *)",
     "Bash(*>*)",
+    // A session's tools: consulting itself would wait on its own turn.
+    "mcp__devpit__devpit_project_agent_consult",
+    "mcp__devpit__devpit_project_agent_propose",
 ];
 
 /// What an agent is started with.
@@ -352,6 +357,11 @@ pub(crate) fn propose_for_session(
             "a proposal is one line of at most {PROPOSAL_CHARS} characters"
         ));
     }
+    if crate::project_memory::proposals(root).len() >= PENDING {
+        return Err(format!(
+            "{PENDING} proposals already wait for the person: ask them to decide those first"
+        ));
+    }
     crate::project_memory::propose(
         root,
         day,
@@ -380,6 +390,19 @@ pub(crate) fn nudged(prompt: &str, root: &Path) -> String {
          `.devpit/project-agent/` yourself.",
         prompt.trim_end()
     )
+}
+
+/// The session a consult comes from, within its project: the pane it runs
+/// in, else where it stands. What signs a comment names the CLI, not this.
+pub(crate) fn session_of(project_id: &str, params: &Value, cwd: &Path) -> String {
+    let pane = params
+        .get("pane")
+        .and_then(Value::as_str)
+        .filter(|pane| !pane.is_empty());
+    match pane {
+        Some(pane) => format!("{project_id} pane {pane}"),
+        None => format!("{project_id} at {}", cwd.display()),
+    }
 }
 
 /// The profile of an orchestrator linked to `project_id`, which its agent is
@@ -462,11 +485,7 @@ pub(crate) fn from_session(
         name: &here.name,
         mcp_config: mcp.as_deref(),
     };
-    // A session devpit did not start is known by where it stands.
-    let session = match asked.author.as_str() {
-        "" => cwd.display().to_string(),
-        author => author.to_owned(),
-    };
+    let session = session_of(&here.id, &asked.params, cwd);
     let (answer, left) = app
         .state::<Agents>()
         .consult(&here.id, &session, &wake, question)?;

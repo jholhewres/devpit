@@ -156,6 +156,8 @@ fn the_agent_is_refused_every_write_whatever_the_profile_allows() {
         "Bash(git commit *)",
         "Bash(git push *)",
         "Bash(*>*)",
+        "mcp__devpit__devpit_project_agent_consult",
+        "mcp__devpit__devpit_project_agent_propose",
     ] {
         assert!(
             start.contains(&format!("--disallowedTools={rule} ")),
@@ -409,6 +411,41 @@ fn a_sessions_proposal_writes_nothing_to_memory_until_approved() {
     for (kind, text) in [("secret", "x"), ("fact", "  ")] {
         assert!(propose_for_session(root, "2026-11-14", "#355", kind, text).is_err());
     }
+    // A session cannot fill the queue past what the memory reads back.
+    let refused = (0..100)
+        .find_map(|n| {
+            propose_for_session(
+                root,
+                "2026-11-14",
+                "#355",
+                "lesson",
+                &format!("Lesson {n}."),
+            )
+            .err()
+        })
+        .expect("proposals have no ceiling");
+    assert!(refused.contains("wait"), "{refused}");
+}
+
+/// What devpit sends names the CLI, never the session: two sessions are told
+/// apart by their panes, else by where they stand, and one project's budget
+/// is not another's.
+#[test]
+fn a_session_is_known_by_its_pane_within_its_project() {
+    let cwd = Path::new("/work/card-1");
+    let in_pane = |pane: &str| serde_json::json!({ "question": "Q", "pane": pane });
+    let one = session_of("p1", &in_pane("leaf_1"), cwd);
+    assert_ne!(one, session_of("p1", &in_pane("leaf_2"), cwd));
+    assert_ne!(one, session_of("p2", &in_pane("leaf_1"), cwd));
+    assert_eq!(
+        one,
+        session_of("p1", &in_pane("leaf_1"), Path::new("/elsewhere"))
+    );
+    let unpaned = serde_json::json!({ "question": "Q" });
+    assert_ne!(
+        session_of("p1", &unpaned, cwd),
+        session_of("p1", &unpaned, Path::new("/work/card-2"))
+    );
 }
 
 /// A session's brief says to consult the agent first, once; a project whose

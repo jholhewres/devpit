@@ -407,3 +407,47 @@ fn a_session_is_started_in_a_model_only_when_one_is_asked_for() {
     assert_eq!(schema["properties"]["model"]["type"], "string");
     assert_eq!(schema["required"], json!(["project", "prompt"]));
 }
+
+/// A consult's answer comes back whole: cut, the rest would be asked for
+/// again and spend another of the session's questions.
+#[test]
+fn a_consults_answer_comes_back_whole() {
+    let long = "x".repeat(crate::lean::BUDGET * 2);
+    let ask = |method: &str, _: Value| -> Result<Value, String> {
+        assert_eq!(method, "project_agent_consult");
+        Ok(json!({ "answer": long, "left": 3 }))
+    };
+    let said = reply(
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"devpit_project_agent_consult","arguments":{"question":"Where?"}}}"#,
+        &ask,
+    );
+    let text = said["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or_default();
+    assert!(text.contains(&long), "the answer was cut");
+    assert!(text.contains("\"left\":3"), "{text}");
+}
+
+/// A consult names the pane its session runs in, from the environment the
+/// CLI started this server with and never from the call: a session's budget
+/// is its own and cannot be renamed away.
+#[test]
+fn a_consult_names_its_sessions_pane_and_only_that() {
+    const CONSULT: &str = "devpit_project_agent_consult";
+    let env = |name: &str| (name == crate::hook::PANE_ENV).then(|| "leaf_1".to_owned());
+    let none = |_: &str| None;
+    let renamed = json!({ "question": "Q", "pane": "leaf_9" });
+    assert_eq!(
+        crate::consult::paned(CONSULT, renamed.clone(), &env),
+        json!({ "question": "Q", "pane": "leaf_1" })
+    );
+    assert_eq!(
+        crate::consult::paned(CONSULT, renamed, &none),
+        json!({ "question": "Q" })
+    );
+    let other = json!({ "cardId": "card_1", "pane": "leaf_9" });
+    assert_eq!(
+        crate::consult::paned("devpit_card", other.clone(), &env),
+        other
+    );
+}

@@ -2,7 +2,7 @@
 //! and told what is worth remembering. Apart from the orchestrator's and the
 //! assistant's tools, so their lists stay what they were.
 
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::listing::Seat;
 use crate::mcp::Tool;
@@ -36,4 +36,24 @@ pub(crate) fn offered(seat: &Seat) -> &'static [Tool] {
     } else {
         &[]
     }
+}
+
+/// A consult's arguments with the pane its session runs in, from the
+/// environment the CLI started this server with and never from the call: one
+/// session's budget is kept apart from another's, and cannot be renamed away.
+pub(crate) fn paned(
+    tool: &str,
+    mut arguments: Value,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Value {
+    if tool != TOOLS[0].name {
+        return arguments;
+    }
+    if let Some(fields) = arguments.as_object_mut() {
+        match env(crate::hook::PANE_ENV).filter(|pane| !pane.is_empty()) {
+            Some(pane) => fields.insert("pane".to_owned(), json!(pane)),
+            None => fields.remove("pane"),
+        };
+    }
+    arguments
 }

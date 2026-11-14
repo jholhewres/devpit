@@ -42,14 +42,16 @@ orchestrator, which has its own pair, and in a project whose agent was never
 asked, which has none yet. The agent is woken under the profile of an
 orchestrator linked to the project, as for a closed card.
 
-- **A budget of questions.** A session asks at most ten questions; `left`
-  says how many remain, and one past the budget is refused without reaching
-  the agent. A question the agent could not answer is not counted.
+- **A budget of questions.** A session, known by the pane it runs in (else
+  by where it stands), asks at most ten questions of its project's agent;
+  `left` says how many remain, and one past the budget is refused without
+  reaching the agent. A question the agent could not answer is not counted.
+  The answer comes back whole, never cut to fit.
 - **Proposals, never writes.** What a session wants remembered goes to
   `proposed.md`, with the card it came from (`cardId`, or the card whose
   checkout the session stands in) as its source, and waits for Approve, Edit
   or Discard like any other proposal. The memory files change only once the
-  person approves it.
+  person approves it. Each is one line, and at most fifty wait at once.
 - **Briefed to ask first.** A session the orchestrator starts in a project
   with an agent finds a short section after its task, under
   `## The project agent`: consult the agent before exploring broadly or
@@ -64,8 +66,9 @@ the profile of the orchestrator that woke it, with devpit's MCP tools. It
 runs in the CLI's plan mode whatever the profile's own settings choose, so it
 reads and never writes. Plan mode keeps the profile's Bash allow rules, so the
 process is also started with deny rules, which win over any allow rule:
-`Edit`, `Write`, `NotebookEdit`, and Bash's `rm`, `mv`, `git commit`,
-`git push` and any `>` redirect.
+`Edit`, `Write`, `NotebookEdit`, Bash's `rm`, `mv`, `git commit`,
+`git push` and any `>` redirect, and the sessions' own
+`devpit_project_agent_consult` and `devpit_project_agent_propose`.
 
 - **Wakes when called.** The first question starts the process. Further
   questions go to the same process, one at a time.
