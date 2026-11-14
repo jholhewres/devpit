@@ -33,7 +33,7 @@ pub(crate) const ORCHESTRATOR_ONLY: [&str; 14] = [
 pub(crate) const DECISIONS: [&str; 2] = ["devpit_decide", "devpit_rubric_run"];
 
 /// The tools that change nothing, which a host may run without asking.
-pub(crate) const READ_ONLY: [&str; 12] = [
+pub(crate) const READ_ONLY: [&str; 13] = [
     "devpit_context",
     "devpit_board",
     "devpit_card",
@@ -46,6 +46,7 @@ pub(crate) const READ_ONLY: [&str; 12] = [
     "devpit_reminders",
     "devpit_devflow_status",
     "devpit_devflow_skill",
+    "devpit_schedules",
 ];
 
 /// The tools whose change cannot be taken back: work in flight, a file.
@@ -61,6 +62,8 @@ pub(crate) const DESTRUCTIVE: [&str; 3] = [
 pub(crate) struct Seat {
     pub orchestrator: Option<bool>,
     pub decisions: Option<bool>,
+    /// An orchestrator whose Assistant mode is on.
+    pub assistant: Option<bool>,
 }
 
 impl Seat {
@@ -68,6 +71,7 @@ impl Seat {
         Seat {
             orchestrator: answer.get("orchestrator").and_then(Value::as_bool),
             decisions: answer.get("decisions").and_then(Value::as_bool),
+            assistant: answer.get("assistant").and_then(Value::as_bool),
         }
     }
 

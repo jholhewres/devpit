@@ -12,6 +12,7 @@
 //! keeps its state, and everything else is a socket and some JSON.
 
 pub mod apps;
+mod assistant;
 pub mod cli;
 pub mod client;
 pub mod devflow;

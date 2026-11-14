@@ -33,6 +33,7 @@ fn names(listed: &[Value]) -> Vec<&str> {
 const PROJECT: Seat = Seat {
     orchestrator: Some(false),
     decisions: Some(false),
+    assistant: None,
 };
 
 #[test]
@@ -41,6 +42,7 @@ fn every_tool_named_here_is_one_devpit_has() {
         .iter()
         .chain(&SETUP_TOOLS)
         .chain(STAGED.iter().map(|(_, tool)| tool))
+        .chain(&crate::assistant::TOOLS)
         .map(|tool| tool.name)
         .collect();
     for name in ORCHESTRATOR_ONLY
@@ -113,6 +115,7 @@ fn an_orchestrator_is_offered_its_own_tools_and_another_projects_board() {
     let seat = Seat {
         orchestrator: Some(true),
         decisions: Some(true),
+        assistant: None,
     };
     // The app answers `off` for an orchestrator: its folder is notes.
     let listed = tools(&Offer::Off, &seat);
@@ -195,6 +198,7 @@ fn the_project_agent_is_offered_to_the_orchestrator_alone() {
     let orchestrator = Seat {
         orchestrator: Some(true),
         decisions: Some(false),
+        assistant: None,
     };
     for name in ["devpit_project_agent_ask", "devpit_project_agent_brief"] {
         let tool = TOOLS
@@ -205,4 +209,47 @@ fn the_project_agent_is_offered_to_the_orchestrator_alone() {
         assert!(!PROJECT.offers(tool), "{name}");
         assert!(tool.description.contains("project agent"), "{name}");
     }
+}
+
+/// Assistant mode adds its tools to the orchestrator's list, and only it: with
+/// the mode off, or an app too old to say, the list is the one it always was.
+#[test]
+fn the_assistants_tools_come_with_assistant_mode_alone() {
+    let orchestrator = |assistant| Seat {
+        orchestrator: Some(true),
+        decisions: Some(false),
+        assistant,
+    };
+    let before = names(&tools(&Offer::Off, &orchestrator(None))).join(",");
+    let off = names(&tools(&Offer::Off, &orchestrator(Some(false)))).join(",");
+    assert_eq!(off, before, "the list without the mode changed");
+    let on = tools(&Offer::Off, &orchestrator(Some(true)));
+    let on = names(&on);
+    for tool in &crate::assistant::TOOLS {
+        assert!(on.contains(&tool.name), "{} was not listed", tool.name);
+        assert!(
+            !before.split(',').any(|name| name == tool.name),
+            "{}",
+            tool.name
+        );
+    }
+    assert_eq!(
+        on.len(),
+        before.split(',').count() + crate::assistant::TOOLS.len()
+    );
+}
+
+/// The person turning the mode on or off changes the list the server offers,
+/// and the client is told so.
+#[test]
+fn turning_assistant_mode_on_or_off_changes_the_list() {
+    let root = tempfile::tempdir().expect("tmp");
+    let mut watch = Watch::new(root.path());
+    let looked = watch.due().expect("due");
+    let off = json!({ "offer": "off", "orchestrator": true, "assistant": false });
+    assert!(watch.settle(looked.clone(), Ok(off.clone())).is_some());
+    assert!(watch.settle(looked.clone(), Ok(off)).is_none());
+    let on = json!({ "offer": "off", "orchestrator": true, "assistant": true });
+    assert!(watch.settle(looked, Ok(on)).is_some());
+    assert_eq!(watch.seat.assistant, Some(true));
 }
