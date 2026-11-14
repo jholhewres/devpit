@@ -3,10 +3,16 @@
 What changed between releases, written for the people who use devpit. The
 release notes are taken from here when a version is tagged.
 
-## Unreleased
+## 0.1.50 — 2026-11-14
 
 ### Chat
 
+- **Answers stream smoothly, even in a long chat.** An answer moves as
+  it arrives instead of standing still and jumping, and each new block
+  fades in (at once, with reduced motion). Only the turn being written is
+  drawn again, so the rest of the chat stays still, and a turn starts and
+  ends without waiting on git. The chat uses one scale for its type,
+  corners and spacing, and answers are drawn at full contrast.
 - **Every chat keeps its agent running between your messages.** A message
   starts its answer without starting the agent again, a model or mode picked
   mid-conversation applies to the agent already running, and Stop interrupts
@@ -17,6 +23,122 @@ release notes are taken from here when a version is tagged.
   own background tasks, as an orchestrator does: what it says then appears in
   the chat, marked as not in answer to you. The supervised mode still starts
   the agent for each message.
+- **Stop always stops, and a steer says when it was missed.** A stop sent
+  before the agent has started stops it as it starts, a stop the agent does
+  not heed can be forced, and Force stop ends the turn's tools on every
+  platform. A steer the agent never took in says so under it, with Resend.
+- **Act on any message.** Hover over a message to copy it, edit from
+  there, fork the conversation or send it again. Edit from here can put
+  back the files the later turns changed. Retry sits beside Continue when
+  a turn failed, and a refused request can carry your reason to the agent.
+  Select words in an answer to quote them, click a `file:line` to open it
+  beside the chat, and click a picture to zoom it. Each turn ends with one
+  quiet line: when, which model and effort, how long, how full the context
+  was and what it cost.
+- **Show as much of the work as you want.** The Activity menu shows all
+  of it, hides what succeeded, hides it all, or keeps only your messages
+  and the answers (Zen). Subagents started together are one row with each
+  one's state. Work left running sits behind one chip by the composer,
+  with a Stop for each task and the wakeup the turn set. An opened tool
+  row shows its whole input and output, with copy buttons, and names its
+  MCP server. A thought says how long it took, and every control reached
+  by the keyboard shows a focus ring.
+- **Conversations are easier to find, keep and share.** Sidebar rows say
+  which agent runs, whether it is working, waiting on you or finished,
+  and its branch, project and last message time, grouped as In progress
+  and Settled. A header over the chat holds its title (click to rename),
+  card, context meter, cost and export; right-click it to choose which
+  details it shows. Conversations can be pinned, settled, snoozed, marked
+  unread or archived, the command palette finds what was said in any
+  project's conversations, and export copies a conversation as markdown,
+  with or without its tool calls. Alt+↑ and Alt+↓ move between messages.
+- **Clearer states.** A turn refused by a usage limit or an outage shows a
+  banner with Try again, and Resume when it resets when the time is known.
+  Screen readers hear a turn start and end, and each message says who
+  spoke. A picture an answer names on this machine is drawn in it. A plan
+  is approved as written, edited or refused, and approving it leaves plan
+  mode. `/btw` asks a side question while a turn runs, answered apart from
+  the conversation.
+
+### Project agent & Assistant
+
+- **Each project has its own agent.** It reads the project, never changes
+  it, and keeps a dated, sourced memory of facts, lessons and decisions in
+  `.devpit/project-agent/`. The orchestrator asks it about the project and
+  has it write the brief a card's session starts with. It wakes when
+  asked and rests after ten minutes.
+- **Ask the project from its sidebar.** "Ask the project" opens a chat
+  with the project's agent. Answers name the files they rest on, and an
+  answer can be saved as a fact once you approve it.
+- **Sessions consult it while they work.** A session can ask its project's
+  agent up to ten questions and propose what to remember. Nothing enters
+  the memory until you approve it.
+- **The memory learns from finished cards and stays current.** A card that
+  reaches done proposes lessons and decisions; you approve, edit or
+  discard each, and approved lessons reach briefs and reviews. An entry
+  whose files changed is checked again, and a stale one is proposed for
+  update or removal. A card shows the decisions that name it.
+- **Assistant mode for an orchestrator.** A toggle in the orchestrator's
+  chat. Schedules in its sidebar list every reminder and routine, and
+  routines run at their time. A heartbeat (Settings → Assistant) looks for
+  failing checks on open pull requests, sessions stuck on a question and
+  blocked cards, and speaks once about what needs you. Notices reach
+  Telegram, where a stuck session's question can be answered with its
+  buttons. Back after 30 minutes away, the orchestrator briefs you on what
+  ran, what merged and what waits for your decision.
+
+### Settings
+
+- **Merged cards clean up after themselves.** Once a card's branch has
+  landed, devpit removes its worktree, build cache and local branch, a few
+  minutes after start and every hour. A checkout with uncommitted work or
+  a running process is kept and listed. Settings → Worktrees → Cleanup
+  says what went and how much space it freed, and Delete now runs it.
+- **Branch names you choose.** A new card's branch is named
+  `{type}/{number}-{slug}`, such as `fix/351-flaky-tests`, and the pattern
+  is a setting in Settings → Worktrees.
+- **Defaults per project.** The default model, permission mode and branch
+  name can be set for one project, or in the repository's
+  `.devpit/settings.json`. Each row says where its value comes from. A
+  repository may only start chats in Supervised or Plan.
+- **More control over providers.** A Claude profile lists its models, each
+  with an on/off switch, and sets an advisor model and a subagent model.
+  Sign-ins and MCP servers are checked every 1, 5, 15 or 30 minutes.
+- **A long idle Claude conversation can be compacted.** Pick it on a
+  Claude profile in Settings → Providers: when you return, or just before
+  its prompt cache expires, so the next turn does not read the whole
+  context again uncached. Off by default.
+- **Maintenance and Diagnostics.** A power saver that slows devpit's
+  background checks while you are away or on battery. Logs and run
+  artifacts can be kept for 7 to 90 days. Labs turns the project agent
+  and the canvas on or off. Diagnostics shows devpit's own processes with
+  their CPU and memory, its checks with their fixes, and the newest
+  entries of its error log.
+- **Your preferences for chat and display.** Send with Enter or
+  Ctrl+Enter, and queue or steer while a turn runs. Text and code sizes,
+  more contrast, LaTeX maths, and how diffs open. Keyboard shortcuts say
+  when they act, and new ones go to a tab by number, reopen a closed tab,
+  set a draft aside and send in the background.
+- **An orchestrator's guardrails.** Settings → Orchestrator → Guardrails
+  sets, for each confirmation, whether it follows the chat's permission,
+  always asks or never asks. A stop or a draft your words do not cover
+  now waits above the composer for one click, Stop all or Send all,
+  instead of being refused. A click stops only on the loss it showed, and
+  a stop whose names read more than one way stops nothing.
+- **Settings is easier to find your way in.** General keeps only what is
+  general; notifications, sessions and the rest have panes of their own,
+  and search still finds every row.
+- **devpit in a terminal shows a menu.** Open devpit, see its status,
+  update it or run its diagnostics from the keyboard. Subcommands and
+  scripts get plain lines.
+- **Archived conversations and an About page.** An archived conversation
+  leaves the sidebar, the palette and every other list, and Settings →
+  Archive restores it. Settings → About shows the version and platform,
+  and opens the privacy policy, the licence and the open-source notices.
+- **Commit messages drafted in the repository's style.** On an empty
+  message, the Changes panel offers Draft a message: a subject for the
+  staged changes, written the way the repository's history writes them.
+  It only fills the field; nothing is committed on its own.
 
 ### Fixes
 
@@ -28,6 +150,9 @@ release notes are taken from here when a version is tagged.
   unless you turn on "Show the island anyway" under Settings →
   Notifications. Sessions waiting on you still reach you as
   notifications.
+- **A chat's cost counts each turn once.** With the agent kept running,
+  each turn reported what the whole process had spent. It now counts only
+  what it added, in every chat and in an orchestrator's.
 - **Coming back to a project draws its terminals sooner.** Switching
   projects moved the terminals of the project you left inside the
   window, and each move made the whole window work out its styles again.
@@ -37,6 +162,30 @@ release notes are taken from here when a version is tagged.
   zsh waiting at its prompt now and then quit on one of those resizes,
   leaving the pane empty. A shell at its prompt is no longer resized to
   be redrawn: coming back already draws what it showed.
+- **The board redraws only the cards that changed**, so a busy board
+  stays quick when it is read again.
+- **A safer sign-in from the browser.** "Open in browser" no longer puts
+  a lasting token on the browser's command line, and on Linux the
+  one-time code is accepted only over your own connection. devpit's local
+  servers read a request within a deadline and serve at most 256
+  connections, and the terminal keeper's folder is yours alone.
+- **devflow in other tools keeps your files as they were.** Codex's
+  config is read as TOML, so an entry written another way is found and
+  updated in place. JSON files keep their order, indentation and line
+  endings, and each file keeps one backup.
+- **Smaller fixes.** Scrolling back through a terminal no longer stops at
+  a progress bar. An agent run as a script is named by its script. A
+  command waiting to be allowed sits in a box of capped height. Two tests
+  that failed now and then on macOS are deterministic, and one of them
+  found git reading an early `--since` time as now.
+
+### Installer
+
+- **The installer shows what it is doing.** On a terminal, `install.sh`
+  draws a banner, says which version it installs or updates from and to,
+  shows a download bar and ticks off each step. Piped, in CI or with
+  `TERM=dumb` it prints the same plain lines as before, and `NO_COLOR`
+  drops the colour.
 
 ## 0.1.49 — 2026-11-05
 
