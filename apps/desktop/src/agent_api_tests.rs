@@ -79,6 +79,28 @@ fn it_says_what_it_answers() {
 }
 
 #[test]
+fn the_terminals_status_is_answered_from_anywhere() {
+    let said: Value =
+        serde_json::from_str(&answer(None, r#"{"method":"status","cwd":"/"}"#)).expect("json");
+    assert!(said["ok"]["running"].is_u64(), "{said}");
+    assert!(said["ok"]["waiting"].is_u64(), "{said}");
+}
+
+#[test]
+fn the_terminals_pairing_is_asked_of_no_project() {
+    // Remote is off in the tests' home, unless another test turned it on.
+    let said = answer(None, r#"{"method":"pair","cwd":"/"}"#);
+    assert!(
+        !said.contains("does not answer") && !said.contains("no devpit project contains"),
+        "{said}"
+    );
+    assert!(
+        said.contains("turn Remote on first") || said.contains("\"code\""),
+        "{said}"
+    );
+}
+
+#[test]
 fn a_comment_is_signed_by_an_agent_devpit_knows_or_by_nobody_in_particular() {
     assert_eq!(signed("claude"), "claude");
     assert_eq!(signed("codex"), "codex");

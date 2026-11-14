@@ -176,6 +176,18 @@ fn respond(app: Option<&AppHandle>, asked: &Asked) -> Result<Value, String> {
         let app = app.ok_or("no window to check from")?;
         return Ok(json!(crate::agent_door::health_now(app)));
     }
+    // `devpit status` and `devpit pair` in a terminal, also of no project. A
+    // pairing still waits for the person to allow the device on screen.
+    if asked.method == "status" {
+        return Ok(json!(crate::checkup::sessions_of(
+            &crate::island_feed::now()
+        )));
+    }
+    if asked.method == "pair" {
+        return crate::remote::pair_now(false)
+            .map(|pairing| json!(pairing))
+            .map_err(|err| err.message);
+    }
     if !METHODS.contains(&asked.method.as_str()) {
         return Err(format!(
             "devpit does not answer `{}` — `devpit-agent methods` lists what it does",
