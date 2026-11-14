@@ -100,7 +100,8 @@ export const commands = {
 	/**  `chat.prompts` — what the person said in the whole conversation, and where. */
 	chatPrompts: (projectId: string, conversationId: string) => typedError<ConversationPrompts, RpcError>(__TAURI_INVOKE("chat_prompts", { projectId, conversationId })),
 	/**
-	 *  `chat.list` — every conversation this project has had.
+	 *  `chat.list` — every conversation this project has had, but the archived
+	 *  ones, which `chat.archived` lists.
 	 * 
 	 *  The transcripts were always on disk; nothing listed them, so closing a tab
 	 *  left a file nobody could reach again.

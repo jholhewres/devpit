@@ -27,6 +27,8 @@ export function Threads(): React.JSX.Element {
   const [threads, setThreads] = useState<readonly Thread[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showing, setShowing] = useState(false)
+  /* A tab opened or closed may be one archived or restored meanwhile: read again. */
+  const tabs = open.map((tab) => tab.id).join(' ')
 
   useEffect(() => {
     if (!project || !showing) return
@@ -34,7 +36,7 @@ export function Threads(): React.JSX.Element {
       setThreads(answer.data?.conversations ?? [])
       setError(answer.error)
     })
-  }, [project, showing])
+  }, [project, showing, tabs])
 
   /* A conversation already open is not somewhere to go — it is a tab. */
   const here = new Set(open.map((tab) => tab.id))
