@@ -70,6 +70,13 @@ pub(crate) fn start(args: &[String], terminal: bool, dev: bool) -> Start {
     }
 }
 
+/// Whether the menu may take this terminal: stdin and stdout are one, and
+/// this process is in its foreground group. `devpit &` is not, and would stop
+/// on SIGTTOU at the first key read instead of opening the app.
+pub(crate) fn owns_terminal(stdin: bool, stdout: bool, foreground: Option<i32>, own: i32) -> bool {
+    stdin && stdout && foreground == Some(own)
+}
+
 /// A key, as one read of a terminal in raw mode hands it over.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Key {

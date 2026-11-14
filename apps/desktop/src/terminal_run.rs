@@ -9,7 +9,13 @@ use crate::terminal::{self, Item, Look, Start};
 /// the app.
 pub(crate) fn from_args() -> Option<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let terminal = cfg!(unix) && std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+    let (foreground, own) = groups();
+    let terminal = terminal::owns_terminal(
+        std::io::stdin().is_terminal(),
+        std::io::stdout().is_terminal(),
+        foreground,
+        own,
+    );
     match terminal::start(&args, terminal, cfg!(debug_assertions)) {
         Start::Window => None,
         Start::Menu => Some(menu()),
@@ -21,6 +27,20 @@ pub(crate) fn from_args() -> Option<i32> {
             Some(2)
         }
     }
+}
+
+/// The terminal's foreground process group, if it has one, and this process's.
+#[cfg(unix)]
+fn groups() -> (Option<i32>, i32) {
+    // SAFETY: both only read process groups.
+    let foreground = unsafe { libc::tcgetpgrp(libc::STDIN_FILENO) };
+    let own = unsafe { libc::getpgrp() };
+    ((foreground >= 0).then_some(foreground), own)
+}
+
+#[cfg(not(unix))]
+fn groups() -> (Option<i32>, i32) {
+    (None, 0)
 }
 
 /// One item done, its output under it moved right by `pad`; the exit code.
