@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 
 import { ask, commands } from './live'
 import { went } from './problems'
+import { abandoned } from './typing'
 
 /* A picture in the thread that opens as large as the window allows. `path`
    when it is a file, which the system's own viewer can open. */
@@ -23,7 +24,7 @@ export function Zoomable({ src, name, path = null, className }: { src: string; n
 function Zoom({ src, name, path, onClose }: { src: string; name: string; path: string | null; onClose: () => void }): React.JSX.Element {
   useEffect(() => {
     const key = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
+      if (abandoned(event)) onClose()
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)

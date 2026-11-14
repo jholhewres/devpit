@@ -4,6 +4,7 @@ import type { Question } from '../gen/bindings'
 import { allowKey, questionsOf, subjectOf, useFocused, type Chosen } from './choices'
 import { Choosing } from './Choosing'
 import { Markdown } from './MarkdownView'
+import { committed, composing } from './typing'
 
 /*
  * What the agent is waiting to be allowed to do, or waiting to be told.
@@ -63,6 +64,7 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
       ref={card}
       tabIndex={-1}
       onKeyDown={(event) => {
+        if (composing(event)) return
         const said = allowKey(event.key, event.target === event.currentTarget)
         if (!said) return
         event.preventDefault()
@@ -99,7 +101,7 @@ function Allowing({ question, onAnswer }: { question: Question; onAnswer: (said:
           aria-label="Reason for refusing, told to the agent"
           onChange={(event) => setWhy(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key !== 'Enter' || !why.trim()) return
+            if (!committed(event) || !why.trim()) return
             event.preventDefault()
             onAnswer('deny', why)
           }}
