@@ -2,6 +2,7 @@ import { AgentGlyph } from './AgentGlyph'
 import type { Entry } from './catalogue'
 import { IdleCompact } from './IdleCompact'
 import { ProfileEditor } from './ProfileEditor'
+import { ProfileModels } from './ProfileModels'
 import type { Draft } from './profiles'
 import type { KnownAgent } from '../gen/bindings'
 import { ask, commands } from './live'
@@ -134,6 +135,7 @@ export function AgentRow({
           onRemove={entry.mine ? onRemove : undefined}
         />
       )}
+      {open && entry.base === 'claude' && <ProfileModels profileId={entry.id} draft={entry.mine ? draft : null} onDraft={onDraft} />}
       {open && entry.base === 'claude' && <IdleCompact profileId={entry.id} />}
     </>
   )

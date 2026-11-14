@@ -201,12 +201,14 @@ mod post;
 mod prime;
 mod prime_command;
 mod prime_paths;
+mod profile_models;
 mod profile_waiting;
 mod project_agent;
 mod project_lessons;
 mod project_memory;
 mod project_naming;
 mod project_proposals;
+mod project_settings;
 mod projects;
 #[cfg(unix)]
 mod ptyd_attach;

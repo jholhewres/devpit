@@ -1388,6 +1388,22 @@ export const commands = {
 	maintenanceWrite: (powerSaver: boolean | null, keepDays: number | null, projectAgent: boolean | null, canvas: boolean | null) => typedError<Maintenance, RpcError>(__TAURI_INVOKE("maintenance_write", { powerSaver, keepDays, projectAgent, canvas })),
 	/**  `maintenance.clean_now` — the Delete now button, at the days chosen. */
 	maintenanceCleanNow: () => typedError<Maintenance, RpcError>(__TAURI_INVOKE("maintenance_clean_now")),
+	/**  `profile.models_read` */
+	profileModelsRead: (profileId: string) => typedError<ProfileModels, RpcError>(__TAURI_INVOKE("profile_models_read", { profileId })),
+	/**  `profile.models_write` — the whole of one profile's models, replaced. */
+	profileModelsWrite: (profileId: string, models: ProfileModels) => typedError<ProfileModels, RpcError>(__TAURI_INVOKE("profile_models_write", { profileId, models })),
+	/**  `providers.check_read` */
+	providersCheckRead: () => typedError<ProviderChecks, RpcError>(__TAURI_INVOKE("providers_check_read")),
+	/**  `providers.check_write` */
+	providersCheckWrite: (minutes: number) => typedError<ProviderChecks, RpcError>(__TAURI_INVOKE("providers_check_write", { minutes })),
+	/**  `project.settings_read` — `projectId` empty for the machine's. */
+	projectSettingsRead: (projectId: string | null) => typedError<ProjectSettings, RpcError>(__TAURI_INVOKE("project_settings_read", { projectId })),
+	/**
+	 *  `project.settings_write` — a project's own settings, replaced; for the
+	 *  machine, its model and permission mode (its branch name is chosen where it
+	 *  always was, in Settings → Worktrees).
+	 */
+	projectSettingsWrite: (projectId: string | null, settings: Scoped) => typedError<ProjectSettings, RpcError>(__TAURI_INVOKE("project_settings_write", { projectId, settings })),
 	/**  `worktree.sources` — the kinds this project has, and which are shown. */
 	worktreeSources: (projectId: string | null) => typedError<Source[], RpcError>(__TAURI_INVOKE("worktree_sources", { projectId })),
 	/**  `worktree.source_show` — shows or hides one kind. */
@@ -4947,6 +4963,14 @@ export type Profile = {
 	enabled?: boolean,
 };
 
+/**  One profile's models, as Settings shows them. */
+export type ProfileModels = {
+	/**  Left out of the model picker. */
+	modelsOff?: string[],
+	/**  Written as `advisorModel` into the settings devpit starts it with. */
+	advisorModel?: string | null,
+};
+
 /**
  *  A profile that came from another machine and waits for the person here
  *  before it can start: values only this machine may hold, or a base URL
@@ -5095,6 +5119,19 @@ export type ProjectRun = {
 	cardTitle: string,
 };
 
+/**  One scope's settings, beside where each applied value came from. */
+export type ProjectSettings = {
+	/**  The project's own; empty when the scope is the machine. */
+	own: Scoped,
+	/**  From the repository's `.devpit/settings.json`. */
+	repo: Scoped,
+	machine: Scoped,
+	/**  What a new chat or worktree of this scope gets. */
+	applied: Scoped,
+	/**  Why the repository's file was left out, when it was. */
+	repoProblem: string | null,
+};
+
 export type ProjectTree = {
 	nodes: FileNode[],
 };
@@ -5120,6 +5157,11 @@ export type ProposedReminder = {
 	at: number | null,
 	projectId: string,
 	project: string | null,
+};
+
+/**  How often sign-ins and MCP servers are checked. */
+export type ProviderChecks = {
+	minutes: number,
 };
 
 /**  What the agent wants to do, as the screen puts it. */
@@ -5708,6 +5750,13 @@ export type ScheduleState =
 export type Schedules = {
 	schedules: Schedule[],
 	proposed: ScheduleProposal[],
+};
+
+/**  The settings a scope can hold, each unset unless chosen. */
+export type Scoped = {
+	model?: string | null,
+	permissionMode?: string | null,
+	branchPattern?: string | null,
 };
 
 export type SearchFile = {

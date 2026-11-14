@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Credentials, SignIns } from '../gen/bindings'
 import { useAway } from './away'
 import { ask, commands } from './live'
+import { useCheckEvery } from './providerChecks'
 import { useShell } from './useShell'
 
 /*
@@ -11,8 +12,6 @@ import { useShell } from './useShell'
  * AWS profile, gcloud, gh — asked of their CLIs. An expired one is seen here
  * before a session finds it halfway through a task.
  */
-
-const EVERY_MS = 5 * 60 * 1000
 
 export const ACCOUNT_WORDS: Record<Credentials, string> = {
   saved: 'signed in',
@@ -52,9 +51,13 @@ export function SignInChip({ projectId }: { projectId: string | null }): React.J
 
   useEffect(() => {
     check()
-    const every = window.setInterval(() => document.visibilityState === 'visible' && check(), EVERY_MS)
-    return () => window.clearInterval(every)
   }, [check])
+  /* As often as Settings → Providers says; a new choice restarts the wait. */
+  const everyMs = useCheckEvery()
+  useEffect(() => {
+    const every = window.setInterval(() => document.visibilityState === 'visible' && check(), everyMs)
+    return () => window.clearInterval(every)
+  }, [check, everyMs])
 
   if (!signIns && !error) return null
   if (signIns && signIns.accounts.length + signIns.needed.length === 0) return null

@@ -120,6 +120,14 @@ pub const LOCAL: &[(&str, &str)] = &[
         "goes with the calendar on this machine",
     ),
     (key::SYNC, "sync is turned on per machine"),
+    (
+        key::AGENTS_PROFILE_MODELS,
+        "beside the profiles, whose own sync is apart",
+    ),
+    (key::PROVIDERS_CHECK_MINUTES, "how often this machine asks"),
+    (key::CHAT_MODEL, "the models this machine reaches"),
+    (key::CHAT_PERMISSION, "how this machine's chats start"),
+    (key::PROJECT_SETTINGS, "the projects on this machine"),
 ];
 
 /// Whether `name` is a preference that follows the person.

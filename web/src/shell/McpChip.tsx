@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { McpHealth, McpServerHealth } from '../gen/bindings'
 import { useAway } from './away'
 import { ask, commands } from './live'
+import { useCheckEvery } from './providerChecks'
 
 /*
  * The MCP servers the default account has, as its CLI finds them when it
@@ -12,8 +13,6 @@ import { ask, commands } from './live'
  * the CLI when that has run out, and a session's start reads it without
  * waiting.
  */
-
-const EVERY_MS = 5 * 60 * 1000
 
 /** Connected out of all, and whether anything needs looking at. */
 export function summed(servers: readonly McpServerHealth[]): { up: number; all: number; bad: boolean } {
@@ -58,9 +57,13 @@ export function McpChip({ projectId }: { projectId: string | null }): React.JSX.
 
   useEffect(() => {
     check(false)
-    const every = window.setInterval(() => document.visibilityState === 'visible' && check(false), EVERY_MS)
-    return () => window.clearInterval(every)
   }, [check])
+  /* As often as Settings → Providers says; a new choice restarts the wait. */
+  const everyMs = useCheckEvery()
+  useEffect(() => {
+    const every = window.setInterval(() => document.visibilityState === 'visible' && check(false), everyMs)
+    return () => window.clearInterval(every)
+  }, [check, everyMs])
 
   if (!health && !error) return null
   const { up, all, bad } = summed(health?.servers ?? [])

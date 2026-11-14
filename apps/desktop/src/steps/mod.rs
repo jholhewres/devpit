@@ -56,10 +56,25 @@ pub(crate) fn fresh_session_id() -> String {
 /// still has a file to read, and a path that changes every run would be a new
 /// file on disk for every card moved.
 pub(crate) fn hook_settings() -> Option<String> {
+    hook_settings_for(None)
+}
+
+/// [`hook_settings`] for a session of `profile_id`: a file of the profile's
+/// own when it has an advisor model, devpit's shared one otherwise. The
+/// profile's own settings file is never touched.
+pub(crate) fn hook_settings_for(profile_id: Option<&str>) -> Option<String> {
     let root = Store::root().ok()?;
     let endpoint = devpit_agentcli::endpoint_file(&root);
-    let path = root.join("hooks.json");
-    let wanted = devpit_agentcli::settings_json(&endpoint, &devpit_agentcli::auth_file(&root));
+    let advisor = profile_id.and_then(|id| {
+        let store = Store::open_default().ok()?;
+        crate::profile_models::of(&store, id).advisor_model
+    });
+    let path = crate::profile_models::hooks_file(&root, profile_id.filter(|_| advisor.is_some()));
+    let wanted = devpit_agentcli::settings_json_advised(
+        &endpoint,
+        &devpit_agentcli::auth_file(&root),
+        advisor.as_deref(),
+    );
 
     // Rewritten only when it differs, so a turn does not touch the disk for
     // nothing.

@@ -185,3 +185,13 @@ export function onProfilesChanged(then: () => void): () => void {
   window.addEventListener(PROFILES_CHANGED, then)
   return () => window.removeEventListener(PROFILES_CHANGED, then)
 }
+
+/** The variable a profile's subagent model is given as. */
+export const SUBAGENT_VAR = 'CLAUDE_CODE_SUBAGENT_MODEL'
+
+/** The draft with its subagent model set, or gone when empty. */
+export function withSubagent(draft: Draft, model: string): Draft {
+  const env = draft.env.filter((one) => one.name !== SUBAGENT_VAR)
+  const value = model.trim()
+  return { ...draft, env: value ? [...env, { name: SUBAGENT_VAR, value }] : env }
+}

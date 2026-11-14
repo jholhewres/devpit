@@ -150,6 +150,8 @@ export function useChat(conversationId: string): Chat {
   /* What the conversation's own head said it last ran with; the profile's
      last pick only fills what that leaves empty. */
   const stored = useRef<Modes>({})
+  /* The mode a new chat of this project starts in, when it says one. */
+  const startsIn = useRef<string | null>(null)
 
   /* A turn still running when this chat opens — it was left, or the window
      reloaded — is joined where it is, instead of being said to have died. */
@@ -230,6 +232,17 @@ export function useChat(conversationId: string): Chat {
         setRewindable(past.data.rewindable ?? [])
         rejoined(project.id, false, past.data.messages.at(-1)?.id ?? null)
       }
+      startsIn.current = null
+      if (!past.data?.sessionId && (past.data?.messages.length ?? 0) === 0) {
+        /* A new chat starts as its project says: its own, its repo's, then this machine's. */
+        const said = await ask(() => commands.projectSettingsRead(project.id))
+        if (!now.open()) return
+        const applied = said.data?.applied
+        if (applied?.model) setModel(applied.model)
+        const mode = MODES.find((one) => one.id === applied?.permissionMode)?.id ?? null
+        startsIn.current = mode
+        if (mode) setPermission(mode)
+      }
       const installed = pickable(found.data ?? [], belongs)
       setProfiles(installed)
       /* The driver's own default, until someone picks otherwise. */
@@ -249,7 +262,9 @@ export function useChat(conversationId: string): Chat {
     const open = reopened(conversationId, stored.current, profileId)
     // An orchestrator in the supervised mode would be deaf between turns:
     // its process stays only when nothing waits on a question.
-    const permission = open.permission ?? (project?.orchestrator ? 'acceptEdits' : undefined)
+    // This conversation's own pick, then its project's, then the profile's last.
+    const own = reopened(conversationId, stored.current, null).permission
+    const permission = own ?? startsIn.current ?? open.permission ?? (project?.orchestrator ? 'acceptEdits' : undefined)
     if (permission) setPermission(permission)
     if (open.effort) setEffort(open.effort)
   }, [profileId, conversationId, project?.orchestrator])

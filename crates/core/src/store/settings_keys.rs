@@ -162,3 +162,13 @@ pub const CALENDAR_LINK: &str = "calendar.link";
 pub const CALENDAR_TITLES: &str = "calendar.titles";
 /// Whether this machine syncs with the account's others. Off unless turned on.
 pub const SYNC: &str = "sync.enabled";
+/// Each profile's models switched off and its advisor model, by profile id, as JSON.
+pub const AGENTS_PROFILE_MODELS: &str = "agents.profile_models";
+/// Minutes between checks of sign-ins and MCP servers. Absent is five.
+pub const PROVIDERS_CHECK_MINUTES: &str = "providers.check_minutes";
+/// The model a new chat starts with on every project. Absent is the CLI's own.
+pub const CHAT_MODEL: &str = "chat.default_model";
+/// The permission mode a new chat starts with on every project. Absent is the first.
+pub const CHAT_PERMISSION: &str = "chat.default_permission";
+/// What each project sets for itself over the machine and its repo, by project id, as JSON.
+pub const PROJECT_SETTINGS: &str = "projects.settings";

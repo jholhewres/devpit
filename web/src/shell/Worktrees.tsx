@@ -5,6 +5,7 @@ import { Confirm } from './Confirm'
 import { bytes } from './disk'
 import { ask, commands } from './live'
 import { useShell } from './useShell'
+import { ScopedSetting } from './ScopedSetting'
 import { Sources } from './Sources'
 import { WorktreeBase } from './WorktreeBase'
 import { WorktreeBranch } from './WorktreeBranch'
@@ -57,6 +58,7 @@ export function Worktrees(): React.JSX.Element {
 
       <WorktreeBase />
       <WorktreeBranch />
+      <ScopedSetting field="branchPattern" />
       <Sources />
 
       <p className="prefs__gt">Cleanup</p>

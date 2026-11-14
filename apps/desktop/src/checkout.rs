@@ -167,10 +167,7 @@ fn new_branch(
     main: &Path,
     card: &devpit_core::CardRow,
 ) -> Result<String, String> {
-    let pattern = store
-        .preference(devpit_core::preference::WORKTREE_BRANCH)
-        .map_err(|err| err.to_string())?
-        .unwrap_or_default();
+    let pattern = crate::project_settings::branch_pattern(store, project_id);
     let number = store
         .card_numbers(project_id)
         .map_err(|err| err.to_string())?

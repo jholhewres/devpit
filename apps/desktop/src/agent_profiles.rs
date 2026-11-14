@@ -109,6 +109,9 @@ pub(crate) fn all(store: &Store) -> Result<Vec<Profile>, RpcError> {
     let mut all = profiles(&stored(store)?, base_of, crate::shell_launch::shell_knows());
     for one in &mut all {
         one.enabled = !off.contains(&one.id);
+        let models = crate::profile_models::of(store, &one.id);
+        one.models
+            .retain(|model| !models.models_off.contains(model));
     }
     Ok(all)
 }

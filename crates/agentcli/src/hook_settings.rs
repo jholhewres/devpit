@@ -34,6 +34,19 @@ pub fn settings_json(endpoint_file: &Path, auth_file: &Path) -> String {
     )
 }
 
+/// [`settings_json`] with the advisor model a profile's sessions start with.
+pub fn settings_json_advised(
+    endpoint_file: &Path,
+    auth_file: &Path,
+    advisor: Option<&str>,
+) -> String {
+    let plain = settings_json(endpoint_file, auth_file);
+    match advisor.and_then(|model| serde_json::to_string(model).ok()) {
+        Some(model) => format!("{},\"advisorModel\":{model}}}", &plain[..plain.len() - 1]),
+        None => plain,
+    }
+}
+
 /// The same hooks, as the devpit plugin for Claude Code carries them.
 ///
 /// A plugin reaches every session of the installation it is installed in —

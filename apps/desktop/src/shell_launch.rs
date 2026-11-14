@@ -60,7 +60,7 @@ fn typed_agents() -> Vec<(String, String)> {
         return Vec::new();
     };
     let mut env = Vec::new();
-    if hook_settings().is_some() {
+    if hook_settings(None).is_some() {
         env.push((
             "DEVPIT_CLAUDE_SETTINGS".to_owned(),
             root.join("hooks.json").display().to_string(),
@@ -544,9 +544,10 @@ fn launch_line(
     agent: &str,
     settings_flag: Option<&str>,
     project_id: Option<&str>,
+    profile_id: Option<&str>,
 ) -> String {
     let mut line = launch.to_owned();
-    if let Some(settings) = settings_flag.and_then(|_| hook_settings()) {
+    if let Some(settings) = settings_flag.and_then(|_| hook_settings(profile_id)) {
         line.push(' ');
         line.push_str(&settings_flag.unwrap_or_default().replace("{}", &settings));
     }
@@ -602,7 +603,7 @@ pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, 
                 }
                 let flag = devpit_pty::agents::known(&found.base).and_then(|one| one.settings_flag);
                 let said = devpit_agentcli::running::line(&devpit_agentcli::running::runner(found));
-                let line = launch_line(&said, &found.base, flag, project_id);
+                let line = launch_line(&said, &found.base, flag, project_id, Some(&found.id));
                 return Ok(in_account(line, &found.driver, project_id));
             }
         }
@@ -613,7 +614,13 @@ pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, 
             format!("{id} is not an agent this build knows"),
         )
     })?;
-    let line = launch_line(agent.launch, agent.id, agent.settings_flag, project_id);
+    let line = launch_line(
+        agent.launch,
+        agent.id,
+        agent.settings_flag,
+        project_id,
+        None,
+    );
     Ok(in_account(line, agent.id, project_id))
 }
 
@@ -629,30 +636,20 @@ fn in_account(line: String, driver: &str, project_id: Option<&str>) -> String {
     }
 }
 
-/// Where the hook settings live, written if they are not there yet.
-///
-/// The same file the board's headless turns use, and written by the same
-/// rule: only when it differs, so starting an agent does not touch the disk
-/// for nothing.
-fn hook_settings() -> Option<String> {
+/// Where the hook settings live, written if they are not there yet: the
+/// shared file, or `profile_id`'s own when it has an advisor model.
+fn hook_settings(profile_id: Option<&str>) -> Option<String> {
     // Switched off means the flag is never added, so the agent is started
     // exactly as it would have been by hand.
     if !integrated() {
         return None;
     }
-    let root = Store::root().ok()?;
-    let endpoint = devpit_agentcli::endpoint_file(&root);
-    let path = root.join("hooks.json");
-    let wanted = devpit_agentcli::settings_json(&endpoint, &devpit_agentcli::auth_file(&root));
-    if std::fs::read_to_string(&path).ok().as_deref() != Some(wanted.as_str()) {
-        std::fs::create_dir_all(&root).ok()?;
-        // Private: these are the commands an agent runs on every hook, so a
-        // file someone else can write is a command someone else chose.
-        devpit_core::home::write_private(&path, wanted.as_bytes()).ok()?;
-    }
     // Quoted, because a home directory with a space in it would otherwise
     // become two arguments to the shell this is typed into.
-    Some(format!("'{}'", path.display()))
+    Some(format!(
+        "'{}'",
+        crate::steps::hook_settings_for(profile_id)?
+    ))
 }
 
 /// The defaults file Gemini CLI is pointed at in a devpit terminal, written if
