@@ -55,10 +55,15 @@ fn words_of(subject: &str) -> &str {
     }
 }
 
-/// Read from subjects, newest first. No history is plain sentences.
+/// Read from subjects, newest first. No history is plain sentences, and a
+/// merge's subject is git's, not the repository's, so it does not vote.
 pub fn voice_of(subjects: &[String]) -> Voice {
+    let subjects: Vec<&String> = subjects
+        .iter()
+        .filter(|one| !one.starts_with("Merge "))
+        .collect();
     let mut kinds: HashMap<&str, usize> = HashMap::new();
-    for subject in subjects {
+    for subject in &subjects {
         if let Some(kind) = type_of(subject) {
             *kinds.entry(kind).or_default() += 1;
         }
@@ -183,6 +188,22 @@ mod tests {
         assert_eq!(
             draft_for(dir.path(), &paths(&["web/x.ts", "web/y.ts", "web/z.ts"])),
             "Update 3 files in web"
+        );
+    }
+
+    #[test]
+    fn merges_do_not_outvote_the_repos_own_subjects() {
+        let subjects: Vec<String> = [
+            "Merge pull request #2 from me/b",
+            "feat: add y",
+            "Merge pull request #1 from me/a",
+            "feat: add x",
+        ]
+        .map(str::to_owned)
+        .into();
+        assert_eq!(
+            draft(&voice_of(&subjects), &paths(&["src/a.rs"])),
+            "feat: update a.rs"
         );
     }
 

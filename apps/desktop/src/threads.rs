@@ -16,11 +16,23 @@ pub async fn chat_list(project_id: String) -> Result<Conversations, RpcError> {
     crate::off_main::blocking(move || chat_list_now(project_id)).await
 }
 
-/// [`chat_list`], on the calling thread.
+/// [`chat_list`], on the calling thread. An archived conversation is not listed.
 pub(crate) fn chat_list_now(project_id: String) -> Result<Conversations, RpcError> {
+    listed(project_id, false)
+}
+
+/// `chat.archived` — the project's archived conversations, for Settings → Archive.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_archived(project_id: String) -> Result<Conversations, RpcError> {
+    crate::off_main::blocking(move || listed(project_id, true)).await
+}
+
+fn listed(project_id: String, archived: bool) -> Result<Conversations, RpcError> {
     Ok(Conversations {
-        conversations: devpit_agentcli::history::conversations(
+        conversations: devpit_agentcli::history::listed(
             &crate::projects::project_home(&project_id)?.sessions(),
+            archived,
         )
         .into_iter()
         .map(|one| Thread {

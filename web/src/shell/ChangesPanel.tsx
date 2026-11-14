@@ -82,7 +82,7 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
   const draft = (): void => {
     const { staged } = grouped(tree.changes)
     const paths = (staged.length > 0 ? staged : tree.changes).map((change) => change.path)
-    if (project) void ask(() => commands.changesDraft(project.id, null, paths)).then((answer) => answer.data && setMessage(answer.data.message))
+    if (project) void ask(() => commands.changesDraft(project.id, null, paths)).then(({ data }) => data && setMessage((was) => was || data.message))
   }
 
   const turn = (next: View): void => {

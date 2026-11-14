@@ -111,6 +111,8 @@ export const commands = {
 	 *  pin, settled, snoozed or unread. Answers the marks as kept.
 	 */
 	chatMark: (projectId: string, conversationId: string, marks: ConversationMarks) => typedError<ConversationMarks, RpcError>(__TAURI_INVOKE("chat_mark", { projectId, conversationId, marks })),
+	/**  `chat.archived` — the project's archived conversations, for Settings → Archive. */
+	chatArchived: (projectId: string) => typedError<Conversations, RpcError>(__TAURI_INVOKE("chat_archived", { projectId })),
 	/**  `chat.outside` — sessions of this project started outside devpit. */
 	chatOutside: (projectId: string) => typedError<OutsideSession[], RpcError>(__TAURI_INVOKE("chat_outside", { projectId })),
 	/**

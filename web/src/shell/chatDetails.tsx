@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 
 import { Menu, MenuItem } from './Menu'
+import { menuPoint } from './menuRules'
 
 /*
  * Which details a conversation's header and its "where" line show, chosen
@@ -72,8 +73,10 @@ export function useDetailsMenu(): { open: (event: React.MouseEvent) => void; men
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   const shows = useDetails()
   const open = (event: React.MouseEvent): void => {
+    /* A text field keeps the system's cut, copy and paste. */
+    if ((event.target as Element).closest('input, textarea, [contenteditable="true"]')) return
     event.preventDefault()
-    setAt({ x: event.clientX, y: event.clientY })
+    setAt(menuPoint(event))
   }
   const menu = at && (
     <Menu at={at} label="Details shown" onClose={() => setAt(null)}>
@@ -84,10 +87,3 @@ export function useDetailsMenu(): { open: (event: React.MouseEvent) => void; men
   )
   return { open, menu }
 }
-
-/*
- * Where the work happens: the project, the machine and the branch.
- *
- * Quieter than the composer's own chips, because these describe the
- * conversation rather than steer the turn.
- */

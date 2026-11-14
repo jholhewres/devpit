@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::head::{head_path, marks_path, write_head, write_marks, Head};
-use crate::history::{conversations, title_of};
+use crate::history::{conversations, listed, title_of};
 use crate::store::{append, conversation_path};
 use devpit_rpc::{ConversationMarks, Message, Part, Role};
 
@@ -206,6 +206,25 @@ fn marks_kept_before_archiving_existed_read_as_not_archived() {
     let listed = conversations(home.path());
     assert!(listed[0].marks.pinned);
     assert!(!listed[0].marks.archived);
+}
+
+#[test]
+fn an_archived_conversation_leaves_the_list_for_the_archive() {
+    let home = tempfile::tempdir().expect("tempdir");
+    conversation(home.path(), "conv_kept", "Fix the parser", "claude", 0.1);
+    conversation(home.path(), "conv_away", "Old spike", "claude", 0.1);
+    write_marks(
+        &marks_path(home.path(), "conv_away"),
+        ConversationMarks {
+            archived: true,
+            ..Default::default()
+        },
+    )
+    .expect("marks");
+    let ids =
+        |all: Vec<crate::history::Summary>| all.into_iter().map(|one| one.id).collect::<Vec<_>>();
+    assert_eq!(ids(listed(home.path(), false)), ["conv_kept"]);
+    assert_eq!(ids(listed(home.path(), true)), ["conv_away"]);
 }
 
 #[test]

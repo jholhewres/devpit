@@ -53,6 +53,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         chat_window::chat_prompts,
         threads::chat_list,
         threads::chat_mark,
+        threads::chat_archived,
         outside_sessions::chat_outside,
         adopting::chat_adopt,
         plan_limits::plan_limits,
