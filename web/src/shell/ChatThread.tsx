@@ -5,6 +5,7 @@ import { steeredAnswers } from './activity'
 import { continuable, retryable, unanswered } from './chat'
 import { useMessage, useMessagesPick, type ChatMessages } from './chatMessages'
 import { Turn } from './Turn'
+import { outcome, statusOf, type Outcome } from './turnFold'
 import type { Reveal } from './useJump'
 import { estimate, GAP, useWindow } from './useWindow'
 
@@ -93,7 +94,9 @@ export function ChatThread({
   }, [reveal, view.reveal])
 
   return (
-    <div className="thread" data-windowed="">
+    /* A log, kept quiet: read out, every streamed word and every row the
+       window draws would be spoken. The announcer speaks for it. */
+    <div className="thread" data-windowed="" role="log" aria-label="Conversation" aria-live="off">
       {older && <div ref={top} className="thread__older" aria-hidden />}
       {older && stalled && <button className="thread__more" onClick={onMore}>Load earlier</button>}
       {view.before > 0 && <div className="thread__gap" style={{ height: view.before - GAP }} aria-hidden />}
@@ -122,9 +125,47 @@ export function ChatThread({
         </div>
       )}
       {error && <div className="exempty__t" role="alert">{error}</div>}
+      <Announcer messages={messages} />
     </div>
   )
 }
+
+const WORKING = 'The agent is working.'
+const ENDED: Readonly<Record<Outcome, string>> = { done: 'The agent answered.', stopped: 'The agent stopped.', failed: 'The turn failed.' }
+
+type Last = { id: string; streaming: boolean; said: string | null } | null
+
+function lastAnswer(all: readonly Message[]): Last {
+  const last = all.findLast((one) => one.role === 'assistant')
+  if (!last) return null
+  return { id: last.id, streaming: last.streaming, said: last.ended ? [ENDED[outcome(last.ended)], statusOf(last)].filter(Boolean).join(' ') : null }
+}
+
+/* What changed between two reads of the last answer, in words: one starting, or the one that ran ending. */
+function announced(before: Last, last: Last): string | null {
+  if (!last || (before?.id === last.id && before.streaming === last.streaming)) return null
+  if (last.streaming) return WORKING
+  return before?.id === last.id ? last.said : null
+}
+
+/* What a screen reader hears of the turns: that one started and how it ended. */
+function Announcer({ messages }: { messages: ChatMessages }): React.JSX.Element {
+  const last = useMessagesPick(messages, lastAnswer)
+  const [seen, setSeen] = useState(last)
+  const [said, setSaid] = useState(() => (last?.streaming ? WORKING : ''))
+  if (seen !== last) {
+    setSeen(last)
+    const next = announced(seen, last)
+    if (next) setSaid(next)
+  }
+  return (
+    <div className="sr-only" role="status" aria-live="polite">
+      {said}
+    </div>
+  )
+}
+
+const speaker = (role: Message['role']): string => (role === 'user' ? 'You' : role === 'assistant' ? 'Agent' : 'Note')
 
 /* One message of the window, drawn again only when that message is replaced. */
 const Row = memo(function Row({
@@ -160,7 +201,7 @@ const Row = memo(function Row({
   })
   if (!message) return null
   return (
-    <div className="trow" data-id={id} ref={row}>
+    <div className="trow" data-id={id} ref={row} role="article" aria-label={speaker(message.role)}>
       <Turn
         message={message}
         folder={folder}

@@ -70,3 +70,10 @@ describe('typing in the composer of a long conversation', () => {
     expect(drawn).toEqual({ pane: 0, thread: 0, turns: 0 })
   })
 })
+
+describe('the composer read with a screen reader', () => {
+  it('names its field, not only a placeholder that goes once typing starts', () => {
+    render(<ChatPane tab={{ id: 'conv_1', kind: 'chat' }} />)
+    expect(screen.getByRole('textbox', { name: 'Message to the agent' })).toBeTruthy()
+  })
+})

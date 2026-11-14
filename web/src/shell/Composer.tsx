@@ -149,6 +149,7 @@ export const Composer = memo(function Composer({
           <OwnCommand slash={slash} from={tab.id} profileId={chat.profileId} orchestrator={project?.orchestrator ?? null} onClose={() => (slash.closeOwn(), field.current?.focus())} />
           <textarea
             className="composer__ph"
+            aria-label="Message to the agent"
             placeholder="Do anything… @ for a file, / for a command"
             ref={field}
             value={prompt}
