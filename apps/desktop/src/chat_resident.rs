@@ -444,13 +444,15 @@ pub(crate) fn steer(
         .and_then(|live| live.resident.steer(prompt, uuid, id).then_some(true))
 }
 
-/// Asks this conversation's process to stop one background task. `None` when
-/// it has none listening, so the caller reaches the turn the other way.
-pub(crate) fn stop_task(app: &AppHandle, conversation_id: &str, task_id: &str) -> Option<bool> {
-    let residents = app.try_state::<Residents>()?;
-    let all = residents.0.lock().ok()?;
-    all.get(conversation_id)
-        .and_then(|live| live.resident.stop_task(task_id).then_some(true))
+/// Asks this conversation's process to stop one background task. False when
+/// it has none listening.
+pub(crate) fn stop_task(app: &AppHandle, conversation_id: &str, task_id: &str) -> bool {
+    app.try_state::<Residents>().is_some_and(|residents| {
+        residents.0.lock().is_ok_and(|all| {
+            all.get(conversation_id)
+                .is_some_and(|live| live.resident.stop_task(task_id))
+        })
+    })
 }
 
 /// The steers this conversation's process never echoed back, by id.

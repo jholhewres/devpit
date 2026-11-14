@@ -58,14 +58,12 @@ pub fn chat_stop_task(
     conversation_id: String,
     task_id: String,
 ) -> Result<bool, RpcError> {
-    // A process that stays has its own input; a turn's own is attached to its process.
-    Ok(
-        crate::chat_resident::stop_task(&app, &conversation_id, &task_id).unwrap_or_else(|| {
-            steering
-                .get(&conversation_id)
-                .is_some_and(|control| control.stop_task(&task_id))
-        }),
-    )
+    // The turn's own input first: a supervised turn's process is not the one
+    // the conversation keeps, and a later turn on that one has none attached.
+    Ok(steering
+        .get(&conversation_id)
+        .is_some_and(|control| control.stop_task(&task_id))
+        || crate::chat_resident::stop_task(&app, &conversation_id, &task_id))
 }
 
 /// `chat.steer` — hands the turn in flight one more message, without waiting
