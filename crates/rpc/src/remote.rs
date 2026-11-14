@@ -1,4 +1,4 @@
-//! What the window asks of a checkout's remote.
+//! What the Changes panel asks of a checkout and its remote.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -12,4 +12,11 @@ pub enum RemoteAct {
     Push,
     /// Pull, then push.
     Sync,
+}
+
+/// A first commit message, for the person to read and edit before committing.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitDraft {
+    pub message: String,
 }

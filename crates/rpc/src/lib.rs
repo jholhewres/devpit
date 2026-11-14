@@ -136,7 +136,7 @@ pub use project::{
     ProjectTree, Worktree, WorktreeOrigin,
 };
 pub use reminder::{Reminder, Reminders};
-pub use remote::RemoteAct;
+pub use remote::{CommitDraft, RemoteAct};
 pub use remote_view::{
     RemoteActivities, RemoteActivity, RemoteAsking, RemoteDevice, RemoteDraft, RemoteIn,
     RemoteOrchestrator, RemoteOut, RemotePairing, RemoteProject, RemoteQuestion, RemoteRelay,

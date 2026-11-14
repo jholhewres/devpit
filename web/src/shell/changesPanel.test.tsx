@@ -10,12 +10,14 @@ afterEach(cleanup)
 const staged = vi.fn()
 const unstaged = vi.fn()
 const committed = vi.fn()
+const drafted = vi.fn()
 
 vi.mock('./live', () => ({
   ask: (call: () => unknown) => Promise.resolve({ data: call(), error: null, loading: false }),
   commands: {
     changesStage: (_p: string, _w: null, paths: string[]) => (staged(paths), null),
     changesUnstage: (_p: string, _w: null, paths: string[]) => (unstaged(paths), null),
+    changesDraft: (_p: string, _w: null, paths: string[]) => (drafted(paths), { message: 'feat: update a.ts' }),
     changesCommit: (_p: string, _w: null, message: string) => {
       committed(message)
       return { sha: 'abc1234', subject: message }
@@ -115,5 +117,16 @@ describe('the totals', () => {
     render(<Changes tree={tree([change('a.rs')], { added: 6624, removed: 241 })} />)
     expect(screen.getByText('+6,624')).toBeTruthy()
     expect(screen.getByText('−241')).toBeTruthy()
+  })
+})
+
+describe('drafting a message', () => {
+  it('asks for a subject for what is staged and puts it in the empty field', async () => {
+    render(<Changes tree={tree([change('src/a.ts', { staged: true }), change('src/b.ts')])} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Draft a message' }))
+    await waitFor(() => expect((screen.getByLabelText('Commit message') as HTMLTextAreaElement).value).toBe('feat: update a.ts'))
+    expect(drafted).toHaveBeenCalledWith(['src/a.ts'])
+    /* A message already there is the person's: nothing offers to replace it. */
+    expect(screen.queryByRole('button', { name: 'Draft a message' })).toBeNull()
   })
 })

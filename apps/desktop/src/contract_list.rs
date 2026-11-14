@@ -383,6 +383,7 @@ pub(super) fn loaded(builder: Builder<tauri::Wry>) -> Builder<tauri::Wry> {
         staging::changes_stage,
         staging::changes_unstage,
         staging::changes_commit,
+        staging::changes_draft,
         staging::changes_remote,
         staging::changes_discard,
         saves::file_write,

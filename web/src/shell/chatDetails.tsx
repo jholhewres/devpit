@@ -1,0 +1,93 @@
+import { useState, useSyncExternalStore } from 'react'
+
+import { Menu, MenuItem } from './Menu'
+
+/*
+ * Which details a conversation's header and its "where" line show, chosen
+ * from a right-click on either. Kept per viewer; all show until hidden.
+ */
+
+export const DETAILS = [
+  { id: 'card', label: 'Card' },
+  { id: 'context', label: 'Context' },
+  { id: 'cost', label: 'Cost' },
+  { id: 'project', label: 'Project' },
+  { id: 'machine', label: 'Machine' },
+  { id: 'branch', label: 'Branch' },
+] as const
+
+export type Detail = (typeof DETAILS)[number]['id']
+
+const KEY = 'devpit.chatDetails'
+
+function read(): ReadonlySet<Detail> {
+  try {
+    const kept: unknown = JSON.parse(localStorage.getItem(KEY) ?? '[]')
+    return new Set(Array.isArray(kept) ? kept.filter((one): one is Detail => DETAILS.some((detail) => detail.id === one)) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+let hidden: ReadonlySet<Detail> | null = null
+const told = new Set<() => void>()
+
+const hiddenNow = (): ReadonlySet<Detail> => (hidden ??= read())
+
+export function toggleDetail(id: Detail): void {
+  const next = new Set(hiddenNow())
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  hidden = next
+  try {
+    localStorage.setItem(KEY, JSON.stringify([...next]))
+  } catch {
+    // Refused: the choice holds until the window closes.
+  }
+  for (const listener of told) listener()
+}
+
+/** Forgets the window's copy, so the next read is from storage. For tests. */
+export const rereadDetails = (): void => {
+  hidden = null
+}
+
+function subscribe(listener: () => void): () => void {
+  told.add(listener)
+  return () => told.delete(listener)
+}
+
+/** Whether a detail is shown, read again when one is toggled. */
+export function useDetails(): (id: Detail) => boolean {
+  const now = useSyncExternalStore(subscribe, hiddenNow)
+  return (id) => !now.has(id)
+}
+
+const TICK = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+)
+
+/* A right-click on the header or on this line picks which details they show. */
+export function useDetailsMenu(): { open: (event: React.MouseEvent) => void; menu: React.JSX.Element | null } {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const shows = useDetails()
+  const open = (event: React.MouseEvent): void => {
+    event.preventDefault()
+    setAt({ x: event.clientX, y: event.clientY })
+  }
+  const menu = at && (
+    <Menu at={at} label="Details shown" onClose={() => setAt(null)}>
+      {DETAILS.map((one) => (
+        <MenuItem key={one.id} label={one.label} glyph={shows(one.id) ? TICK : undefined} onPick={() => toggleDetail(one.id)} />
+      ))}
+    </Menu>
+  )
+  return { open, menu }
+}
+
+/*
+ * Where the work happens: the project, the machine and the branch.
+ *
+ * Quieter than the composer's own chips, because these describe the
+ * conversation rather than steer the turn.
+ */

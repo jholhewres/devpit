@@ -1642,6 +1642,11 @@ export const commands = {
 	changesUnstage: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<ProjectChanges, RpcError>(__TAURI_INVOKE("changes_unstage", { projectId, worktreeId, paths })),
 	/**  `changes.commit` — commits what is staged. */
 	changesCommit: (projectId: string, worktreeId: string | null, message: string) => typedError<Commit, RpcError>(__TAURI_INVOKE("changes_commit", { projectId, worktreeId, message })),
+	/**
+	 *  `changes.draft` — a first commit message for `paths`, written the way this
+	 *  checkout's own history writes its subjects. Never committed from here.
+	 */
+	changesDraft: (projectId: string, worktreeId: string | null, paths: string[]) => typedError<CommitDraft, RpcError>(__TAURI_INVOKE("changes_draft", { projectId, worktreeId, paths })),
 	/**  `changes.remote` — fetch, pull, push or sync this checkout's branch. */
 	changesRemote: (projectId: string, worktreeId: string | null, act: RemoteAct) => typedError<null, RpcError>(__TAURI_INVOKE("changes_remote", { projectId, worktreeId, act })),
 	/**
@@ -2870,6 +2875,11 @@ export type Commit = {
 	committedAt: number | null,
 };
 
+/**  A first commit message, for the person to read and edit before committing. */
+export type CommitDraft = {
+	message: string,
+};
+
 /**  A commit named in full, and its page on the remote's forge if it has one. */
 export type CommitRef = {
 	full: string,
@@ -2969,6 +2979,8 @@ export type ConversationMarks = {
 	snoozedUntil?: number | null,
 	/**  Marked unread by hand, until it is looked at again. */
 	unread?: boolean,
+	/**  Put away: kept on disk, out of the lists until restored. */
+	archived?: boolean,
 };
 
 /**  What the person said in a conversation, for the rail beside it. */

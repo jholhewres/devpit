@@ -47,6 +47,7 @@ mod sourcing;
 pub mod standing;
 mod state;
 mod status;
+mod voice;
 mod weblink;
 mod worktrees;
 
@@ -82,6 +83,7 @@ pub use sourcing::{hidden_as, hidden_in, origin_of, shown, word_of};
 pub use standing::standing_at;
 pub use state::{plain_branch, repo_state, BranchState, RepoState};
 pub use status::{changes, status, Status};
+pub use voice::draft_for;
 pub use weblink::{commit_link, web_url, CommitLink};
 pub use worktrees::{worktree_path, worktrees, worktrees_unread};
 

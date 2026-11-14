@@ -78,6 +78,12 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
       .finally(() => setBusy(false))
   }
   const go = (): void => (act1.doing === 'stage' ? stage(stageable(tree.changes)) : commit())
+  /* A first subject in the repository's own voice, for what is staged, else for every change. */
+  const draft = (): void => {
+    const { staged } = grouped(tree.changes)
+    const paths = (staged.length > 0 ? staged : tree.changes).map((change) => change.path)
+    if (project) void ask(() => commands.changesDraft(project.id, null, paths)).then((answer) => answer.data && setMessage(answer.data.message))
+  }
 
   const turn = (next: View): void => {
     setView(next)
@@ -155,6 +161,7 @@ export function Changes({ tree }: { tree: UseTree }): React.JSX.Element {
           }}
           aria-label="Commit message"
         />
+        {!message && tree.changes.length > 0 && <button className="btn git__go" onClick={draft}>Draft a message</button>}
         {/* One button, not three. What it says is decided in `primary.ts`. */}
         <button className="btn btn--go git__go" disabled={busy || act1.disabled} title={act1.why ?? undefined} onClick={go}>
           {act1.label}
