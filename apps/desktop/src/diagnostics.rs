@@ -156,7 +156,8 @@ pub(crate) fn process_of(
     }
 }
 
-/// Whether a process name is one of devpit's own.
+/// Whether a process name is one of devpit's own. Only Linux lists them.
+#[cfg(any(target_os = "linux", test))]
 pub(crate) fn is_devpit(name: &str) -> bool {
     name.starts_with("devpit")
 }
