@@ -254,3 +254,15 @@ fn an_items_output_keeps_the_menus_margin() {
     );
     assert_eq!(indented("plain\n", ""), "plain\n");
 }
+
+#[test]
+fn a_devpit_started_in_the_background_leaves_the_terminal_and_opens_the_app() {
+    assert!(owns_terminal(true, true, Some(4242), 4242));
+    assert!(!owns_terminal(true, true, Some(4242), 4300), "`devpit &`");
+    assert!(!owns_terminal(true, true, None, 4242));
+    assert!(!owns_terminal(true, false, Some(4242), 4242));
+    assert_eq!(
+        start(&[], owns_terminal(true, true, Some(1), 2), false),
+        Start::Window
+    );
+}
