@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+
+import { ask, commands } from './live'
 import type { PaneName } from './paneList'
 import { useShell } from './useShell'
 
@@ -6,10 +9,16 @@ import { useShell } from './useShell'
  * it — set up, switched on or not, every project has one to look at. An
  * orchestrator has neither: its folder is notes, and the projects' boards
  * are in its right panel. It has its Schedules instead. A project also has
- * its agent to ask.
+ * its agent to ask, unless Labs has the project agent off.
  */
 export function ProjectPlaces({ open, showing }: { open: (kind: PaneName) => void; showing: (kind: PaneName) => boolean }): React.JSX.Element | null {
   const shell = useShell()
+  const [agent, setAgent] = useState(true)
+  /* Settings is the one place Labs flips, so it is read again as Settings closes. */
+  const settled = !shell.prefs
+  useEffect(() => {
+    if (settled) void ask(() => commands.maintenanceRead()).then((answer) => setAgent(answer.data?.projectAgent ?? true))
+  }, [settled])
   if (shell.project?.orchestrator) {
     return (
       <button className="act" onClick={() => open('schedules')} aria-pressed={showing('schedules')}>
@@ -28,10 +37,12 @@ export function ProjectPlaces({ open, showing }: { open: (kind: PaneName) => voi
         <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="6" r="2" /><circle cx="12" cy="18" r="2" /><circle cx="19" cy="6" r="2" /><path d="M5 8v2a4 4 0 0 0 4 4h1M19 8v2a4 4 0 0 1-4 4h-1" /></svg></span>
         <span className="act__label">Devflow</span>
       </button>
+      {agent && (
       <button className="act" onClick={() => open('ask')} aria-pressed={showing('ask')}>
         <span className="act__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.7-2.5 2.3-2.5 3.8M12 17h.01" /></svg></span>
         <span className="act__label">Ask the project</span>
       </button>
+      )}
     </>
   )
 }
