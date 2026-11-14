@@ -94,6 +94,7 @@ describe('Capabilities in the sidebar', () => {
     expect([...nav].map((label) => label.textContent)).toEqual([
       'Board',
       'Devflow',
+      'Ask the project',
       'Files',
       'Capabilities',
       'Excalidraw',
