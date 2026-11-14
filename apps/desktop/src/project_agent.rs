@@ -699,6 +699,19 @@ fn sidebar_project(projects: &[Project], project_id: &str) -> Result<Project, Rp
         .ok_or_else(|| RpcError::new(ErrorCode::NotFound, "that project is gone"))
 }
 
+/// The chat's commands are refused while Labs has the project agent off, as
+/// its MCP tools are.
+pub(crate) fn labs_on(store: &devpit_core::Store) -> Result<(), RpcError> {
+    if crate::maintenance::project_agent_on(store) {
+        Ok(())
+    } else {
+        Err(RpcError::new(
+            ErrorCode::Conflict,
+            crate::agent_api::LABS_OFF,
+        ))
+    }
+}
+
 /// `project_agent.chat` — the person asks a project's agent from its sidebar.
 #[tauri::command]
 #[specta::specta]
@@ -713,6 +726,7 @@ pub async fn project_agent_chat(
         if question.is_empty() {
             return Err(RpcError::new(ErrorCode::Invalid, "what to ask?"));
         }
+        labs_on(&crate::projects::store()?)?;
         let listed = crate::projects::project_list_now()?;
         let project = sidebar_project(&listed.projects, &project_id)?;
         let profile = linked_profile(&listed.projects, &project.id).map_err(refused)?;
@@ -744,6 +758,7 @@ pub async fn project_agent_fact(
     cited: Vec<String>,
 ) -> Result<LessonProposals, RpcError> {
     crate::off_main::blocking(move || {
+        labs_on(&crate::projects::store()?)?;
         let listed = crate::projects::project_list_now()?;
         let project = sidebar_project(&listed.projects, &project_id)?;
         chat_fact(Path::new(&project.root_path), &today(), &text, &cited)

@@ -65,7 +65,8 @@ Each project's sidebar has **Ask the project**, a chat with its agent: the
 same resident process the orchestrator asks, woken under the profile of an
 orchestrator linked to the project, read-only like every wake. Its first
 question writes the memory, as `devpit_project_agent_ask` does, and after an
-idle-out the next question resumes the same conversation.
+idle-out the next question resumes the same conversation. While Labs has the
+project agent off, the entry is hidden and the chat is refused, as its tools are.
 
 - **Answers name their files.** Each question asks the agent to name the
   files its answer rests on, and the files of the project an answer names

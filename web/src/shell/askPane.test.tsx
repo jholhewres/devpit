@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ProjectAgentAnswer } from '../gen/bindings'
@@ -13,6 +13,7 @@ let answer: ProjectAgentAnswer = {
   cited: ['Makefile'],
 }
 let here: { id: string; name: string; orchestrator: string | null } = { id: 'prj_api', name: 'api', orchestrator: null }
+let labs = true
 
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
@@ -24,12 +25,13 @@ vi.mock('./live', () => ({
           ? undefined
           : async (...args: unknown[]) => {
               called(name, ...args)
+              if (name === 'maintenanceRead') return { projectAgent: labs }
               return name === 'projectAgentChat' ? answer : { proposals: [], decisions: [] }
             },
     },
   ),
 }))
-vi.mock('./useShell', () => ({ useShell: () => ({ project: here }) }))
+vi.mock('./useShell', () => ({ useShell: () => ({ project: here, prefs: null }) }))
 vi.mock('./shellStore', () => ({ useShellPick: () => shown }))
 vi.mock('./MarkdownView', () => ({ Markdown: ({ source }: { source: string }) => <p>{source}</p> }))
 
@@ -38,6 +40,7 @@ afterEach(() => {
   called.mockReset()
   shown.mockReset()
   here = { id: 'prj_api', name: 'api', orchestrator: null }
+  labs = true
 })
 
 const asked = async (question: string): Promise<void> => {
@@ -47,15 +50,23 @@ const asked = async (question: string): Promise<void> => {
 }
 
 describe('Ask the project', () => {
-  it('is a place of every project, and not of an orchestrator', () => {
+  it('is a place of every project, and not of an orchestrator', async () => {
     const open = vi.fn()
     render(<ProjectPlaces open={open} showing={() => false} />)
+    await waitFor(() => expect(called).toHaveBeenCalledWith('maintenanceRead'))
     fireEvent.click(screen.getByRole('button', { name: 'Ask the project' }))
     expect(open).toHaveBeenCalledWith('ask')
     cleanup()
     here = { id: 'orch', name: 'Jhol', orchestrator: 'claude' }
     render(<ProjectPlaces open={open} showing={() => false} />)
     expect(screen.queryByRole('button', { name: 'Ask the project' })).toBeNull()
+  })
+
+  it('is hidden while Labs has the project agent off', async () => {
+    labs = false
+    render(<ProjectPlaces open={vi.fn()} showing={() => false} />)
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Ask the project' })).toBeNull())
+    expect(screen.getByRole('button', { name: 'Board' })).toBeTruthy()
   })
 
   /* Each test asks in a project of its own: the pane keeps each project's turns. */
@@ -78,7 +89,7 @@ describe('Ask the project', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Propose' }))
     await screen.findByText(/waits for your approval/)
     expect(called).toHaveBeenCalledWith('projectAgentFact', 'prj_web', 'Tests run with make test.', ['Makefile'])
-    expect(called.mock.calls.map(([name]) => name)).toEqual(['projectAgentChat', 'projectAgentFact'])
+    expect(called.mock.calls.map(([name]) => name).filter((name) => name !== 'maintenanceRead')).toEqual(['projectAgentChat', 'projectAgentFact'])
   })
 
   it('offers no fact from an answer that cites no file', async () => {
