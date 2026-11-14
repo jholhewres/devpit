@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { noteView } from './beat'
 import { ask, commands } from './live'
 import { useWantedPane } from './useWantedPane'
 import type { PaneName } from './paneList'
-import { attached, closed, drafted as taken, focused, joined, launched as sent, moved, opened, renamed, replaced, type Strip, type Tab } from './strip'
+import { attached, closed, drafted as taken, focused, joined, kept, launched as sent, moved, opened, renamed, replaced, type Strip, type Tab } from './strip'
 import { remember, remembered } from './tabs'
 
 export type Where = 'strip' | 'sidebar'
@@ -19,6 +19,8 @@ export interface Tabs {
   readonly active: Tab | null
   show: (kind: PaneName, tab?: Partial<Tab>) => void
   close: (id: string) => void
+  /** Opens again the tab closed last that can come back; false when there is none. */
+  reopen: () => boolean
   /** Moves every pane of `from` beside `into`'s, and `from` leaves the strip. */
   join: (from: string, into: string) => Promise<string | null>
   focus: (id: string) => void
@@ -83,6 +85,7 @@ export function useTabs(projectId: string | null): Tabs {
 
   /* Closing a terminal tab closes its whole tree, or the session keeps
      windows nothing is looking at. */
+  const gone = useRef<Tab[]>([])
   const close = useCallback(
     (id: string) =>
       setStrip((was) => {
@@ -93,10 +96,22 @@ export function useTabs(projectId: string | null): Tabs {
         if (going?.kind === 'term' && projectId) {
           void ask(() => commands.sessionCloseTab(projectId, id))
         }
+        if (going) gone.current = kept(gone.current, going)
         return closed(was, id)
       }),
     [projectId],
   )
+  /* Another project's closed tabs are not this strip's to reopen. */
+  useEffect(() => {
+    gone.current = []
+  }, [projectId])
+  const reopen = useCallback((): boolean => {
+    const back = gone.current.at(-1)
+    if (!back) return false
+    gone.current = gone.current.slice(0, -1)
+    setStrip((was) => opened(was, back))
+    return true
+  }, [])
 
   /* Answers the refusal, or null. The strip changes only once the backend
      has moved the panes: dropping the tab first and failing would be a
@@ -136,6 +151,7 @@ export function useTabs(projectId: string | null): Tabs {
       active: focused(strip),
       show,
       close,
+      reopen,
       join,
       focus,
       move,
@@ -148,6 +164,6 @@ export function useTabs(projectId: string | null): Tabs {
       setRenaming,
       openPane,
     }),
-    [strip, show, close, join, focus, move, rename, attach, launched, drafted, replace, renaming, openPane],
+    [strip, show, close, reopen, join, focus, move, rename, attach, launched, drafted, replace, renaming, openPane],
   )
 }

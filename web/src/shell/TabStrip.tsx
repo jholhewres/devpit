@@ -7,7 +7,7 @@ import { busyIn, doingIn } from './running'
 import { tabTitle, twice, type Clicked, type Tab } from './strip'
 import { unreadIn } from './unread'
 import { useShell } from './useShell'
-import { useKeys } from './useShortcut'
+import { useKeys, useShortcut } from './useShortcut'
 
 /*
  * The strip is the order. A tab is appended when it opens and only moves when
@@ -17,8 +17,14 @@ import { useKeys } from './useShortcut'
  * fires a ghost image nobody asked for.
  */
 export function TabStrip(): React.JSX.Element {
-  const { open, active, focus, close, move, rename, renaming, setRenaming } = useShell()
+  const { open, active, focus, close, move, rename, renaming, setRenaming, reopen } = useShell()
   const { running, doing, unread, openPalette, mark } = useShell()
+  useShortcut('reopenTab', () => reopen())
+  useShortcut('goToTab', (event) => {
+    const tab = open[Number(/\d$/.exec(event.code || event.key)?.[0] ?? 0) - 1]
+    if (!tab) return false
+    focus(tab.id)
+  })
   const keys = useKeys()
     const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())

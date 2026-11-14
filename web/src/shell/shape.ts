@@ -62,6 +62,8 @@ export interface Shell extends Talks {
   /** Opens a new one of a kind you can have several of; focuses the rest. */
   show: (kind: PaneName, tab?: Partial<Tab>) => void
   close: (id: string) => void
+  /** Opens again the tab closed last; false when there is none. */
+  reopen: () => boolean
   /** Moves a terminal tab's panes into another's split; answers a refusal or null. */
   join: (from: string, into: string) => Promise<string | null>
   /** Closing several at once, as the tab's menu names it. */

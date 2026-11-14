@@ -13,7 +13,7 @@ import { useDraftShortcut } from './draftShortcut'
 import { JumpToEnd } from './JumpToEnd'
 import { MentionMenu } from './MentionMenu'
 import { SessionsWaiting } from './OrchestratorChat'
-import { matches } from './shortcuts'
+import { keysLabel, matches } from './shortcuts'
 import { OwnCommand } from './OwnCommand'
 import { Queued } from './Queued'
 import { useRecall } from './recall'
@@ -25,12 +25,14 @@ import { targetOf } from './stop'
 import type { Tab } from './strip'
 import { committed } from './typing'
 import type { Chat } from './useChat'
-import { useDraft } from './useDraft'
+import { keptStash, swapStash, useDraft } from './useDraft'
 import { useMention } from './useMention'
 import { useQueue } from './useQueue'
 import type { Extras } from './queueing'
 import { useSlash } from './useSlash'
 import { useStop } from './useStop'
+import { useShellPick } from './shellStore'
+import { followUpOf, sendKeyOf, useViewPrefs } from './viewPrefs'
 
 /* What the conversation above may do to what is being written. */
 /** `put` replaces what is typed; `add` goes after it. */
@@ -80,9 +82,13 @@ export const Composer = memo(function Composer({
   const queue = useQueue(project?.id ?? null, tab.id, chat)
   const sendDraft = useDraftShortcut(project?.orchestrator ?? null, setPrompt)
   const extras = (): Extras => ({ files: chat.files, skills: chat.skills })
-  const send = (): void => {
+  const prefs = useViewPrefs()
+  const show = useShellPick((shell) => shell.show)
+  /* `other` is the second key's way: into the turn when the first queues, and the reverse. */
+  const send = (other = false): void => {
     if (!ready(prompt, false, chat.profileId)) return
     if (sendDraft(prompt) || slash.ran(prompt)) return setPrompt('')
+    if (chat.sending && followUpOf(prefs, other) === 'steer') return steerTyped()
     if (chat.sending) {
       queue.add(prompt, extras())
       chat.clearExtras()
@@ -150,7 +156,7 @@ export const Composer = memo(function Composer({
           <textarea
             className="composer__ph"
             aria-label="Message to the agent"
-            placeholder="Do anything… @ for a file, / for a command"
+            placeholder={!prompt && keptStash(tab.id) ? `A draft is put aside: ${keysLabel('stashDraft')} brings it back` : 'Do anything… @ for a file, / for a command'}
             ref={field}
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
@@ -158,13 +164,15 @@ export const Composer = memo(function Composer({
             onKeyDown={(event) => {
               /* Enter sends, Shift+Enter a new line; `committed` keeps an accent's Enter out. */
               if (slash.keyDown(event) || mention.keyDown(event) || recall(event)) return
+              if (matches('stashDraft', event)) return (event.preventDefault(), setPrompt(swapStash(tab.id, prompt)))
               if (!committed(event)) return
               /* Held down, it would steer the whole queue in, one repeat at a time. */
               if (matches('steerQueued', event)) return (event.preventDefault(), event.repeat || queue.first())
-              if (matches('steerNow', event)) return (event.preventDefault(), chat.sending ? steerTyped() : send())
-              if (!event.shiftKey) {
+              if (matches('sendBackground', event)) return (event.preventDefault(), ready(prompt, false, chat.profileId) && (send(), show('chat')))
+              const action = sendKeyOf(event, prefs.sendKey)
+              if (action) {
                 event.preventDefault()
-                send()
+                send(action === 'other')
               }
             }}
           />
@@ -174,7 +182,7 @@ export const Composer = memo(function Composer({
                 the press instead would be cheaper and swallow the click that opens the menu. */}
             <Chips chat={chat} refocus={() => field.current?.focus()} />
             <ComposerTools chat={chat} onHeard={(text) => (setPrompt((was) => withHeard(was, text)), field.current?.focus())} />
-            <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={send} onStop={halt} onForce={chat.forceable ? chat.force : undefined} />
+            <SendButton sending={chat.sending} showEsc={showEsc} can={ready(prompt, chat.sending, chat.profileId)} onSend={() => send()} onStop={halt} onForce={chat.forceable ? chat.force : undefined} />
           </div>
         </div>
 

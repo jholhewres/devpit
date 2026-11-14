@@ -11,6 +11,7 @@ import {
   resetKeys,
   SCOPES,
   SHORTCUT_LIST,
+  whenOf,
   type Shortcut,
   type ShortcutId,
 } from './shortcuts'
@@ -29,14 +30,15 @@ const titleOf = (one: Shortcut): string => SCOPES.find((scope) => scope.scope ==
 function shortcutsMatching(query: string): readonly Shortcut[] {
   const wanted = query.trim().toLowerCase()
   if (!wanted) return SHORTCUT_LIST
-  return SHORTCUT_LIST.filter((one) => [one.does, titleOf(one), ...keysLabels(one.id)].join(' ').toLowerCase().includes(wanted))
+  return SHORTCUT_LIST.filter((one) => [one.does, titleOf(one), whenOf(one) ?? '', ...keysLabels(one.id)].join(' ').toLowerCase().includes(wanted))
 }
 
 /* What a row says under its name: where it does not fire, which is the
-   surprise worth a line. */
+   surprise worth a line, and when it acts. */
 function noteOf(one: Shortcut): string | null {
-  if (one.fixed) return 'Built in.'
-  if (one.scope !== 'global') return null
+  const when = whenOf(one)
+  if (one.fixed) return ['Built in.', when].filter(Boolean).join(' ')
+  if (one.scope !== 'global') return when
   return firesInTerminal(one) ? 'Also inside a terminal.' : 'Inside a terminal the key goes to the program.'
 }
 
