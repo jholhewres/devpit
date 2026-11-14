@@ -100,6 +100,11 @@ fn proposals(store: &Store, folder: &Path) -> Vec<ScheduleProposal> {
     read(store, folder, PROPOSED)
 }
 
+/// How many proposals wait for the person.
+pub(crate) fn proposed_count(store: &Store, folder: &Path) -> usize {
+    proposals(store, folder).len()
+}
+
 fn keep_proposals(store: &Store, folder: &Path, all: &[ScheduleProposal]) -> Result<(), RpcError> {
     Ok(store.set_orchestrator_setting(folder, PROPOSED, json!(all))?)
 }

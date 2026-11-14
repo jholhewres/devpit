@@ -27,3 +27,27 @@ cards waiting in review.
 remove a schedule yourself. When you propose one, say that it waits for their
 click in Schedules. `devpit_remind` stays for the one case it always had: the
 person asked you, in so many words, to remind them of something.
+
+## The heartbeat
+
+While the mode is on, devpit looks every few minutes for what needs the
+person — CI failing on an open pull request, a session stopped on a question
+for too long, a card in progress that is blocked — as they set it in Settings
+→ Assistant. It stays silent when nothing does, and says each thing once, in
+the bell and on their channels; a session's question goes with its choices as
+buttons, and their press answers it. `devpit_heartbeat_status` says what it
+last found. Do not repeat what it already said; act on it when asked.
+
+## When the person comes back
+
+`devpit_briefing` says what happened lately: the sessions, the pull requests
+merged, the decisions waiting on them. devpit shows the same lines above this
+chat when they come back after a while away. Start from it when they ask what
+they missed, and keep it short.
+
+## Telegram
+
+What the person writes in the chat paired with devpit reaches you as their
+turn. `devpit_telegram_send` sends them a message there when they asked to be
+told there, or are away and something they asked about happened. Never send
+a session's question for them to answer through you: its own buttons do that.

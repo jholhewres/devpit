@@ -680,6 +680,19 @@ export const commands = {
 	 *  the assistant's tools; its brief is read when the chat next starts.
 	 */
 	assistantModeSet: (projectId: string, on: boolean) => typedError<AssistantMode, RpcError>(__TAURI_INVOKE("assistant_mode_set", { projectId, on })),
+	/**  `assistant.heartbeat` — the heartbeat's settings. */
+	assistantHeartbeat: () => typedError<Heartbeat, RpcError>(__TAURI_INVOKE("assistant_heartbeat")),
+	/**  `assistant.heartbeat_set` — the heartbeat's settings, as the person chose. */
+	assistantHeartbeatSet: (heartbeat: Heartbeat) => typedError<Heartbeat, RpcError>(__TAURI_INVOKE("assistant_heartbeat_set", { heartbeat })),
+	/**
+	 *  `assistant.briefing` — what happened since `since`, for an orchestrator
+	 *  whose Assistant mode is on; nothing otherwise.
+	 */
+	assistantBriefing: (projectId: string, since: number | null) => typedError<{
+	/**  Seconds since the epoch. */
+	since: number | null,
+	lines: string[],
+} | null, RpcError>(__TAURI_INVOKE("assistant_briefing", { projectId, since })),
 	/**
 	 *  `schedules.list` — the orchestrator's Schedules, as the window in `zone`,
 	 *  `offset_minutes` from UTC, reads them.
@@ -2323,6 +2336,13 @@ export type Branches = {
 	branches: Branch[],
 };
 
+/**  What happened while the person was away, in a few lines. */
+export type Briefing = {
+	/**  Seconds since the epoch. */
+	since: number | null,
+	lines: string[],
+};
+
 /**
  *  Card dates and reminders as a calendar on devpit.app, for a calendar app
  *  to subscribe to.
@@ -2565,7 +2585,9 @@ export type ChannelEvent =
 /**  A lane's step failed. */
 "step_failed" | 
 /**  devpit's own MCP stopped answering and was restarted. */
-"mcp_restarted";
+"mcp_restarted" | 
+/**  An orchestrator's routine ran, or its heartbeat found what needs the person. */
+"assistant";
 
 /**  A channel this machine can send on. */
 export type ChannelInfo = {
@@ -3785,6 +3807,20 @@ export type HeadsDown = {
 	 *  opens, the pill says so, and the person leaves when they are ready.
 	 */
 	until: number | null,
+};
+
+/**  How an orchestrator's heartbeat looks while its Assistant mode is on. */
+export type Heartbeat = {
+	/**  Minutes between two looks. */
+	minutes: number,
+	/**  A session stopped on a question longer than this needs the person. */
+	waitingMinutes: number,
+	/**  CI failing on an open pull request needs the person. */
+	ci: boolean,
+	/**  A session stopped on a question needs the person. */
+	waiting: boolean,
+	/**  A card in progress waiting on another needs the person. */
+	blocked: boolean,
 };
 
 /**  One thing the workspace holds, measured. */

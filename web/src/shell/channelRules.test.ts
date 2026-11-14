@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChannelRules } from '../gen/bindings'
-import { clock, escalated, flipped, minutes } from './channelRules'
+import { clock, escalated, EVENTS, flipped, minutes } from './channelRules'
 
 const rules: ChannelRules = { routes: [{ event: 'session_waiting', channels: ['telegram'], escalateAfter: 10 }], quiet: null, groupSeconds: 60 }
 
@@ -11,7 +11,8 @@ describe('channel rules', () => {
     expect(off.routes.find((one) => one.event === 'session_waiting')?.channels).toEqual([])
     const on = flipped(off, 'reminder', 'telegram', true)
     expect(on.routes.find((one) => one.event === 'reminder')?.channels).toEqual(['telegram'])
-    expect(on.routes).toHaveLength(7)
+    // Every event the screen lists gets a route.
+    expect(on.routes).toHaveLength(EVENTS.length)
   })
 
   it('sets one event’s minutes before moving on and keeps its channels', () => {

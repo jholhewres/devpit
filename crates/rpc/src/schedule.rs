@@ -113,3 +113,28 @@ pub struct Schedules {
 pub struct AssistantMode {
     pub on: bool,
 }
+
+/// How an orchestrator's heartbeat looks while its Assistant mode is on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Heartbeat {
+    /// Minutes between two looks.
+    pub minutes: u32,
+    /// A session stopped on a question longer than this needs the person.
+    pub waiting_minutes: u32,
+    /// CI failing on an open pull request needs the person.
+    pub ci: bool,
+    /// A session stopped on a question needs the person.
+    pub waiting: bool,
+    /// A card in progress waiting on another needs the person.
+    pub blocked: bool,
+}
+
+/// What happened while the person was away, in a few lines.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Briefing {
+    /// Seconds since the epoch.
+    pub since: f64,
+    pub lines: Vec<String>,
+}
