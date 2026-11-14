@@ -193,14 +193,12 @@ pub(crate) fn on_battery_in(dir: &Path) -> bool {
     })
 }
 
-/// The files the gate and the card read from a run: the newest run holding
-/// each stays, or a card still open loses its evidence or its review.
-const READ: [&str; 4] = ["evidence.json", "findings.json", "gate.json", "review.json"];
-
 /// What is older than `cutoff`: files in `logs`, and in each `<group>` under
-/// `trees` the runs (folders named as Devflow names them) but the newest and
-/// the newest holding each of [`READ`]. Links are never followed, and a folder
-/// that is not a run is never touched.
+/// `trees` the runs (folders named as Devflow names them) but the newest and,
+/// for each file any of them holds, the newest run holding it: the gate, the
+/// card and each stage read their own file from the newest run that has it,
+/// so a card still open keeps them however old. Links are never followed,
+/// and a folder that is not a run is never touched.
 pub(crate) fn stale(logs: &Path, trees: &[PathBuf], cutoff: SystemTime) -> Vec<PathBuf> {
     let before = cutoff
         .duration_since(std::time::UNIX_EPOCH)
@@ -220,7 +218,16 @@ pub(crate) fn stale(logs: &Path, trees: &[PathBuf], cutoff: SystemTime) -> Vec<P
                 .filter_map(|path| path.file_name()?.to_str().map(str::to_owned))
                 .filter(|name| runs::seconds_of(name).is_some())
                 .collect();
-            let mut kept: Vec<String> = READ
+            let mut held: Vec<String> = Vec::new();
+            for run in &runs {
+                for file in inside(&group.join(run), false) {
+                    let name = file.file_name().and_then(|name| name.to_str());
+                    if let Some(name) = name.filter(|name| !held.iter().any(|one| one == name)) {
+                        held.push(name.to_owned());
+                    }
+                }
+            }
+            let mut kept: Vec<String> = held
                 .iter()
                 .filter_map(|file| runs::newest_with(&group, file))
                 .collect();

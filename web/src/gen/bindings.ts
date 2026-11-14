@@ -3502,7 +3502,7 @@ export type DiagnosticCheck = {
 export type Diagnostics = {
 	processes: DevpitProcess[],
 	checks: DiagnosticCheck[],
-	/**  The error log's newest lines, newest last. */
+	/**  The error log's most recent entries, newest first. */
 	log: string[],
 	logPath: string,
 };

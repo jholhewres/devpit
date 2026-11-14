@@ -105,6 +105,7 @@ fn a_folder_that_is_not_a_run_is_never_taken_for_the_newest_nor_deleted() {
 fn the_newest_evidence_and_review_a_card_reads_stay_however_old() {
     let dir = tempfile::tempdir().expect("tempdir");
     let card = dir.path().join("runs/card_a");
+    let stage = run_name(55 * DAY);
     let (evidence, review, newest, oldest) = (
         run_name(50 * DAY),
         run_name(45 * DAY),
@@ -118,6 +119,7 @@ fn the_newest_evidence_and_review_a_card_reads_stay_however_old() {
         (&review, "findings.json"),
         (&review, "review.json"),
         (&newest, "review-context.md"),
+        (&stage, "stage-ci.json"),
     ] {
         std::fs::create_dir_all(card.join(name)).expect("run");
         std::fs::write(card.join(name).join(file), "{}").expect("write");
