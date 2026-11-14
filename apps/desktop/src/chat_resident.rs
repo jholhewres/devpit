@@ -39,6 +39,10 @@ pub(crate) const WOKE: &str = "chat:woke";
 /// How long a chat's process waits for its next turn before it is let go.
 const IDLE: Duration = Duration::from_secs(10 * 60);
 
+/// How long a model or mode switch waits for the CLI to take it.
+const SWITCH_WAITS: Duration = Duration::from_secs(5);
+const SWITCH: &str = "switch_";
+
 /// Numbers the turns: an idle-out sees whether another came since.
 static TURNS: AtomicU64 = AtomicU64::new(1);
 
@@ -50,6 +54,8 @@ struct Live {
     /// The model and mode it runs in now: a turn asking for others switches it.
     model: Option<String>,
     permission: Option<String>,
+    /// Where the CLI's answers to a switch go, while a turn waits for them.
+    switching: Arc<Mutex<Option<mpsc::Sender<Value>>>>,
     project_id: String,
     /// An orchestrator's: it listens for its sessions, so it never idles out.
     listens: bool,
@@ -71,9 +77,24 @@ impl Residents {
         all.remove(conversation_id)
     }
 
-    /// A chat's process still idle since turn `stamp`, taken out to be let go.
-    fn idled(&self, conversation_id: &str, stamp: u64) -> Option<Live> {
-        self.taken(conversation_id, |live| !live.listens && live.turn == stamp)
+    /// Waits `idle`, then lets a chat's process go when no turn came since
+    /// turn `stamp` and it is not reachable.
+    fn idle_out(
+        &self,
+        conversation_id: &str,
+        stamp: u64,
+        idle: Duration,
+        reachable: impl Fn(&str) -> bool,
+    ) {
+        std::thread::sleep(idle);
+        // Remote Control lives in the process.
+        if reachable(conversation_id) {
+            return;
+        }
+        if let Some(live) = self.taken(conversation_id, |live| !live.listens && live.turn == stamp)
+        {
+            live.resident.close();
+        }
     }
 }
 
@@ -177,13 +198,26 @@ pub(crate) fn or_say(
     let residents = staying.app.state::<Residents>();
     let (tell, heard) = mpsc::channel();
     let ear = {
-        let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
         let wanted = started_as(turn);
-        // A model or mode is switched on the process it has; other flags take a new one.
-        if all
+        // A model or mode is switched on the process it has, once the CLI
+        // takes it; anything else takes a new one. Waited for unlocked.
+        let switching = residents
+            .0
+            .lock()
+            .map_err(|_| AgentError::NotInstalled)?
             .get_mut(&staying.conversation_id)
-            .is_some_and(|live| live.started_as != wanted || !live.switched(turn))
-        {
+            .map(|live| {
+                (live.started_as == wanted)
+                    .then(|| live.switch(turn))
+                    .flatten()
+            });
+        let kept = match switching {
+            Some(Some((answers, count))) => switched(&answers, count),
+            Some(None) => false,
+            None => true,
+        };
+        let mut all = residents.0.lock().map_err(|_| AgentError::NotInstalled)?;
+        if !kept {
             if let Some(old) = all.remove(&staying.conversation_id) {
                 old.resident.close();
             }
@@ -341,14 +375,10 @@ fn idle_out(staying: &Staying, stamp: u64) {
     let _ = std::thread::Builder::new()
         .name("chat-idle".to_owned())
         .spawn(move || {
-            std::thread::sleep(IDLE);
-            // Remote Control lives in the process.
-            if crate::chat_remote::wanted(&app, &conversation) {
-                return;
-            }
-            if let Some(live) = app.state::<Residents>().idled(&conversation, stamp) {
-                live.resident.close();
-            }
+            app.state::<Residents>()
+                .idle_out(&conversation, stamp, IDLE, |key| {
+                    crate::chat_remote::wanted(&app, key)
+                });
         });
 }
 
@@ -412,6 +442,15 @@ pub(crate) fn steer(
     // One that died is not listening: the turn its chat runs instead takes it.
     all.get(conversation_id)
         .and_then(|live| live.resident.steer(prompt, uuid, id).then_some(true))
+}
+
+/// Asks this conversation's process to stop one background task. `None` when
+/// it has none listening, so the caller reaches the turn the other way.
+pub(crate) fn stop_task(app: &AppHandle, conversation_id: &str, task_id: &str) -> Option<bool> {
+    let residents = app.try_state::<Residents>()?;
+    let all = residents.0.lock().ok()?;
+    all.get(conversation_id)
+        .and_then(|live| live.resident.stop_task(task_id).then_some(true))
 }
 
 /// The steers this conversation's process never echoed back, by id.
@@ -493,8 +532,8 @@ fn started_as(turn: &Say<'_>) -> String {
 }
 
 /// The control requests that bring a process in `model` and `mode` to the
-/// turn's, one for each that changed. `None` when only a new process can: a
-/// request cannot name the CLI's own default.
+/// turn's, one for each that changed. `None` when only a new process can:
+/// back to no model or mode, which leaves it to the person's own settings.
 fn switches(model: Option<&str>, mode: Option<&str>, turn: &Say<'_>) -> Option<Vec<Value>> {
     if (model.is_some() && turn.model.is_none()) || (mode.is_some() && turn.permission.is_none()) {
         return None;
@@ -511,22 +550,49 @@ fn switches(model: Option<&str>, mode: Option<&str>, turn: &Say<'_>) -> Option<V
 }
 
 impl Live {
-    /// Switches it to the turn's model and mode. False when it takes a new
+    /// Asks it to switch to the turn's model and mode. The CLI's answers come
+    /// back on the receiver, as many as the count. `None` when it takes a new
     /// process.
-    fn switched(&mut self, turn: &Say<'_>) -> bool {
-        let Some(requests) = switches(self.model.as_deref(), self.permission.as_deref(), turn)
-        else {
-            return false;
-        };
-        let sent = requests.into_iter().all(|request| {
-            let id = format!("switch_{}", ulid::Ulid::generate());
-            self.resident.control(&id, request)
-        });
-        if sent {
-            self.model = turn.model.map(str::to_owned);
-            self.permission = turn.permission.map(str::to_owned);
+    fn switch(&mut self, turn: &Say<'_>) -> Option<(mpsc::Receiver<Value>, usize)> {
+        let requests = switches(self.model.as_deref(), self.permission.as_deref(), turn)?;
+        let (tell, answers) = mpsc::channel();
+        *self.switching.lock().ok()? = Some(tell);
+        let count = requests.len();
+        for request in requests {
+            let id = format!("{SWITCH}{}", ulid::Ulid::generate());
+            if !self.resident.control(&id, request) {
+                return None;
+            }
         }
-        sent
+        self.model = turn.model.map(str::to_owned);
+        self.permission = turn.permission.map(str::to_owned);
+        Some((answers, count))
+    }
+}
+
+/// Whether the CLI took every switch, in time. It refuses some: Full access
+/// for a process not started in it.
+fn switched(answers: &mpsc::Receiver<Value>, count: usize) -> bool {
+    (0..count).all(|_| {
+        answers
+            .recv_timeout(SWITCH_WAITS)
+            .is_ok_and(|said| said["subtype"] == "success")
+    })
+}
+
+/// Hands the CLI's answer to a switch to the turn waiting for it. Any other
+/// answer comes back.
+fn to_switch(waiting: &Mutex<Option<mpsc::Sender<Value>>>, said: Value) -> Option<Value> {
+    let ours = said["request_id"]
+        .as_str()
+        .is_some_and(|id| id.starts_with(SWITCH));
+    let tell = waiting.lock().ok().and_then(|held| held.clone());
+    match tell {
+        Some(tell) if ours => {
+            let _ = tell.send(said);
+            None
+        }
+        _ => Some(said),
     }
 }
 
@@ -581,9 +647,13 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
             *held = Some(id.to_owned());
         }
     });
+    let switching = Arc::new(Mutex::new(None));
+    let answering = switching.clone();
     let resident = Resident::start(driver, turn, on_session, move |heard| {
         if let Heard::Control(said) = heard {
-            crate::chat_remote::answered(&answers, said);
+            if let Some(said) = to_switch(&answering, said) {
+                crate::chat_remote::answered(&answers, said);
+            }
             return;
         }
         heard_by.hear(
@@ -598,6 +668,7 @@ fn start(staying: &Staying, turn: &Say<'_>, started_as: String) -> Result<Live, 
         started_as,
         model: turn.model.map(str::to_owned),
         permission: turn.permission.map(str::to_owned),
+        switching,
         project_id: staying.project_id.clone(),
         listens: staying.listens,
         turn: 0,

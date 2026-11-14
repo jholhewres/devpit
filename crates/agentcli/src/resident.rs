@@ -113,6 +113,9 @@ impl Resident {
                         }
                     }
                 });
+            // The CLI counts what the process has spent so far: a turn's cost
+            // is what it added.
+            let mut spent = 0.0;
             loop {
                 let started = Instant::now();
                 let (heard, whole) = next_turn(
@@ -123,10 +126,15 @@ impl Resident {
                     |part| tell(Heard::Part(part)),
                 );
                 if let Some(ending) = heard.ended {
+                    let cost_usd = ending.cost_usd.map(|total| {
+                        let turn = (total - spent).max(0.0);
+                        spent = total;
+                        turn
+                    });
                     tell(Heard::Ended(Box::new(Said {
                         end: TurnEnd {
                             turn_id: String::new(),
-                            cost_usd: ending.cost_usd,
+                            cost_usd,
                             duration_ms: Some(started.elapsed().as_millis() as f64),
                             stop_reason: ending.stop_reason,
                             is_error: ending.is_error,
@@ -172,6 +180,11 @@ impl Resident {
             &serde_json::json!({ "type": "control_request", "request_id": id, "request": request })
                 .to_string(),
         )
+    }
+
+    /// See [`Control::stop_task`].
+    pub fn stop_task(&self, task_id: &str) -> bool {
+        self.control.stop_task(task_id)
     }
 
     /// Stops the turn it is on and keeps it running.
