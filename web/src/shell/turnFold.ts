@@ -96,5 +96,6 @@ export function endedNow(end: Pick<TurnEnd, 'stopReason' | 'isError'> & Partial<
     costUsd: end.costUsd ?? null,
     durationMs: end.durationMs == null ? null : Math.round(end.durationMs),
     tokens: end.context?.used ?? null,
+    limit: end.limit ?? null,
   }
 }

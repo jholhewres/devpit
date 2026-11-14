@@ -138,7 +138,7 @@ impl Ear {
             (Listening::Woken(woken), Heard::Part(part)) => woken.heard(part),
             (Listening::Woken(_), Heard::Ended(said)) => {
                 if let Listening::Woken(woken) = std::mem::take(&mut now.listening) {
-                    woken.finish(transcript, head, said);
+                    woken.finish(transcript, head, *said);
                 }
             }
             (Listening::Woken(_), Heard::Gone) => {

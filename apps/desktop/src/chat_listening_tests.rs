@@ -103,7 +103,12 @@ fn the_person_waits_for_the_woken_turn_then_hears_only_their_own() {
     until_waiting(&ear);
     assert!(is_woken(&ear), "the woken turn is not taken from under it");
 
-    ear.hear(Heard::Ended(ended()), || unreachable!(), &transcript, &head);
+    ear.hear(
+        Heard::Ended(Box::new(ended())),
+        || unreachable!(),
+        &transcript,
+        &head,
+    );
     assert!(claiming.join().unwrap());
     ear.hear(
         Heard::Part(text("mine")),

@@ -140,6 +140,7 @@ pub fn say(
             stop_reason: ending.stop_reason,
             is_error: ending.is_error,
             context: ending.context,
+            limit: heard.limit,
             ..Default::default()
         },
         session_id: heard.session_id,

@@ -254,3 +254,41 @@ pub(crate) fn string_at(value: &serde_json::Value, key: &str) -> String {
         .unwrap_or_default()
         .to_owned()
 }
+
+/// A line saying the provider refused the turn, kept with what was heard
+/// before it: the reset comes on its own line, ahead of the error.
+pub(crate) fn limit(line: &str, was: Option<devpit_rpc::Limit>) -> Option<devpit_rpc::Limit> {
+    use devpit_rpc::{Limit, LimitKind};
+    // Most lines are neither: only these are worth parsing.
+    if !line.contains("rate_limit_event") && !line.contains("\"error\"") {
+        return was;
+    }
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+        return was;
+    };
+    let resets_at = was.and_then(|limit| limit.resets_at);
+    match value.get("type").and_then(serde_json::Value::as_str) {
+        Some("rate_limit_event") => {
+            let info = &value["rate_limit_info"];
+            if info["status"] != "rejected" {
+                return was;
+            }
+            Some(Limit {
+                kind: LimitKind::RateLimit,
+                resets_at: info["resetsAt"].as_f64().or(resets_at),
+            })
+        }
+        Some("assistant") => match value["error"].as_str() {
+            Some("rate_limit") => Some(Limit {
+                kind: LimitKind::RateLimit,
+                resets_at,
+            }),
+            Some("server_error") => Some(Limit {
+                kind: LimitKind::Outage,
+                resets_at: None,
+            }),
+            _ => was,
+        },
+        _ => was,
+    }
+}

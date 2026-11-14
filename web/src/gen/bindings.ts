@@ -258,6 +258,7 @@ export const commands = {
 	/**  The model the CLI said it ran on, and the effort it was asked for. */
 	model?: string | null,
 	effort?: string | null,
+	limit?: Limit | null,
 } | null, RpcError>(__TAURI_INVOKE("chat_cancel", { conversationId })),
 	/**
 	 *  `chat.force_stop` — ends the turn in flight however it is: what a stop
@@ -3487,6 +3488,8 @@ export type Ended = {
 	durationMs?: number | null,
 	/**  How full the context was when it ended. */
 	tokens?: number | null,
+	/**  As [`TurnEnd::limit`]. Absent from a line written before it existed. */
+	limit?: Limit | null,
 };
 
 /**  A session of the account that ran and ended, as devpit saw it. */
@@ -4068,6 +4071,19 @@ export type LessonProposals = {
 	proposals: LessonProposal[],
 	decisions: MemoryDecision[],
 };
+
+/**  A turn the provider refused, and when it may answer again. */
+export type Limit = {
+	kind: LimitKind,
+	/**  Unix seconds, when the CLI said. */
+	resetsAt: number | null,
+};
+
+/**
+ *  Why the provider would not answer: the account's limit, or the service
+ *  itself failing.
+ */
+export type LimitKind = "rate_limit" | "outage";
 
 /**  A devpit terminal, as a tab attaches to it. */
 export type LivePane = {
@@ -6209,6 +6225,7 @@ export type TurnEnd = {
 	/**  The model the CLI said it ran on, and the effort it was asked for. */
 	model?: string | null,
 	effort?: string | null,
+	limit?: Limit | null,
 };
 
 /**  Where a turn the person sent came from, other than the composer. */

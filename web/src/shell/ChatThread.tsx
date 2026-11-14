@@ -4,6 +4,7 @@ import type { Message } from '../gen/bindings'
 import { steeredAnswers } from './activity'
 import { continuable, retryable, unanswered } from './chat'
 import { useMessage, useMessagesPick, type ChatMessages } from './chatMessages'
+import { LimitBanner } from './LimitBanner'
 import { Turn } from './Turn'
 import { outcome, statusOf, type Outcome } from './turnFold'
 import type { Reveal } from './useJump'
@@ -75,7 +76,7 @@ export function ChatThread({
   const ids = useMessagesPick(messages, idsOf)
   const lost = useMessagesPick(messages, lostOf)
   const steered = useMessagesPick(messages, steeredAnswers)
-  const end = useMessagesPick(messages, (all) => ({ unanswered: unanswered(all, sending), continuable: continuable(all, sending), retry: retryable(all, sending) }))
+  const end = useMessagesPick(messages, (all) => ({ unanswered: unanswered(all, sending), continuable: continuable(all, sending), retry: retryable(all, sending), limit: all.at(-1)?.ended?.limit ?? null }))
   const guess = useCallback((id: string) => estimate(messages.byId(id)), [messages])
   const view = useWindow(ids, guess, box)
   /* Sent again from here: not offered twice. */
@@ -118,7 +119,9 @@ export function ChatThread({
       ))}
       {view.after > 0 && <div className="thread__gap" style={{ height: view.after - GAP }} aria-hidden />}
       {end.unanswered && <p className="said__cmd">No answer was saved for this — the app closed while the turn was running.</p>}
-      {(end.continuable || end.retry !== null) && (
+      {end.limit && end.retry !== null ? (
+        <LimitBanner limit={end.limit} onRetry={() => onRetry(end.retry!)} />
+      ) : (end.continuable || end.retry !== null) && (
         <div className="thread__end">
           {end.continuable && <button className="thread__go" onClick={onContinue}>Continue</button>}
           {end.retry !== null && <button className="thread__go" onClick={() => onRetry(end.retry!)}>Retry</button>}

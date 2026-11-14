@@ -99,7 +99,7 @@ pub use devflow_screen::{
     DevflowTeam, DevflowTeamChange, DevflowTeamChanges,
 };
 pub use display::{Display, DisplayBackend, DisplayWhy};
-pub use ended::{Ended, TurnEnd};
+pub use ended::{Ended, Limit, LimitKind, TurnEnd};
 pub use error::{ErrorCode, RpcError};
 pub use file::{FileContents, FileKind, FileSaved};
 pub use focus::{HeadsDown, Waiting};

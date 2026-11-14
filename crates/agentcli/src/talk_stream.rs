@@ -20,6 +20,8 @@ pub(crate) struct Heard {
     /// The CLI's own reason, cost and error flag. `None` when the stream ended
     /// without an end frame, which means the turn was stopped.
     pub ended: Option<Ending>,
+    /// The provider refused the turn: a rate limit or an outage.
+    pub limit: Option<devpit_rpc::Limit>,
 }
 
 /// The CLI's own end frame, as it said it.
@@ -84,6 +86,7 @@ fn one_turn(
             control.heard(&uuid);
         }
         heard.anchor = driver.anchor(&line).or(heard.anchor);
+        heard.limit = crate::claude_lines::limit(&line, heard.limit);
         match driver.read(&line) {
             Read::Parts(parts) => parts.into_iter().for_each(|part| {
                 running.saw(&part);
