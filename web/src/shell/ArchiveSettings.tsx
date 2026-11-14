@@ -16,8 +16,8 @@ export function ArchiveSettings(): React.JSX.Element {
   useEffect(() => {
     if (!projectId) return
     let live = true
-    void ask(() => commands.chatList(projectId)).then((answer) => {
-      if (live) setArchived((answer.data?.conversations ?? []).filter((one) => one.marks?.archived))
+    void ask(() => commands.chatArchived(projectId)).then((answer) => {
+      if (live) setArchived(answer.data?.conversations ?? [])
     })
     return () => {
       live = false

@@ -44,8 +44,7 @@ export function useConversations(
   useEffect(() => {
     if (!projectId) return setThreads([])
     let live = true
-    /* Archived ones are out of every list; Settings → Archive reads them itself. */
-    void ask(() => commands.chatList(projectId)).then((answer) => live && setThreads((answer.data?.conversations ?? []).filter((one) => !one.marks?.archived)))
+    void ask(() => commands.chatList(projectId)).then((answer) => live && setThreads(answer.data?.conversations ?? []))
     return () => {
       live = false
     }

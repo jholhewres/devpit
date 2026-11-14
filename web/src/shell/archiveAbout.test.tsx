@@ -1,15 +1,14 @@
-import { cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ConversationMarks, Thread } from '../gen/bindings'
 import { AboutSettings } from './AboutSettings'
 import { ArchiveSettings } from './ArchiveSettings'
-import { useConversations } from './useConversations'
 
 const thread = (id: string, title: string, marks: Partial<ConversationMarks> = {}): Thread =>
   ({ id, title, profile: 'claude', model: null, costUsd: 0, lastAt: 1_800_000_000, cwd: null, marks }) as Thread
 
-const listed = [thread('c1', 'Fix the parser'), thread('c2', 'Old spike', { archived: true, name: 'Spike on caching' })]
+const archived = [thread('c2', 'Old spike', { archived: true, name: 'Spike on caching' })]
 const marked = vi.fn()
 const opened = vi.fn()
 const reload = vi.fn()
@@ -17,7 +16,7 @@ const reload = vi.fn()
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
   commands: {
-    chatList: async () => ({ conversations: listed }),
+    chatArchived: async () => ({ conversations: archived }),
     chatMark: async (_p: string, id: string, marks: ConversationMarks) => (marked(id, marks), marks),
     agentProfiles: async () => [],
     appInfo: async () => ({ version: '0.1.50', platform: 'linux', statePath: '/x', dev: false }),
@@ -32,15 +31,9 @@ afterEach(() => {
 })
 
 describe('an archived conversation', () => {
-  it('leaves the conversation lists', async () => {
-    const { result } = renderHook(() => useConversations('p1', vi.fn(), [], vi.fn()))
-    await waitFor(() => expect(result.current.threads.map((one) => one.id)).toEqual(['c1']))
-  })
-
   it('is listed in Settings → Archive, and Restore puts it back', async () => {
     render(<ArchiveSettings />)
     await waitFor(() => expect(screen.getByText('Spike on caching')).toBeTruthy())
-    expect(screen.queryByText('Fix the parser')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Restore' }))
     await waitFor(() => expect(screen.queryByText('Spike on caching')).toBeNull())
     expect(marked).toHaveBeenCalledWith('c2', expect.objectContaining({ archived: false, name: 'Spike on caching' }))

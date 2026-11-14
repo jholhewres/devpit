@@ -1,6 +1,13 @@
 import { useDetails, useDetailsMenu } from './chatDetails'
 import { useShell } from './useShell'
 
+/*
+ * Where the work happens: the project, the machine and the branch.
+ *
+ * Quieter than the composer's own chips, because these describe the
+ * conversation rather than steer the turn.
+ */
+
 export function ChatWhere(): React.JSX.Element {
   const { project } = useShell()
   const shows = useDetails()

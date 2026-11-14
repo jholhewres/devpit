@@ -82,6 +82,15 @@ fn seconds(path: &Path) -> f64 {
         .unwrap_or_default()
 }
 
+/// The conversations in the lists, or only the archived ones: an archived
+/// conversation is out of every list but Settings → Archive.
+pub fn listed(dir: &Path, archived: bool) -> Vec<Summary> {
+    conversations(dir)
+        .into_iter()
+        .filter(|one| one.marks.archived == archived)
+        .collect()
+}
+
 /// Every conversation in a project's `sessions`, most recently spoken in first.
 pub fn conversations(dir: &Path) -> Vec<Summary> {
     let Ok(entries) = std::fs::read_dir(dir) else {
