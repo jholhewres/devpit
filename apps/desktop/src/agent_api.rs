@@ -45,7 +45,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 53] = [
+pub(crate) const METHODS: [&str; 56] = [
     "context",
     "board",
     "card",
@@ -99,6 +99,9 @@ pub(crate) const METHODS: [&str; 53] = [
     "project_agent_brief",
     "schedules",
     "schedule_propose",
+    "heartbeat_status",
+    "briefing",
+    "telegram_send",
 ];
 
 /// The methods that change the board, and so tell the window.

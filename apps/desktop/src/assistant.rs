@@ -100,7 +100,13 @@ pub(crate) fn brief_in(folder: &Path, on: bool) -> std::io::Result<()> {
 
 /// The methods only an orchestrator in Assistant mode is answered, for the
 /// agent API's list.
-pub(crate) const METHODS: [&str; 2] = ["schedules", "schedule_propose"];
+pub(crate) const METHODS: [&str; 5] = [
+    "schedules",
+    "schedule_propose",
+    "heartbeat_status",
+    "briefing",
+    "telegram_send",
+];
 
 /// One of [`METHODS`], asked by the orchestrator `here` about `project`.
 pub(crate) fn respond(
@@ -112,7 +118,21 @@ pub(crate) fn respond(
     params: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     require(here)?;
-    crate::schedules::respond(app, method, here, project, projects, params)
+    match method {
+        "heartbeat_status" => crate::assistant_watch::status(here),
+        "briefing" => {
+            let hours = params
+                .get("hours")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(24);
+            let since = crate::ended_sessions::now_secs() - hours.clamp(1, 24 * 14) as i64 * 3600;
+            Ok(serde_json::json!(crate::briefing::briefing(
+                here, projects, since
+            )))
+        }
+        "telegram_send" => crate::assistant_watch::telegram(params),
+        _ => crate::schedules::respond(app, method, here, project, projects, params),
+    }
 }
 
 /// The orchestrator `here`, when its Assistant mode is on; why not otherwise.

@@ -19,12 +19,14 @@ mod asking_kept;
 mod asking_picks;
 mod asking_plan;
 mod assistant;
+mod assistant_watch;
 mod attaching;
 mod attaching_chat;
 mod blocks;
 mod board;
 mod board_page;
 mod branches;
+mod briefing;
 mod browser;
 mod browser_cookies;
 mod browser_driving;
@@ -552,6 +554,7 @@ fn main() {
             desk::shortcut_restore(app.handle());
             // A card's date goes off at its time, whatever project it is in.
             reminders::watch(app.handle().clone());
+            assistant_watch::watch(app.handle().clone());
             // devpit's half of each orchestrator's brief, as this build has it.
             orchestrator::seed_all_on_start();
             // Hooks are how the board hears about work as it happens rather

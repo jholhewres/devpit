@@ -170,6 +170,14 @@ export const PREFS_NAV: readonly NavGroup[] = [
         ),
       },
       {
+        id: 'assistant',
+        label: 'Assistant',
+        about: 'assistant mode heartbeat schedules routines proactive check in ci blocked waiting briefing away',
+        icon: (
+          <svg {...stroke}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M5 3 2 6M22 6l-3-3" /></svg>
+        ),
+      },
+      {
         id: 'decisions',
         label: 'Decisions',
         about: 'jev typesafe openrouter vercel gateway rubric gate judge classify verdict probability key cap',
