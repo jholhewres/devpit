@@ -135,3 +135,124 @@ fn a_process_that_dies_mid_turn_is_heard_as_gone() {
     };
     assert_eq!((next(), next()), ("half".to_owned(), "<gone>".to_owned()));
 }
+
+fn script(dir: &Path, body: &str) -> String {
+    let cli = dir.join("fake-claude");
+    std::fs::write(&cli, body).expect("script");
+    std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    cli.to_string_lossy().into_owned()
+}
+
+/// A CLI that takes a while to start, then answers each line with its pid.
+const STARTS_SLOWLY: &str = r#"#!/bin/sh
+sleep 0.5
+n=0
+while read -r _next; do
+  n=$((n+1))
+  printf '{"type":"system","subtype":"init","session_id":"s-1"}\n'
+  printf '{"type":"assistant","message":{"id":"m-%s","role":"assistant","content":[{"type":"text","text":"%s"}]},"session_id":"s-1"}\n' "$n" "$$"
+  printf '{"type":"result","subtype":"success","session_id":"s-1","total_cost_usd":0}\n'
+done
+"#;
+
+/// Turn start, measured from the prompt to the first word of the answer: a
+/// process per turn starts the CLI each time, the process that stays does not.
+#[test]
+fn a_resident_starts_its_next_turn_without_starting_the_cli_again() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let command = script(dir.path(), STARTS_SLOWLY);
+
+    let per_turn = (0..5)
+        .find_map(|_| {
+            let asked = std::time::Instant::now();
+            let mut first = None;
+            match crate::talk::say(
+                driver("claude").expect("driver").as_ref(),
+                &turn(&command),
+                |_| {
+                    first.get_or_insert_with(|| asked.elapsed());
+                },
+                |_| {},
+            ) {
+                Err(crate::AgentError::NotInstalled) => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    None
+                }
+                other => {
+                    other.expect("a turn of its own");
+                    first
+                }
+            }
+        })
+        .expect("a process of its own answered");
+
+    let (tell, heard) = mpsc::channel();
+    let resident = started(&command, tell);
+    let next = || {
+        heard
+            .recv_timeout(Duration::from_secs(5))
+            .expect("heard in time")
+    };
+    assert!(resident.say("one"));
+    assert_eq!(next(), resident.pid().to_string());
+    assert_eq!(next(), "<ended>");
+    let asked = std::time::Instant::now();
+    assert!(resident.say("two"));
+    assert_eq!(next(), resident.pid().to_string(), "the same process");
+    let staying = asked.elapsed();
+    eprintln!("turn start: {per_turn:?} with a process per turn, {staying:?} on one that stays");
+    assert!(
+        staying * 2 < per_turn,
+        "{staying:?} on the process that stays, {per_turn:?} per turn"
+    );
+    resident.close();
+}
+
+/// Interrupts a turn that runs until it is stopped, and echoes a steer back.
+const RUNS_UNTIL_STOPPED: &str = r#"#!/bin/sh
+n=0
+while read -r line; do
+  case "$line" in
+    *'"subtype":"interrupt"'*)
+      printf '{"type":"result","subtype":"error_during_execution","session_id":"s-1","total_cost_usd":0}\n' ;;
+    *'"uuid"'*)
+      uuid=$(printf '%s' "$line" | sed 's/.*"uuid":"\([^"]*\)".*/\1/')
+      printf '{"type":"user","isReplay":true,"uuid":"%s","session_id":"s-1","message":{"role":"user","content":[{"type":"text","text":"more"}]}}\n' "$uuid" ;;
+    *)
+      n=$((n+1))
+      printf '{"type":"system","subtype":"init","session_id":"s-1"}\n'
+      printf '{"type":"assistant","message":{"id":"m-%s","role":"assistant","content":[{"type":"text","text":"%s"}]},"session_id":"s-1"}\n' "$n" "$$" ;;
+  esac
+done
+"#;
+
+#[test]
+fn an_interrupt_ends_the_turn_and_the_same_process_takes_the_next() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let command = script(dir.path(), RUNS_UNTIL_STOPPED);
+    let (tell, heard) = mpsc::channel();
+    let resident = started(&command, tell);
+    let pid = resident.pid().to_string();
+    let until_ended = || {
+        let mut said = Vec::new();
+        while said.last().map(String::as_str) != Some("<ended>") {
+            said.push(
+                heard
+                    .recv_timeout(Duration::from_secs(5))
+                    .expect("heard in time"),
+            );
+        }
+        said
+    };
+
+    assert!(resident.say("go"));
+    assert!(resident.steer("more", "u-1", "said-1"));
+    assert!(resident.interrupt());
+    assert!(until_ended().contains(&pid));
+    assert!(resident.unheard().is_empty(), "the steer was taken in");
+
+    assert!(resident.say("again"));
+    assert!(resident.interrupt());
+    assert!(until_ended().contains(&pid), "the same process answered");
+    resident.close();
+}
