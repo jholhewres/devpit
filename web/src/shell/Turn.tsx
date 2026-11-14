@@ -113,7 +113,7 @@ function Answer({
       {!live && !failed && activity !== 'zen' && (hides || ended) && (
         <TurnStatus message={message} work={shown.flatMap(rows)} hides={hides} open={open} toggle={() => setOpen((was) => !was)} />
       )}
-      <Segments message={message} every={every} shown={shown} answer={answer} folded={hides && !open && activity !== 'zen'} lastWork={failed ? lastWork : -1} activity={activity} steered={steered} />
+      <Segments message={message} every={every} shown={shown} answer={answer} folder={folder} folded={hides && !open && activity !== 'zen'} lastWork={failed ? lastWork : -1} activity={activity} steered={steered} />
       <TurnDelegations parts={message.parts} />
       <TurnDrafts parts={message.parts} />
       <TurnApps parts={message.parts} messageId={message.id} />
@@ -136,11 +136,13 @@ function Segments({
   lastWork,
   activity,
   steered,
+  folder,
 }: {
   message: Message
   every: readonly Part[]
   shown: readonly Segment[]
   answer: number
+  folder: string | null
   folded: boolean
   /** The work a failed turn ended on, kept open; -1 for none. */
   lastWork: number
@@ -155,7 +157,7 @@ function Segments({
         if (folded && at !== answer && one.kind !== 'said') return null
         if (!drawn(one, at, answer, activity, steered)) return null
         if (one.kind === 'prose')
-          return <Reply key={one.at} source={one.text} live={live && at === last} />
+          return <Reply key={one.at} source={one.text} live={live && at === last} folder={folder} />
         if (one.kind === 'said')
           return (
             <pre className="said__cmd" key={one.at}>
@@ -223,11 +225,12 @@ function Failed({ message }: { message: Message }): React.JSX.Element {
 
 /* The answer as it has arrived: the backend paces it into batches, and each
    new block fades in rather than the text being typed out on a timer. */
-function Reply({ source, live }: { source: string; live: boolean }): React.JSX.Element {
+function Reply({ source, live, folder }: { source: string; live: boolean; folder: string | null }): React.JSX.Element {
   const opens = useContext(OpensPath)
   return (
     <div className="reply" data-live={live || undefined} data-fade={(live && !reducedMotion()) || undefined}>
-      <Markdown source={source} live={live} opens={opens ?? undefined} />
+      {/* A path ending in `/` is the folder itself: a picture the answer names is read there. */}
+      <Markdown source={source} live={live} opens={opens ?? undefined} path={folder ? `${folder.replace(/\/$/, '')}/` : undefined} />
     </div>
   )
 }
