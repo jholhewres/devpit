@@ -12,6 +12,7 @@ import { FilesPane } from './FilesPane'
 import { McpPane } from './McpPane'
 import type { PaneName } from './paneList'
 import { PluginsPane } from './PluginsPane'
+import { SchedulesPane } from './SchedulesPane'
 import { SkillsPane } from './SkillsPane'
 import type { Tab } from './strip'
 import { TerminalPane } from './TerminalPane'
@@ -111,6 +112,7 @@ export const PANE_MOUNTS: readonly PaneMount[] = [
   { name: 'mcps', many: false, className: 'pane', render: () => <McpPane /> },
   { name: 'plugins', many: false, className: 'pane', render: () => <PluginsPane /> },
   { name: 'browser', many: true, className: 'pane pane--browser', render: (tab) => <BrowserPane tab={tab} /> },
+  { name: 'schedules', many: false, className: 'pane', render: () => <SchedulesPane /> },
   { name: 'files', many: false, className: 'pane', render: () => <FilesPane /> },
   { name: 'workspace', many: false, className: 'pane', render: () => <WorkspacePane /> },
   { name: 'chat', many: true, className: 'pane', render: (tab) => <ChatPane tab={tab} /> },

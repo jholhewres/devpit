@@ -305,6 +305,7 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
         // What else the server lists: an orchestrator's tools, and Decisions'.
         "orchestrator": orchestrator,
         "decisions": crate::decisions::key().is_some(),
+        "assistant": orchestrator && crate::assistant::on(store, root),
     })
 }
 
