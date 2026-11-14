@@ -7,7 +7,8 @@ itself, and has it write the brief a card's session starts with instead of
 writing that brief by hand.
 
 It answers and briefs. It does not edit files, move cards or start sessions,
-and it stays in its own project.
+and it stays in its own project. The project's own sessions consult it too,
+while they work.
 
 ## How the orchestrator reaches it
 
@@ -24,6 +25,37 @@ Neither call starts a card session, opens a terminal or touches a checkout.
 The brief is text for the orchestrator to pass as `devpit_start_session`'s
 `prompt`. The card's own text goes to the agent marked as data, not as
 instructions.
+
+## How a project's sessions reach it
+
+A session working in a project, on a card or in the project's folder, has
+two MCP tools of its own, apart from the orchestrator's and the assistant's:
+
+| Tool | Takes | Answers |
+|---|---|---|
+| `devpit_project_agent_consult` | `question` | `{ project, answer, woke, left }` |
+| `devpit_project_agent_propose` | `kind` (`fact`, `lesson` or `decision`), `text`, `cardId` | `{ project, proposed, source, waiting }` |
+
+Neither takes a `project`: a session reaches its own project's agent, the
+same process the orchestrator asks, and no other. Both are refused to an
+orchestrator, which has its own pair, and in a project whose agent was never
+asked, which has none yet. The agent is woken under the profile of an
+orchestrator linked to the project, as for a closed card.
+
+- **A budget of questions.** A session asks at most ten questions; `left`
+  says how many remain, and one past the budget is refused without reaching
+  the agent. A question the agent could not answer is not counted.
+- **Proposals, never writes.** What a session wants remembered goes to
+  `proposed.md`, with the card it came from (`cardId`, or the card whose
+  checkout the session stands in) as its source, and waits for Approve, Edit
+  or Discard like any other proposal. The memory files change only once the
+  person approves it.
+- **Briefed to ask first.** A session the orchestrator starts in a project
+  with an agent finds a short section after its task, under
+  `## The project agent`: consult the agent before exploring broadly or
+  choosing a pattern its memory may settle, and propose rather than edit
+  `.devpit/project-agent/`. A brief for a project without an agent goes as it
+  was.
 
 ## The process
 

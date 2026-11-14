@@ -43,6 +43,7 @@ fn every_tool_named_here_is_one_devpit_has() {
         .chain(&SETUP_TOOLS)
         .chain(STAGED.iter().map(|(_, tool)| tool))
         .chain(&crate::assistant::TOOLS)
+        .chain(&crate::consult::TOOLS)
         .map(|tool| tool.name)
         .collect();
     for name in ORCHESTRATOR_ONLY
@@ -252,4 +253,37 @@ fn turning_assistant_mode_on_or_off_changes_the_list() {
     let on = json!({ "offer": "off", "orchestrator": true, "assistant": true });
     assert!(watch.settle(looked, Ok(on)).is_some());
     assert_eq!(watch.seat.assistant, Some(true));
+}
+
+/// A project's own session is offered its project agent, to ask and to
+/// propose, without `project`: its own is the only one it reaches. The
+/// orchestrator keeps its own pair, and an app too old to say offers neither.
+#[test]
+fn a_projects_session_is_offered_its_own_project_agent_and_no_one_else_is() {
+    const SESSION_TOOLS: [&str; 2] = [
+        "devpit_project_agent_consult",
+        "devpit_project_agent_propose",
+    ];
+    let orchestrator = Seat {
+        orchestrator: Some(true),
+        decisions: Some(false),
+        assistant: None,
+    };
+    let session = tools(&Offer::Off, &PROJECT);
+    for name in SESSION_TOOLS {
+        let tool = session
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap_or_else(|| panic!("{name} was not offered to a project's session"));
+        assert!(
+            tool["inputSchema"]["properties"].get("project").is_none(),
+            "{name}"
+        );
+        for seat in [&orchestrator, &Seat::default()] {
+            assert!(
+                !names(&tools(&Offer::Off, seat)).contains(&name),
+                "{name}: {seat:?}"
+            );
+        }
+    }
 }

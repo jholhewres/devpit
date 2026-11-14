@@ -142,7 +142,11 @@ fn a_refusal_carries_what_devpit_said() {
 /// not like a lookup.
 #[test]
 fn the_project_agent_is_waited_for_while_it_reads() {
-    for method in ["project_agent_ask", "project_agent_brief"] {
+    for method in [
+        "project_agent_ask",
+        "project_agent_brief",
+        "project_agent_consult",
+    ] {
         assert!(
             wait_for(method) >= std::time::Duration::from_secs(600),
             "{method}"

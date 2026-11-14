@@ -45,7 +45,7 @@ pub(crate) struct Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 56] = [
+pub(crate) const METHODS: [&str; 58] = [
     "context",
     "board",
     "card",
@@ -97,6 +97,8 @@ pub(crate) const METHODS: [&str; 56] = [
     "devflow_stage",
     "project_agent_ask",
     "project_agent_brief",
+    "project_agent_consult",
+    "project_agent_propose",
     "schedules",
     "schedule_propose",
     "heartbeat_status",
@@ -480,6 +482,9 @@ fn respond_in(
             &asked.params,
         );
     }
+    if crate::project_agent::SESSION_METHODS.contains(&asked.method.as_str()) {
+        return crate::project_agent::from_session(app, here, projects, asked);
+    }
     if crate::project_agent::METHODS.contains(&asked.method.as_str()) {
         return crate::project_agent::respond(
             app,
@@ -693,7 +698,10 @@ fn respond_in(
                 orchestrating(here)?,
                 &crate::orchestrator_notes::briefed(
                     Path::new(&here.root_path),
-                    &text("prompt").unwrap_or_default(),
+                    &crate::project_agent::nudged(
+                        &text("prompt").unwrap_or_default(),
+                        Path::new(&project.root_path),
+                    ),
                     Some(crate::orchestrator_notes::ProjectName {
                         id: &project.id,
                         name: &project.name,
@@ -721,7 +729,10 @@ fn respond_in(
                 &card_id,
                 &crate::orchestrator_notes::briefed(
                     Path::new(&here.root_path),
-                    &text("prompt").unwrap_or_default(),
+                    &crate::project_agent::nudged(
+                        &text("prompt").unwrap_or_default(),
+                        Path::new(&project.root_path),
+                    ),
                     Some(crate::orchestrator_notes::ProjectName {
                         id: &project.id,
                         name: &project.name,
@@ -1044,14 +1055,18 @@ fn first_column(board: &Board) -> Result<&Column, String> {
         .ok_or_else(|| "this board has no columns".to_owned())
 }
 
-fn context(project: &Project, board: &Board, cwd: &Path) -> Value {
-    // The card whose own checkout the agent stands in, when it stands in one.
+/// The card whose own checkout the agent stands in, when it stands in one.
+pub(crate) fn card_at<'a>(board: &'a Board, cwd: &Path) -> Option<&'a Card> {
     let here = resolved(cwd);
-    let card = board.cards.iter().find(|card| {
+    board.cards.iter().find(|card| {
         card.worktree_path
             .as_deref()
             .is_some_and(|tree| here.starts_with(resolved(Path::new(tree))))
-    });
+    })
+}
+
+fn context(project: &Project, board: &Board, cwd: &Path) -> Value {
+    let card = card_at(board, cwd);
     json!({
         "project": { "id": project.id, "name": project.name, "root": project.root_path },
         "columns": board.columns.iter().map(|column| json!({

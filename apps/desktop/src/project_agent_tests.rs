@@ -325,3 +325,111 @@ fn a_recheck_runs_when_the_agent_wakes_and_never_on_its_idle_timer() {
     assert!(lines[2].contains("<stale>"), "{lines:?}");
     assert!(lines[3].contains("third"), "{lines:?}");
 }
+
+/// [`Agents::consult`], with the retry [`asked`] has.
+fn consulted(agents: &Agents, bench: &Bench, session: &str, question: &str) -> (Answer, u32) {
+    for _ in 0..5 {
+        match agents.consult("p1", session, &wake(bench), question) {
+            Err(why) if why.contains(NOT_STARTED) => std::thread::sleep(Duration::from_millis(50)),
+            other => return other.expect("answered"),
+        }
+    }
+    panic!("the stand-in never started");
+}
+
+/// A session asks within its budget: each answer says how many questions are
+/// left, the one past it never reaches the agent, a question the agent could
+/// not answer is not counted, and another session has a budget of its own.
+#[test]
+fn a_sessions_questions_stop_at_its_budget_and_each_answer_says_what_is_left() {
+    let bench = bench();
+    let agents = Agents::idling_after(Duration::from_secs(60));
+    let broken = Wake {
+        command: "/nowhere/claude",
+        ..wake(&bench)
+    };
+    assert!(agents.consult("p1", "s-1", &broken, "Lost?").is_err());
+    for asked in 1..=QUESTIONS {
+        let (answer, left) = consulted(&agents, &bench, "s-1", "Where are the guards?");
+        assert_eq!(answer.text, format!("answer {asked}"));
+        assert_eq!(left, QUESTIONS - asked);
+    }
+    let refused = agents
+        .consult("p1", "s-1", &wake(&bench), "One more?")
+        .map(|_| ())
+        .expect_err("past the budget");
+    assert!(refused.contains("budget"), "{refused}");
+    assert!(!log(&bench.log).contains("One more?"));
+
+    let (_, left) = consulted(&agents, &bench, "s-2", "And mine?");
+    assert_eq!(left, QUESTIONS - 1);
+}
+
+/// What a session wants remembered waits as a proposal: no memory file
+/// changes until the person approves it, and a discarded one leaves no trace.
+#[test]
+fn a_sessions_proposal_writes_nothing_to_memory_until_approved() {
+    let bench = bench();
+    let root = bench.root.as_path();
+    crate::project_memory::seed(root, "2026-11-14").expect("seeded");
+    let memory = || {
+        crate::project_memory::FILES.map(|file| {
+            std::fs::read_to_string(root.join(crate::project_memory::DIR).join(file))
+                .unwrap_or_default()
+        })
+    };
+    let before = memory();
+    let proposed = [
+        ("fact", "facts.md", "The guards run with cargo xtask check."),
+        ("lesson", "lessons.md", "Run make fmt after a Rust edit."),
+        (
+            "decision",
+            "decisions.md",
+            "Sessions propose and never write.",
+        ),
+    ];
+    for (kind, file, text) in proposed {
+        assert_eq!(
+            propose_for_session(root, "2026-11-14", "#355", kind, text),
+            Ok(file)
+        );
+    }
+    assert_eq!(memory(), before, "a proposal wrote to the memory");
+    assert_eq!(crate::project_memory::proposals(root).len(), 3);
+
+    let decide = |text: &str, kept: Option<&str>| {
+        crate::project_memory::decide(root, "2026-11-15", "#355", text, None, kept)
+            .expect("decided");
+    };
+    decide(proposed[0].2, None);
+    assert_eq!(memory(), before, "a discarded proposal wrote to the memory");
+    decide(proposed[1].2, Some(proposed[1].2));
+    assert!(memory()[1].contains("- 2026-11-15 · #355 · Run make fmt after a Rust edit.\n"));
+
+    for (kind, text) in [("secret", "x"), ("fact", "  ")] {
+        assert!(propose_for_session(root, "2026-11-14", "#355", kind, text).is_err());
+    }
+}
+
+/// A session's brief says to consult the agent first, once; a project whose
+/// agent was never asked, and an empty brief, go as they were.
+#[test]
+fn a_brief_says_to_consult_the_project_agent_first_and_old_briefs_still_work() {
+    let bench = bench();
+    let brief = "Fix the invoice total.";
+    assert_eq!(nudged(brief, &bench.root), brief);
+
+    crate::project_memory::seed(&bench.root, "2026-11-14").expect("seeded");
+    let once = nudged(brief, &bench.root);
+    assert!(once.starts_with(brief), "{once}");
+    for said in [
+        "devpit_project_agent_consult",
+        "devpit_project_agent_propose",
+        "before",
+        &format!("{QUESTIONS} questions"),
+    ] {
+        assert!(once.contains(said), "{said}: {once}");
+    }
+    assert_eq!(nudged(&once, &bench.root), once);
+    assert_eq!(nudged("  ", &bench.root), "  ");
+}

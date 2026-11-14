@@ -259,14 +259,7 @@ fn close(app: &AppHandle, project_id: &str, card_id: &str) -> Result<(), String>
         .map(|(_, findings)| findings);
     let day = crate::project_agent::today();
     project_memory::measure(root, &day, &source, rounds.len(), repeated(&kept))?;
-    let profile = listed
-        .projects
-        .iter()
-        .filter(|one| {
-            crate::orchestrator_links::linked(Path::new(&one.root_path)).contains(&project.id)
-        })
-        .find_map(|one| one.orchestrator.clone())
-        .ok_or("no orchestrator is linked to this project")?;
+    let profile = crate::project_agent::linked_profile(&listed.projects, &project.id)?;
     let (command, env, mcp) = crate::project_agent::waking(&profile)?;
     let wake = Wake {
         command: &command,

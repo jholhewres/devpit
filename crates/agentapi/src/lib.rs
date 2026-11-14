@@ -15,6 +15,7 @@ pub mod apps;
 mod assistant;
 pub mod cli;
 pub mod client;
+mod consult;
 pub mod devflow;
 pub mod events;
 pub mod guide;
