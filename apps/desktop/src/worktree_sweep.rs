@@ -134,11 +134,12 @@ fn sweep_card(
         .as_deref()
         .map(PathBuf::from)
         .filter(|path| path.is_dir() && devpit_git::landing::linked_checkout(root, path));
+    let recorded = store.card_branch(&card.id).ok().flatten();
     let branch = match &checkout {
         Some(path) => devpit_git::branch_at(path)
             .ok()
             .filter(|name| !name.is_empty()),
-        None => devpit_git::branch_left(root, &card.id),
+        None => devpit_git::branch_left(root, &card.id, recorded.as_deref()),
     };
     let Some(branch) = branch else {
         return;
@@ -186,7 +187,8 @@ fn sweep_card(
         .as_deref()
         .and_then(|caches| card_cache(caches, &card.id));
     freed += cache.as_deref().and_then(drop_dir).unwrap_or(0);
-    if devpit_git::landing::drop_landed(root, &branch, &card.id, began).is_ok() {
+    if devpit_git::landing::drop_landed(root, &branch, &card.id, recorded.as_deref(), began).is_ok()
+    {
         run.branches += 1;
     }
     if checkout.is_some() || freed > 0 {

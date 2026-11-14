@@ -60,9 +60,15 @@ impl World {
         }
     }
 
-    /// A card with a checkout of its own, one commit in, a build in `target`
-    /// and a build cache of its own.
+    /// A card on the branch an older devpit named, which it never recorded.
     fn card(&self, title: &str) -> (String, PathBuf, String) {
+        self.card_named(title, "devpit/{slug}-{id}")
+    }
+
+    /// A card with a checkout of its own, one commit in, a build in `target`
+    /// and a build cache of its own. A branch on the default pattern is
+    /// recorded on the card, as a checkout does now.
+    fn card_named(&self, title: &str, pattern: &str) -> (String, PathBuf, String) {
         let column = self.store.columns(&self.project).expect("columns")[0]
             .id
             .clone();
@@ -76,11 +82,15 @@ impl World {
             .join("worktrees")
             .join(&self.project)
             .join(&id);
-        let branch = devpit_git::branch_for(title, &id);
+        let number = self.store.card_numbers(&self.project).expect("numbers")[&id];
+        let branch = devpit_git::branch_for(pattern, title, Some(number), &id);
         let made = devpit_git::create(&self.root, &at, &branch, "HEAD").expect("worktree");
         self.store
             .set_card_front(&id, made.path.to_str(), Some(&made.base_ref))
             .expect("front");
+        if pattern.is_empty() {
+            self.store.set_card_branch(&id, &branch).expect("branch");
+        }
         std::fs::write(at.join(format!("{title}.txt")), "work\n").expect("write");
         commit(&at, title);
         std::fs::create_dir_all(at.join("target/debug")).expect("mkdir");
@@ -239,6 +249,45 @@ fn a_landed_card_whose_checkout_was_removed_by_hand_loses_its_cache_and_branch()
     assert!(!world.branch_exists(&branch));
     assert_eq!(run.removed.len(), 1);
     assert!(run.freed_bytes >= 8192.0);
+}
+
+#[test]
+fn a_landed_card_on_a_new_branch_name_loses_its_worktree_and_its_branch() {
+    let world = World::new();
+    let (_id, at, branch) = world.card_named("Fix the sweep", "");
+    assert!(branch.starts_with("fix/"), "{branch}");
+    world.merge(&branch);
+
+    let run = world.sweep(&DEFAULTS, &nobody);
+
+    assert!(!at.exists(), "the checkout is still there");
+    assert!(!world.branch_exists(&branch), "the branch is still there");
+    assert_eq!(run.branches, 1);
+}
+
+#[test]
+fn old_and_new_branches_of_checkouts_removed_by_hand_are_both_found_and_removed() {
+    let world = World::new();
+    let (old, old_at, old_branch) = world.card("older");
+    let (new, new_at, new_branch) = world.card_named("newer", "");
+    assert!(old_branch.starts_with("devpit/") && new_branch.starts_with("feat/"));
+    for (id, at, branch) in [(&old, &old_at, &old_branch), (&new, &new_at, &new_branch)] {
+        world.merge(branch);
+        devpit_git::remove(&world.root, at, false).expect("remove");
+        world.store.forget_card_checkout(id).expect("forget");
+    }
+
+    let run = world.sweep(&DEFAULTS, &nobody);
+
+    assert!(
+        !world.branch_exists(&old_branch),
+        "the older branch is still there"
+    );
+    assert!(
+        !world.branch_exists(&new_branch),
+        "the newer branch is still there"
+    );
+    assert_eq!(run.branches, 2);
 }
 
 #[test]

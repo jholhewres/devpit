@@ -821,4 +821,14 @@ CREATE TABLE card_superseded (
 SELECT 1;
 "#,
     },
+    // Migration 033 — the branch a card's worktree was made on.
+    Migration {
+        version: 33,
+        sql: r#"
+-- What cleanup and a second checkout trust, whatever the branch is called.
+-- NULL for a card an older devpit checked out: its `devpit/…-<id>` branch is
+-- found by its name.
+ALTER TABLE card ADD COLUMN branch TEXT;
+"#,
+    },
 ];

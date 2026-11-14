@@ -4,11 +4,16 @@ use std::path::Path;
 
 use crate::invoke::run;
 use crate::lifecycle::{assignable, short, Made};
+use crate::naming::is_ref;
 use crate::GitError;
 
-/// The branch an earlier checkout of this card left behind, found by the
-/// card's own suffix: the title, and the name with it, may have changed.
-pub fn branch_left(root: &Path, card_id: &str) -> Option<String> {
+/// The branch an earlier checkout of this card left behind: the one the card
+/// recorded, else an older devpit's, found by the card's own suffix since the
+/// title, and the name with it, may have changed.
+pub fn branch_left(root: &Path, card_id: &str, recorded: Option<&str>) -> Option<String> {
+    if let Some(recorded) = recorded.filter(|name| is_ref(root, &format!("refs/heads/{name}"))) {
+        return Some(recorded.to_owned());
+    }
     let suffix = format!("-{}", short(card_id));
     run(
         root,

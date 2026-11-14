@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::fixture;
 use crate::landing::*;
-use crate::lifecycle::{branch_for, create};
+use crate::lifecycle::create;
 
 fn git(at: &Path, args: &[&str]) {
     let out = devpit_pty::host_env::command("git")
@@ -18,8 +18,13 @@ fn git(at: &Path, args: &[&str]) {
     );
 }
 
-/// A repository on `main` and a card's worktree beside it, one commit in.
+/// A repository on `main` and a card's worktree beside it, one commit in, on
+/// the branch an older devpit named.
 fn card_with_a_commit(dir: &Path) -> (std::path::PathBuf, std::path::PathBuf, String, String) {
+    card_on(dir, "devpit/fix-it-01hzxy9k")
+}
+
+fn card_on(dir: &Path, branch: &str) -> (std::path::PathBuf, std::path::PathBuf, String, String) {
     let root = dir.join("repo");
     std::fs::create_dir_all(&root).expect("mkdir");
     fixture::repo(&root);
@@ -27,11 +32,10 @@ fn card_with_a_commit(dir: &Path) -> (std::path::PathBuf, std::path::PathBuf, St
     fixture::commit(&root, "first");
 
     let at = dir.join("wt").join("card_01HZXY9K");
-    let branch = branch_for("Fix it", "card_01HZXY9K");
-    let made = create(&root, &at, &branch, "HEAD").expect("create");
+    let made = create(&root, &at, branch, "HEAD").expect("create");
     std::fs::write(at.join("b.txt"), "two\n").expect("write");
     fixture::commit(&at, "the card's work");
-    (root, at, branch, made.base_ref)
+    (root, at, branch.to_owned(), made.base_ref)
 }
 
 #[test]
@@ -86,11 +90,11 @@ fn a_landed_branch_is_deleted_and_one_not_landed_is_refused() {
     let (root, at, branch, began) = card_with_a_commit(dir.path());
     crate::remove(&root, &at, false).expect("remove the worktree");
 
-    assert!(drop_landed(&root, &branch, "card_01HZXY9K", &began).is_err());
+    assert!(drop_landed(&root, &branch, "card_01HZXY9K", None, &began).is_err());
     assert!(branch_exists(&root, &branch));
 
     git(&root, &["merge", "-q", "--no-ff", "-m", "merge", &branch]);
-    drop_landed(&root, &branch, "card_01HZXY9K", &began).expect("drop");
+    drop_landed(&root, &branch, "card_01HZXY9K", None, &began).expect("drop");
     assert!(!branch_exists(&root, &branch));
 }
 
@@ -101,8 +105,32 @@ fn a_branch_not_named_for_the_card_is_never_deleted() {
     crate::remove(&root, &at, false).expect("remove the worktree");
     git(&root, &["merge", "-q", "--no-ff", "-m", "merge", &branch]);
 
-    assert!(drop_landed(&root, &branch, "card_99999999", &began).is_err());
+    assert!(drop_landed(&root, &branch, "card_99999999", None, &began).is_err());
     assert!(branch_exists(&root, &branch));
+}
+
+#[test]
+fn a_landed_branch_the_card_recorded_is_deleted_whatever_it_is_called() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (root, at, branch, began) = card_on(dir.path(), "feat/7-fix-it");
+    crate::remove(&root, &at, false).expect("remove the worktree");
+    git(&root, &["merge", "-q", "--no-ff", "-m", "merge", &branch]);
+
+    assert!(
+        drop_landed(&root, &branch, "card_01HZXY9K", None, &began).is_err(),
+        "a new name with no record is nobody's"
+    );
+    assert!(drop_landed(
+        &root,
+        &branch,
+        "card_01HZXY9K",
+        Some("feat/8-other"),
+        &began
+    )
+    .is_err());
+    assert!(branch_exists(&root, &branch));
+    drop_landed(&root, &branch, "card_01HZXY9K", Some(&branch), &began).expect("drop");
+    assert!(!branch_exists(&root, &branch));
 }
 
 #[test]

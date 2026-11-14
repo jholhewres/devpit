@@ -56,13 +56,25 @@ pub fn landed(root: &Path, branch: &str, began: &str) -> bool {
             .any(|base| run(root, &["merge-base", "--is-ancestor", &tip, base]).is_ok())
 }
 
+/// Whether `branch` is this card's own: the one it recorded, or an older
+/// devpit's named with the card's id suffix.
+fn owned(branch: &str, card_id: &str, recorded: Option<&str>) -> bool {
+    recorded == Some(branch) || branch.ends_with(&format!("-{}", short(card_id)))
+}
+
 /// Deletes a card's branch once it has landed.
 ///
-/// Only a branch named for this card, so nothing a person made by hand, and
-/// only after asking again whether it landed: the check and the delete are
-/// one step to the caller.
-pub fn drop_landed(root: &Path, branch: &str, card_id: &str, began: &str) -> Result<(), GitError> {
-    if !branch.ends_with(&format!("-{}", short(card_id))) {
+/// Only the card's own branch, so nothing a person made by hand, and only
+/// after asking again whether it landed: the check and the delete are one
+/// step to the caller.
+pub fn drop_landed(
+    root: &Path,
+    branch: &str,
+    card_id: &str,
+    recorded: Option<&str>,
+    began: &str,
+) -> Result<(), GitError> {
+    if !owned(branch, card_id, recorded) {
         return Err(GitError::Refused(format!(
             "{branch} is not this card's branch"
         )));
