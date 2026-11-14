@@ -78,7 +78,7 @@ describe('what an orchestrator chat reads as a shortcut', () => {
 describe('an orchestrator chat’s composer', () => {
   it('offers the shortcuts before the CLI’s commands, hiding none of them', async () => {
     const { result } = renderHook(() => useSlash('claude', '/', vi.fn(), true))
-    await waitFor(() => expect(result.current.items).toEqual(['resume', 'sessions', 'waiting', 'ended', 'resume-session', 'compact', 'status']))
+    await waitFor(() => expect(result.current.items).toEqual(['resume', 'btw', 'sessions', 'waiting', 'ended', 'resume-session', 'compact', 'status']))
   })
 
   it('opens a shortcut picked from the menu instead of typing it', async () => {

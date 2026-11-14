@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { ask, commands } from './live'
-import { matching, offeredWith, ownAsked, ownFor, picked, slashQuery, type OwnAsked } from './slash'
+import { ASIDE, matching, offeredWith, ownAsked, ownFor, picked, slashQuery, type OwnAsked } from './slash'
 import { abandoned, committed } from './typing'
 
 /*
@@ -43,7 +43,8 @@ export function useSlash(profileId: string | null, prompt: string, setPrompt: (n
   useEffect(() => setAt(0), [query])
 
   const choose = (command: string): void => {
-    if (!mine.includes(command)) return setPrompt(picked(command))
+    /* `/btw` is its question: picked, it waits for the words. */
+    if (!mine.includes(command) || command === ASIDE) return setPrompt(picked(command))
     setPrompt('')
     setOwn({ name: command, arg: '' })
   }

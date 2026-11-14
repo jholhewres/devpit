@@ -893,6 +893,11 @@ export const commands = {
 	 *  did not say it has.
 	 */
 	chatSlashCommands: (profileId: string) => typedError<string[], RpcError>(__TAURI_INVOKE("chat_slash_commands", { profileId })),
+	/**
+	 *  `chat.aside` — a side question (`/btw`), answered from the conversation
+	 *  forked: the turn running goes on, and its history never holds it.
+	 */
+	chatAside: (projectId: string, conversationId: string, question: string) => typedError<string, RpcError>(__TAURI_INVOKE("chat_aside", { projectId, conversationId, question })),
 	/**  `permission.answer` — what the person said. */
 	permissionAnswer: (id: string, answer: Answer) => typedError<null, RpcError>(__TAURI_INVOKE("permission_answer", { id, answer })),
 	/**

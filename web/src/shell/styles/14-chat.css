@@ -344,6 +344,8 @@ select.chip { appearance: none; border: 0; background: none; font-family: inheri
 .oans__n { font: 600 var(--fs-sm) var(--mono); color: var(--text); }
 .oans__w { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); color: var(--text-3); }
 .oans__s { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+/* A side question's answer: prose, in the bubble's own scroll. */
+.oans__a { padding: var(--space-1) var(--space-1) 0; font-size: var(--fs-md); color: var(--text); }
 .oans__i[data-state='waiting'] .oans__s { color: var(--warning); font-weight: 600; }
 .oans__i[data-state='busy'] .oans__s { color: var(--accent); }
 .oans__q { flex: 1 1 100%; margin: 2px 0 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--text); }
