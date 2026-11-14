@@ -14,6 +14,7 @@ import { SessionRelaySettings } from './SessionRelaySettings'
 import type { Flag } from './settingsFlags'
 import type { PrefsPane } from './shape'
 import { UpdateSettings } from './UpdateSettings'
+import { ChatKeySettings } from './ViewSettings'
 import { VoiceSettings } from './VoiceSettings'
 
 /*
@@ -66,6 +67,7 @@ export function GeneralPanes({
         <h1 className="prefs__h">Sessions</h1>
         <SessionRelaySettings />
         <ActivityDefault />
+        <ChatKeySettings />
         <PrefSwitch on={on('confirmStop')} onFlip={flip('confirmStop')} title="Ask before stopping a terminal" said={<>A terminal still running something asks before it is closed. Its &ldquo;Don&rsquo;t ask again&rdquo; turns this off; this turns it back on.</>} />
       </section>
 

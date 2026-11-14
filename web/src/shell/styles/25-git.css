@@ -62,7 +62,7 @@
 .mdiff { flex: 1; min-height: 0; overflow: hidden; display: flex; }
 .mdiff > .cm-editor, .mdiff > .cm-mergeView { flex: 1; min-width: 0; height: 100%; }
 .mdiff .cm-mergeView { overflow: auto; }
-.mdiff .cm-editor { background: var(--canvas); color: var(--text); font-size: 12px; }
+.mdiff .cm-editor { background: var(--canvas); color: var(--text); font-size: calc(12px * var(--code-scale, 1)); }
 .mdiff .cm-scroller { font-family: var(--mono); line-height: 1.6; }
 .mdiff .cm-editor.cm-focused { outline: none; }
 .mdiff .cm-content { caret-color: var(--text); }
@@ -73,13 +73,13 @@
 .mdiff .cm-mergeView .cm-merge-a { border-right: 1px solid var(--border); }
 
 /* What changed: a tinted line, and a stronger tint on the characters. */
-.mdiff .cm-merge-a .cm-changedLine, .mdiff .cm-deletedChunk { background: color-mix(in srgb, var(--danger) 13%, transparent); }
-.mdiff .cm-merge-b .cm-changedLine, .mdiff .cm-inlineChangedLine { background: color-mix(in srgb, var(--success) 12%, transparent); }
-.mdiff .cm-merge-a .cm-changedText, .mdiff .cm-deletedChunk .cm-deletedText { background: color-mix(in srgb, var(--danger) 32%, transparent); text-decoration: none; }
-.mdiff .cm-merge-b .cm-changedText, .mdiff .cm-inlineChangedLine .cm-changedText { background: color-mix(in srgb, var(--success) 30%, transparent); text-decoration: none; }
+.mdiff .cm-merge-a .cm-changedLine, .mdiff .cm-deletedChunk { background: color-mix(in srgb, var(--diff-del, var(--danger)) 13%, transparent); }
+.mdiff .cm-merge-b .cm-changedLine, .mdiff .cm-inlineChangedLine { background: color-mix(in srgb, var(--diff-add, var(--success)) 12%, transparent); }
+.mdiff .cm-merge-a .cm-changedText, .mdiff .cm-deletedChunk .cm-deletedText { background: color-mix(in srgb, var(--diff-del, var(--danger)) 32%, transparent); text-decoration: none; }
+.mdiff .cm-merge-b .cm-changedText, .mdiff .cm-inlineChangedLine .cm-changedText { background: color-mix(in srgb, var(--diff-add, var(--success)) 30%, transparent); text-decoration: none; }
 .mdiff .cm-changeGutter { width: 3px; padding: 0; }
-.mdiff .cm-merge-a .cm-changedLineGutter, .mdiff .cm-deletedLineGutter { background: var(--danger); }
-.mdiff .cm-merge-b .cm-changedLineGutter, .mdiff .cm-changedLineGutter { background: var(--success); }
+.mdiff .cm-merge-a .cm-changedLineGutter, .mdiff .cm-deletedLineGutter { background: var(--diff-del, var(--danger)); }
+.mdiff .cm-merge-b .cm-changedLineGutter, .mdiff .cm-changedLineGutter { background: var(--diff-add, var(--success)); }
 /* A folded stretch of unchanged lines: a quiet bar that opens on a click. */
 .mdiff .cm-collapsedLines { padding: 3px 12px; background: var(--overlay); color: var(--text-3); font-family: var(--ui); font-size: 11.5px; cursor: pointer; }
 .mdiff .cm-collapsedLines:hover { background: var(--overlay-strong); color: var(--text-2); }

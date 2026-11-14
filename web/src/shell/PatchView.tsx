@@ -1,7 +1,8 @@
 import { useState } from 'react'
 
-import { parse, sides, type Hunk, type Row } from './diff'
+import { ignoringWhitespace, parse, sides, type Hunk, type Row } from './diff'
 import { DiffText as Text } from './DiffText'
+import { useViewPrefs } from './viewPrefs'
 
 /*
  * A patch as git printed it, hunk by hunk.
@@ -27,8 +28,9 @@ export function PatchView({
   empty: string
 }): React.JSX.Element {
   const [shown, setShown] = useState(HUNKS_AT_ONCE)
+  const ignore = useViewPrefs().diffWhitespace === 'ignore'
   const files = parse(raw)
-  const hunks = files.flatMap((file) => file.hunks)
+  const hunks = files.flatMap((file) => (ignore ? ignoringWhitespace(file.hunks) : file.hunks))
   const renamed = files.find((file) => file.from)
   const binary = files.some((file) => file.binary)
 

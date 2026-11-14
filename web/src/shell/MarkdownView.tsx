@@ -1,4 +1,4 @@
-import { createContext, memo, useCallback, useContext, useMemo, useRef } from 'react'
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 
 import { CopyButton } from './CopyButton'
 import { Diagram } from './Diagram'
@@ -12,6 +12,7 @@ import { went } from './problems'
 import { PICTURES } from './sentFiles'
 import { useShellPick } from './shellStore'
 import { useStream } from './Streamed'
+import { useViewPrefs } from './viewPrefs'
 import { Zoomable } from './Zoom'
 
 /*
@@ -123,9 +124,10 @@ function Piece({ block, path }: { block: Block; path: string }): React.JSX.Eleme
 }
 
 function Inline({ text, path }: { text: string; path: string }): React.JSX.Element {
+  const math = useViewPrefs().latex
   return (
     <>
-      {spans(text).map((span, at) => (
+      {spans(text, math).map((span, at) => (
         <Bit key={at} span={span} path={path} />
       ))}
     </>
@@ -138,6 +140,8 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
   switch (span.kind) {
     case 'code':
       return <Tick text={span.text} opens={opens} />
+    case 'math':
+      return <TeX tex={span.text} display={span.display} />
     case 'strong':
       return <strong>{span.text}</strong>
     case 'em':
@@ -160,6 +164,24 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
     default:
       return <Pathed text={span.text} opens={opens} />
   }
+}
+
+/* KaTeX builds the formula's MathML as DOM nodes, never from a string of
+   markup, and loads with the first formula. Until then, and when it cannot
+   read one, the source stays readable. */
+function TeX({ tex, display }: { tex: string; display: boolean }): React.JSX.Element {
+  const host = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    let live = true
+    void import('katex').then(({ default: katex }) => {
+      if (!live || !host.current) return
+      katex.render(tex, host.current, { displayMode: display, output: 'mathml', throwOnError: false, trust: false })
+    })
+    return () => {
+      live = false
+    }
+  }, [tex, display])
+  return <span ref={host} className="md__math" data-display={display || undefined}>{tex}</span>
 }
 
 const localPicture = (path: string): boolean => path.startsWith('/') && PICTURES.has(path.split('.').at(-1)?.toLowerCase() ?? '')

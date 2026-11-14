@@ -124,6 +124,30 @@ export function sides(hunk: Hunk): { left: (Row | null)[]; right: (Row | null)[]
   return { left, right }
 }
 
+/* A hunk without the changes that only moved whitespace: a line taken out
+   and put back differing only in spaces is drawn once, as it is now. A hunk
+   left with nothing changed goes. */
+export function ignoringWhitespace(hunks: readonly Hunk[]): Hunk[] {
+  const bare = (text: string): string => text.replace(/\s+/g, '')
+  return hunks.flatMap((hunk) => {
+    const rows: Row[] = []
+    let at = 0
+    while (at < hunk.rows.length) {
+      if (hunk.rows[at].kind === 'same') {
+        rows.push(hunk.rows[at++])
+        continue
+      }
+      const dels: Row[] = []
+      const adds: Row[] = []
+      while (at < hunk.rows.length && hunk.rows[at].kind === 'del') dels.push(hunk.rows[at++])
+      while (at < hunk.rows.length && hunk.rows[at].kind === 'add') adds.push(hunk.rows[at++])
+      const moved = dels.length === adds.length && dels.every((row, line) => bare(row.text) === bare(adds[line].text))
+      rows.push(...(moved ? adds.map((row): Row => ({ kind: 'same', text: row.text })) : [...dels, ...adds]))
+    }
+    return rows.some((row) => row.kind !== 'same') ? [{ ...hunk, rows }] : []
+  })
+}
+
 /* A line with its whitespace made visible: a space as `·`, a tab as `→`.
    Pieces rather than a string, so the marks can be drawn quieter than the
    text and the line keeps its width. */
