@@ -58,7 +58,7 @@ describe('the settings sidebar', () => {
        them; a pane in none is a pane that is unreachable. */
     const ids = PREFS_NAV.flatMap((group) => group.items.map((item) => item.id))
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toHaveLength(18)
+    expect(ids).toHaveLength(19)
   })
 
   it('draws the headings, and opens the pane you click', () => {

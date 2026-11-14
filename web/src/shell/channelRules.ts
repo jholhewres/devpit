@@ -9,6 +9,7 @@ export const EVENTS: ReadonlyArray<readonly [ChannelEvent, string]> = [
   ['reminder', 'A reminder goes off'],
   ['step_failed', 'A step failed'],
   ['mcp_restarted', 'devpit’s MCP was restarted'],
+  ['assistant', 'Your assistant has something for you'],
 ]
 
 /** Every event's route, in the screen's order, one made up where none was kept. */

@@ -24,6 +24,8 @@ pub enum ChannelEvent {
     StepFailed,
     /// devpit's own MCP stopped answering and was restarted.
     McpRestarted,
+    /// An orchestrator's routine ran, or its heartbeat found what needs the person.
+    Assistant,
 }
 
 /// Which channels one event goes to, by channel id.

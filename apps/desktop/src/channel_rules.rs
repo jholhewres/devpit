@@ -4,7 +4,7 @@
 use devpit_rpc::{ChannelEvent, ChannelRoute, ChannelRules, QuietHours};
 
 /// Every event, in the order the screen lists them.
-pub(crate) const EVENTS: [ChannelEvent; 7] = [
+pub(crate) const EVENTS: [ChannelEvent; 8] = [
     ChannelEvent::SessionWaiting,
     ChannelEvent::SessionFailed,
     ChannelEvent::SessionDone,
@@ -12,6 +12,7 @@ pub(crate) const EVENTS: [ChannelEvent; 7] = [
     ChannelEvent::Reminder,
     ChannelEvent::StepFailed,
     ChannelEvent::McpRestarted,
+    ChannelEvent::Assistant,
 ];
 
 /// Minutes a notice that waits on the person stays on one channel before it

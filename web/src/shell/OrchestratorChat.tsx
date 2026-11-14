@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import type { LiveSession } from '../gen/bindings'
+import { ComebackBriefing } from './ComebackBriefing'
 import { refreshSessions, useLiveSessions } from './liveStatus'
 import { ProjectProposals } from './ProjectProposals'
 import { ReplyDrafts } from './ReplyDrafts'
@@ -30,7 +31,7 @@ export function SessionsChip({ profileId }: { profileId: string }): React.JSX.El
 }
 
 export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX.Element {
-  const { setProject, openPane } = useShell()
+  const { setProject, openPane, project } = useShell()
   const live = useLiveSessions(profileId)
   const [terminal, setTerminal] = useState<LiveSession | null>(null)
   return (
@@ -39,6 +40,7 @@ export function SessionsWaiting({ profileId }: { profileId: string }): React.JSX
       <ReplyDrafts profileId={profileId} sessions={live} onDone={() => refreshSessions(profileId)} />
       <StopsAsked profileId={profileId} sessions={live} onDone={() => refreshSessions(profileId)} />
       <ProjectProposals />
+      {project?.orchestrator && <ComebackBriefing projectId={project.id} />}
       {terminal && (
         <SessionTerminal
           session={terminal}

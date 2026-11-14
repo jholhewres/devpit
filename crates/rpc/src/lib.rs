@@ -149,8 +149,8 @@ pub use review::{
 };
 pub use runs::{ProjectRun, RunCursor, RunsPage, RunsQuery};
 pub use schedule::{
-    AssistantMode, ProposedReminder, Routine, RoutineKind, Schedule, ScheduleKind,
-    ScheduleProposal, ScheduleState, Schedules,
+    AssistantMode, Briefing, Heartbeat, ProposedReminder, Routine, RoutineKind, Schedule,
+    ScheduleKind, ScheduleProposal, ScheduleState, Schedules,
 };
 pub use search::{SearchFile, SearchHits, SearchLine};
 pub use session::{
