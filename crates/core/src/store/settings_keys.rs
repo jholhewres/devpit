@@ -34,6 +34,16 @@ pub const WORKTREES_HIDDEN: &str = "worktrees.hidden";
 pub const WORKTREES_DELETE_MERGED: &str = "worktrees.delete_merged";
 /// What the last worktree cleanup did, as JSON.
 pub const WORKTREES_CLEANUP_LAST: &str = "worktrees.cleanup_last";
+/// Whether background probes slow down while idle or on battery. Off unless turned on.
+pub const MAINTENANCE_POWER_SAVER: &str = "maintenance.power_saver";
+/// Days logs and run artifacts are kept. Absent or 0 is until deleted.
+pub const MAINTENANCE_KEEP_DAYS: &str = "maintenance.keep_days";
+/// What the last cleaning of logs and run artifacts did, as JSON.
+pub const MAINTENANCE_CLEAN_LAST: &str = "maintenance.clean_last";
+/// Labs: whether the project agent answers. On unless turned off.
+pub const LABS_PROJECT_AGENT: &str = "labs.project_agent";
+/// Labs: whether the Canvas plugin is offered. On unless turned off.
+pub const LABS_CANVAS: &str = "labs.canvas";
 /// When each profile's idle conversations are compacted, by profile id, as
 /// JSON. Absent is never.
 pub const AGENTS_IDLE_COMPACT: &str = "agents.idle_compact";

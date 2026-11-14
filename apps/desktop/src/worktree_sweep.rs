@@ -84,7 +84,7 @@ fn card_cache(caches: &Path, card_id: &str) -> Option<PathBuf> {
 
 /// Removes a real folder, never a link to one elsewhere, and says how much it
 /// held.
-fn drop_dir(path: &Path) -> Option<u64> {
+pub(crate) fn drop_dir(path: &Path) -> Option<u64> {
     if !std::fs::symlink_metadata(path).ok()?.is_dir() {
         return None;
     }

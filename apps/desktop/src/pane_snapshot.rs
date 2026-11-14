@@ -221,7 +221,7 @@ pub(crate) fn watch(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let mut told = Told::default();
         loop {
-            std::thread::sleep(EVERY);
+            std::thread::sleep(crate::maintenance::stretch(EVERY));
             let shown = app.get_webview_window("main").is_some_and(|main| {
                 main.is_visible().unwrap_or(true) && !main.is_minimized().unwrap_or(false)
             });

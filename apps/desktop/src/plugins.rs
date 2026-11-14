@@ -11,7 +11,7 @@ use crate::projects::{home_refusal, store};
 
 /// The manifest for an id, or `NotFound` for one this build does not ship.
 pub(crate) fn manifest(plugin_id: &str) -> Result<PluginManifest, RpcError> {
-    catalogue()
+    offered()
         .into_iter()
         .find(|one| one.id == plugin_id)
         .ok_or_else(|| {
@@ -21,6 +21,21 @@ pub(crate) fn manifest(plugin_id: &str) -> Result<PluginManifest, RpcError> {
             )
         })
 }
+
+/// The catalogue, less the Canvas plugin while Labs has it off.
+pub(crate) fn offered() -> Vec<PluginManifest> {
+    offered_with(Store::open_default().map_or(true, |store| crate::maintenance::canvas_on(&store)))
+}
+
+pub(crate) fn offered_with(canvas: bool) -> Vec<PluginManifest> {
+    catalogue()
+        .into_iter()
+        .filter(|one| canvas || one.id != CANVAS)
+        .collect()
+}
+
+/// The plugin Labs calls Canvas.
+pub(crate) const CANVAS: &str = "excalidraw";
 
 fn registered(store: &Store, project_id: &str) -> Result<(), RpcError> {
     match store.project(project_id)? {
@@ -35,7 +50,7 @@ pub(crate) fn listed(store: &Store, project_id: &str) -> Result<PluginList, RpcE
     registered(store, project_id)?;
     let installed = store.installed_plugins(project_id)?;
     let enabled = store.enabled_plugins(project_id)?;
-    let plugins = catalogue()
+    let plugins = offered()
         .into_iter()
         .map(|manifest| PluginState {
             installed: installed.contains(&manifest.id),

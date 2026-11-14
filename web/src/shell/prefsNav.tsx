@@ -85,6 +85,22 @@ export const PREFS_NAV: readonly NavGroup[] = [
           <svg {...stroke}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 15h6" /></svg>
         ),
       },
+      {
+        id: 'maintenance',
+        label: 'Maintenance',
+        about: 'power saver battery background probes logs artifacts delete clean disk labs beta project agent canvas',
+        icon: (
+          <svg {...stroke}><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" /></svg>
+        ),
+      },
+      {
+        id: 'diagnostics',
+        label: 'Diagnostics',
+        about: 'processes cpu memory load logs errors checks health doctor',
+        icon: (
+          <svg {...stroke}><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>
+        ),
+      },
     ],
   },
   {

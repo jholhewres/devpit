@@ -215,6 +215,9 @@ pub(crate) fn moved(
 /// A card that landed in done, closed in the background: a move never waits
 /// on the agent.
 fn closed(app: &AppHandle, project_id: &str, card_id: &str) {
+    if !Store::open_default().is_ok_and(|store| crate::maintenance::project_agent_on(&store)) {
+        return;
+    }
     let (app, project_id, card_id) = (app.clone(), project_id.to_owned(), card_id.to_owned());
     std::thread::spawn(move || {
         if let Err(why) = close(&app, &project_id, &card_id) {

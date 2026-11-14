@@ -141,6 +141,11 @@ pub(crate) fn gather(root: &Path) -> Facts {
     let sessions = devpit_agentapi::client::ask(root, "status", serde_json::json!({}), root)
         .ok()
         .and_then(|answer| serde_json::from_value(answer).ok());
+    machine(root, sessions)
+}
+
+/// The checks' facts with the app's sessions already known, as the app knows them.
+pub(crate) fn machine(root: &Path, sessions: Option<Sessions>) -> Facts {
     Facts {
         sessions,
         agent_cli: devpit_agentcli::profile::found(devpit_agentcli::PROGRAM),

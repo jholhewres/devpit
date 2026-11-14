@@ -169,6 +169,7 @@ mod local_events;
 mod local_files;
 mod local_rpc;
 mod local_server;
+mod maintenance;
 mod mcp;
 mod mcp_cache;
 mod mcp_health;
@@ -545,6 +546,7 @@ fn main() {
             if let Ok(store) = devpit_core::Store::open_default() {
                 pausing::restore(app.handle(), &store);
                 tray::restore(&store);
+                maintenance::restore(app.handle(), &store);
             }
             island::note_drawn();
             // In the tray, and the shortcut that brings it forward, if one was chosen.
@@ -586,6 +588,8 @@ fn main() {
             stall_watch::watch(app.handle().clone());
             // Merged cards' worktrees and build caches, put away on their own.
             worktree_cleanup::watch();
+            // Old logs and run artifacts, put away when days are set.
+            maintenance::watch();
             // A run still marked `running` after a restart is a run whose
             // thread died with the last process. Closed here, before anything
             // draws, or the card says it is working forever.
