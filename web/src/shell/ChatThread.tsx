@@ -204,7 +204,7 @@ const Row = memo(function Row({
   })
   if (!message) return null
   return (
-    <div className="trow" data-id={id} ref={row} role="article" aria-label={speaker(message.role)}>
+    <div className="trow" data-id={id} ref={row} role="article" aria-label={speaker(message.role)} tabIndex={-1}>
       <Turn
         message={message}
         folder={folder}

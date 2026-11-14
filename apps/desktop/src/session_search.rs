@@ -22,6 +22,8 @@ const MOST_HITS: i64 = 50;
 #[serde(rename_all = "camelCase")]
 pub struct SessionHit {
     pub session_id: String,
+    /// The project whose conversation it is.
+    pub project_id: String,
     /// `user` or `assistant`.
     pub role: String,
     /// The words around the match, the matched ones between `[` and `]`.
@@ -120,11 +122,12 @@ pub(crate) fn refresh(
     Ok(())
 }
 
-/// `sessions.search` — hits in this project's conversations for a query.
+/// `sessions.search` — hits for a query in one project's conversations, or in
+/// every project's when none is named.
 #[tauri::command]
 #[specta::specta]
 pub async fn sessions_search(
-    project_id: String,
+    project_id: Option<String>,
     query: String,
 ) -> Result<Vec<SessionHit>, RpcError> {
     if query.trim().is_empty() {
@@ -132,28 +135,52 @@ pub async fn sessions_search(
     }
     tauri::async_runtime::spawn_blocking(move || {
         let store = crate::projects::store()?;
-        let (_, root) = crate::projects::locate(&store, &project_id)?;
         let installations: Vec<PathBuf> = crate::installations::found()?
             .into_iter()
             .map(|one| one.directory)
             .collect();
-        refresh(&store, &project_id, &root, &installations)?;
-        let sessions =
-            crate::projects::home_of(&store, &devpit_core::Store::root()?, &project_id)?.sessions();
-        let held = held(&sessions);
-        let hits = search_index::search(store.conn(), &query, Some(&project_id), MOST_HITS)?;
+        let projects = match &project_id {
+            Some(id) => vec![crate::projects::locate(&store, id)?],
+            // A project whose folder is gone has nothing left to read.
+            None => store
+                .projects()?
+                .into_iter()
+                .filter_map(|row| crate::projects::locate(&store, &row.id).ok())
+                .collect(),
+        };
+        for (row, root) in &projects {
+            refresh(&store, &row.id, root, &installations)?;
+        }
+        // The index keeps a forgotten project's rows: only a project still here answers.
+        let here: std::collections::HashSet<&str> =
+            projects.iter().map(|(row, _)| row.id.as_str()).collect();
+        let hits = search_index::search(store.conn(), &query, project_id.as_deref(), MOST_HITS)?;
+        let root = devpit_core::Store::root()?;
+        let mut held_by: std::collections::HashMap<
+            String,
+            std::collections::HashMap<String, String>,
+        > = std::collections::HashMap::new();
         Ok(hits
             .into_iter()
-            .map(|hit| SessionHit {
-                installation: Path::new(&hit.path)
-                    .ancestors()
-                    .nth(3)
-                    .map(|dir| dir.display().to_string())
-                    .unwrap_or_default(),
-                conversation_id: held.get(&hit.session_id).cloned(),
-                session_id: hit.session_id,
-                role: hit.role,
-                snippet: hit.snippet,
+            .filter(|hit| here.contains(hit.project.as_str()))
+            .map(|hit| {
+                let known = held_by.entry(hit.project.clone()).or_insert_with(|| {
+                    crate::projects::home_of(&store, &root, &hit.project)
+                        .map(|home| held(&home.sessions()))
+                        .unwrap_or_default()
+                });
+                SessionHit {
+                    installation: Path::new(&hit.path)
+                        .ancestors()
+                        .nth(3)
+                        .map(|dir| dir.display().to_string())
+                        .unwrap_or_default(),
+                    conversation_id: known.get(&hit.session_id).cloned(),
+                    session_id: hit.session_id,
+                    project_id: hit.project,
+                    role: hit.role,
+                    snippet: hit.snippet,
+                }
             })
             .collect())
     })

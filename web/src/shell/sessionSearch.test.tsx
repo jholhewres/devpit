@@ -43,7 +43,7 @@ vi.mock('./live', () => ({
 
 describe('searching what was said', () => {
   it('opens the conversation devpit already holds for a hit', async () => {
-    hits = [{ sessionId: 'aaa', role: 'user', snippet: 'the [lexer]', installation: '/home/me/.claude', conversationId: 'conv_1' }]
+    hits = [{ sessionId: 'aaa', projectId: 'prj_1', role: 'user', snippet: 'the [lexer]', installation: '/home/me/.claude', conversationId: 'conv_1' }]
     render(<SessionSearch />)
     fireEvent.change(screen.getByLabelText('Search conversations'), { target: { value: 'lexer' } })
     fireEvent.click(await screen.findByText('lexer', {}, { timeout: 2000 }))
@@ -52,7 +52,7 @@ describe('searching what was said', () => {
   })
 
   it('takes in a session devpit never held, under a profile of its installation', async () => {
-    hits = [{ sessionId: 'bbb', role: 'user', snippet: 'rename the [tokenizer]', installation: '/home/me/.claude', conversationId: null }]
+    hits = [{ sessionId: 'bbb', projectId: 'prj_1', role: 'user', snippet: 'rename the [tokenizer]', installation: '/home/me/.claude', conversationId: null }]
     render(<SessionSearch />)
     fireEvent.change(screen.getByLabelText('Search conversations'), { target: { value: 'tokenizer' } })
     fireEvent.click(await screen.findByText('tokenizer', {}, { timeout: 2000 }))

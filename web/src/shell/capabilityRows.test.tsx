@@ -52,6 +52,10 @@ const shell = {
   openPrefs: vi.fn(),
   signOut: vi.fn(),
   account: { initials: 'JH', name: 'Jhol', email: null },
+  threads: [],
+  profiles: [],
+  chatDoing: {},
+  mark: vi.fn(),
 }
 vi.mock('./useShell', () => ({ useShell: () => shell }))
 

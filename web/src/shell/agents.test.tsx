@@ -41,6 +41,10 @@ const shell = {
   openPalette: vi.fn(),
   renaming: null as { id: string; where: string } | null,
   setRenaming: vi.fn(),
+  threads: [],
+  profiles: [],
+  chatDoing: {},
+  mark: vi.fn(),
 }
 
 vi.mock('./useShell', () => ({ useShell: () => shell }))

@@ -15,6 +15,11 @@ const shell = {
   rename: vi.fn(),
   renaming: null as { id: string; where: string } | null,
   setRenaming: vi.fn(),
+  unread: new Set<string>(),
+  threads: [],
+  profiles: [],
+  chatDoing: {},
+  mark: vi.fn(),
 }
 
 vi.mock('./useShell', () => ({ useShell: () => shell }))

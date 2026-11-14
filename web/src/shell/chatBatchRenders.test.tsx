@@ -59,6 +59,10 @@ const shell = {
   drafted: nothing,
   finished: nothing,
   show: nothing,
+  threads: [],
+  tellDoing: nothing,
+  mark: nothing,
+  reload: nothing,
 }
 vi.mock('./useShell', () => ({ useShell: () => shell }))
 vi.mock('./shellStore', async (real) => ({

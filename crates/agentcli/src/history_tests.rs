@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::head::{head_path, write_head, Head};
+use crate::head::{head_path, marks_path, write_head, write_marks, Head};
 use crate::history::{conversations, title_of};
 use crate::store::{append, conversation_path};
-use devpit_rpc::{Message, Part, Role};
+use devpit_rpc::{ConversationMarks, Message, Part, Role};
 
 fn said(text: &str, role: Role) -> Message {
     Message {
@@ -160,4 +160,59 @@ fn the_persons_words_outrank_an_adopted_title() {
     crate::head::write_head(&dir.join("conv_a.json"), &adopted).expect("head");
 
     assert_eq!(conversations(dir)[0].title, "rename the lexer");
+}
+
+#[test]
+fn marks_kept_beside_a_conversation_come_back_with_it() {
+    let home = tempfile::tempdir().expect("tempdir");
+    conversation(home.path(), "conv_a", "Fix the parser", "claude", 0.1);
+    let kept = write_marks(
+        &marks_path(home.path(), "conv_a"),
+        ConversationMarks {
+            name: Some("  Parser rework ".to_owned()),
+            pinned: true,
+            settled: true,
+            snoozed_until: Some(1_800_000_000.0),
+            unread: true,
+        },
+    )
+    .expect("marks");
+    assert_eq!(kept.name.as_deref(), Some("Parser rework"));
+
+    let listed = conversations(home.path());
+    assert_eq!(listed[0].title, "Parser rework");
+    assert_eq!(listed[0].marks, kept);
+}
+
+#[test]
+fn a_conversation_from_before_marks_lists_with_none_set() {
+    let home = tempfile::tempdir().expect("tempdir");
+    conversation(home.path(), "conv_old", "Fix the parser", "claude", 0.1);
+    let listed = conversations(home.path());
+    assert_eq!(listed[0].title, "Fix the parser");
+    assert_eq!(listed[0].marks, ConversationMarks::default());
+}
+
+#[test]
+fn a_blank_name_gives_the_conversation_its_first_words_back() {
+    let home = tempfile::tempdir().expect("tempdir");
+    conversation(home.path(), "conv_b", "Fix the parser", "claude", 0.1);
+    let path = marks_path(home.path(), "conv_b");
+    write_marks(
+        &path,
+        ConversationMarks {
+            name: Some("Renamed".to_owned()),
+            ..Default::default()
+        },
+    )
+    .expect("marks");
+    write_marks(
+        &path,
+        ConversationMarks {
+            name: Some("   ".to_owned()),
+            ..Default::default()
+        },
+    )
+    .expect("marks");
+    assert_eq!(conversations(home.path())[0].title, "Fix the parser");
 }

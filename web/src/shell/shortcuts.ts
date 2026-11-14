@@ -68,6 +68,10 @@ const LIST = [
   { id: 'steerQueued', does: 'Send the first queued message into the running turn', scope: 'chat', keys: ['Mod+Shift+Enter'], inTerminal: false },
   { id: 'recallPrompt', does: 'Bring back an earlier prompt, in an empty composer', scope: 'chat', keys: ['ArrowUp'], inTerminal: false, fixed: true },
   { id: 'recallNext', does: 'Go forward through the earlier prompts, back to an empty composer', scope: 'chat', keys: ['ArrowDown'], inTerminal: false, fixed: true },
+  { id: 'nextMessage', does: 'Go to the next message', scope: 'chat', keys: ['Alt+ArrowDown'], inTerminal: false },
+  { id: 'previousMessage', does: 'Go to the previous message', scope: 'chat', keys: ['Alt+ArrowUp'], inTerminal: false },
+  { id: 'nextFailed', does: 'Go to the next tool that failed', scope: 'chat', keys: ['Alt+Shift+ArrowDown'], inTerminal: false },
+  { id: 'toggleRow', does: 'Open or close the row you are on', scope: 'chat', keys: ['Alt+Enter'], inTerminal: false },
 
   { id: 'save', does: 'Save the file', scope: 'file', keys: ['Mod+S'], inTerminal: false },
   { id: 'commit', does: 'Commit, from the message field', scope: 'file', keys: ['Mod+Enter'], inTerminal: false },

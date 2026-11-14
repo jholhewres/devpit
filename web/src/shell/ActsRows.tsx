@@ -139,7 +139,7 @@ function LeafRow({ act }: { act: Act }): React.JSX.Element {
   const [open, setOpen] = useDisclosed(useFoldKey(act.id), edited !== null)
 
   return (
-    <div className="arow">
+    <div className="arow" data-failed={act.failed || undefined}>
       <button
         className="arow__h"
         aria-expanded={parts.length ? open : undefined}

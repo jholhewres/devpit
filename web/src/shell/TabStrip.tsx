@@ -18,7 +18,7 @@ import { useKeys } from './useShortcut'
  */
 export function TabStrip(): React.JSX.Element {
   const { open, active, focus, close, move, rename, renaming, setRenaming } = useShell()
-  const { running, doing, unread, openPalette } = useShell()
+  const { running, doing, unread, openPalette, mark } = useShell()
   const keys = useKeys()
     const strip = useRef<HTMLDivElement>(null)
   const before = useRef(new Map<string, number>())
@@ -146,6 +146,8 @@ export function TabStrip(): React.JSX.Element {
               editing
               onDone={(title) => {
                 if (title) rename(tab.id, title)
+                /* Kept on the conversation too, so its name outlives the tab. */
+                if (title && tab.kind === 'chat') mark(tab.id, { name: title })
                 setRenaming(null)
               }}
             />

@@ -1,4 +1,6 @@
+import type { ConversationMarks } from '../gen/bindings'
 import type { Entry } from './fileMenu'
+import { isSettled, snoozeUntil } from './settling'
 
 /*
  * The session row's context menu.
@@ -19,12 +21,27 @@ export interface SessionHands {
   focus: (id: string) => void
   close: (id: string) => void
   rename: (id: string) => void
+  mark: (id: string, change: Partial<ConversationMarks>) => void
 }
 
-export const sessionMenu = (hands: SessionHands): readonly SessionEntry[] => [
+/* Offered only on a conversation that has been spoken in: a terminal, or a
+   chat with nothing said yet, has nothing to keep them on. */
+const marking = (mark: SessionHands['mark'], marks: ConversationMarks, now: Date): readonly SessionEntry[] => [
+  { rule: true },
+  { label: marks.pinned ? 'Unpin' : 'Pin', run: (id) => mark(id, { pinned: !marks.pinned }) },
+  isSettled(marks, now.getTime() / 1000)
+    ? { label: 'Back to in progress', run: (id) => mark(id, { settled: false, snoozedUntil: null }) }
+    : { label: 'Settle', run: (id) => mark(id, { settled: true }) },
+  { label: 'Snooze for an hour', run: (id) => mark(id, { snoozedUntil: snoozeUntil('hour', now) }) },
+  { label: 'Snooze until tomorrow', run: (id) => mark(id, { snoozedUntil: snoozeUntil('tomorrow', now) }) },
+  { label: 'Mark unread', run: (id) => mark(id, { unread: true }) },
+]
+
+export const sessionMenu = (hands: SessionHands, marks?: ConversationMarks, now = new Date()): readonly SessionEntry[] => [
   { label: 'Open', key: '↵', run: hands.focus },
   { rule: true },
   { label: 'Rename', shortcut: 'rename', run: hands.rename },
+  ...(marks ? marking(hands.mark, marks, now) : []),
   { rule: true },
   { label: 'Close session', bad: true, run: hands.close },
 ]

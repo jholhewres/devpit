@@ -13,6 +13,7 @@ import { useSweep } from './useSweep'
 import { useOutsideTabs } from './useOutsideTabs'
 import { useWidths } from './useWidths'
 import { useTabs } from './useTabs'
+import { useConversations } from './useConversations'
 import { useProjects } from './useProjects'
 import { useRunning } from './useRunning'
 import { useTheme } from './useTheme'
@@ -40,6 +41,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const membership = useAccount()
   const projects = useProjects()
   const tabs = useTabs(projects.project?.id ?? null)
+  const talks = useConversations(projects.project?.id ?? null, projects.setProject, tabs.open, tabs.show)
   useOutsideTabs(projects.project?.id ?? null, tabs.show, tabs.close)
   const running = useRunning(projects.project?.id ?? null)
   const doing = useAgents()
@@ -48,9 +50,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const agentSessions = usePaneSessions()
   const sizing = useWidths()
 
-  /* Which tabs hold an edit that is not on disk. Held here because the cross
-     is drawn by the strip and the edit lives in the pane, and neither can see
-     the other — the pane reports, the strip's close reads. */
+  /* Tabs with an edit not on disk: the strip draws the cross, the pane holds the edit. */
   const [unsaved, setUnsaved] = useState<ReadonlySet<string>>(() => new Set())
   const markUnsaved = useCallback((id: string, dirty: boolean) => {
     setUnsaved((was) => {
@@ -81,6 +81,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const value = useMemo<Shell>(
     () => ({
       ...tabs,
+      ...talks,
       ...guard,
       running,
       doing,
@@ -108,6 +109,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
     }),
     [
       tabs,
+      talks,
       guard,
       running,
       doing,
@@ -131,8 +133,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
     ],
   )
 
-  /* The same shell, for the components that read one slice of it
-     (`useShellPick`): put while rendering so a child mounting now reads it,
+  /* For `useShellPick`: put while rendering so a child mounting now reads it,
      announced once the render is committed. */
   const [store] = useState(() => createShellStore(value))
   store.put(value)

@@ -26,6 +26,8 @@ pub fn stale(recorded: Option<(i64, i64)>, size: i64, mtime: i64) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Hit {
     pub session_id: String,
+    /// The project whose transcript it is.
+    pub project: String,
     pub path: String,
     pub role: String,
     /// The text around the match, with `[` and `]` around the matched words.
@@ -148,7 +150,7 @@ pub fn search(
         return Ok(Vec::new());
     };
     let mut statement = conn.prepare(
-        "SELECT session_id, path, role, snippet(session_text, 5, '[', ']', '…', 12) \
+        "SELECT session_id, project, path, role, snippet(session_text, 5, '[', ']', '…', 12) \
          FROM session_text \
          WHERE session_text MATCH ?1 AND (?2 IS NULL OR project = ?2) \
          ORDER BY rank LIMIT ?3",
@@ -157,9 +159,10 @@ pub fn search(
         .query_map(params![expression, project, limit], |row| {
             Ok(Hit {
                 session_id: row.get(0)?,
-                path: row.get(1)?,
-                role: row.get(2)?,
-                snippet: row.get(3)?,
+                project: row.get(1)?,
+                path: row.get(2)?,
+                role: row.get(3)?,
+                snippet: row.get(4)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
