@@ -8,7 +8,7 @@ let now: SignIns = { accounts: [], needed: [] }
 
 vi.mock('./live', () => ({
   ask: async (call: () => unknown) => ({ data: await call(), error: null, loading: false }),
-  commands: { signIns: async () => now },
+  commands: { signIns: async () => now, providersCheckRead: async () => ({ minutes: 5 }) },
 }))
 vi.mock('./useShell', () => ({ useShell: () => ({ openPrefs }) }))
 
