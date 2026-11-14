@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { McpHealth, McpServerHealth } from '../gen/bindings'
 import { useAway } from './away'
 import { ask, commands } from './live'
-import { useCheckEvery } from './providerChecks'
+import { useCheckEvery } from './checkEvery'
 
 /*
  * The MCP servers the default account has, as its CLI finds them when it

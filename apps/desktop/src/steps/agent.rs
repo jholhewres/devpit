@@ -69,7 +69,13 @@ pub fn run(
 
     // The hooks reach us through a settings file written next to the state,
     // so a turn tells the board what it is doing while it does it.
-    let settings = super::hook_settings();
+    // The profile's advisor model too; no profile is the CLI as installed.
+    let settings = super::hook_settings_for(Some(
+        config
+            .profile
+            .as_deref()
+            .unwrap_or(devpit_agentcli::PROGRAM),
+    ));
 
     // Which account this spends through. A named profile that has gone is an
     // error rather than a silent fall back to the default: the difference

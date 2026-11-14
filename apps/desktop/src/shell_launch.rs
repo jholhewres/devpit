@@ -619,7 +619,7 @@ pub(crate) fn to_start_in(id: &str, project_id: Option<&str>) -> Result<String, 
         agent.id,
         agent.settings_flag,
         project_id,
-        None,
+        Some(agent.id),
     );
     Ok(in_account(line, agent.id, project_id))
 }

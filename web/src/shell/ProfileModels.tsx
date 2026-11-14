@@ -20,7 +20,8 @@ export function ProfileModels({ profileId, draft, onDraft }: { profileId: string
     void ask(() => commands.agentProfiles()).then((answer) => setOffered(answer.data?.find((one) => one.id === profileId)?.models ?? []))
   }, [profileId])
   const off = kept?.modelsOff ?? []
-  const all = [...offered, ...off.filter((one) => !offered.includes(one))]
+  // The default stays on: it is what a session runs without a model chosen.
+  const all = [...offered, ...off.filter((one) => !offered.includes(one))].filter((one) => one !== 'default')
   const save = (next: Kept): void => {
     void ask(() => commands.profileModelsWrite(profileId, next)).then((answer) => {
       setError(answer.error)

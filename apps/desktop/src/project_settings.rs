@@ -43,6 +43,10 @@ pub(crate) const LARGEST: u64 = 64 * 1024;
 pub(crate) const PERMISSION_MODES: [&str; 4] =
     ["manual", "acceptEdits", "bypassPermissions", "plan"];
 
+/// The modes a repository may start chats in: those that ask at least as
+/// much as Supervised.
+pub(crate) const REPO_MODES: [&str; 2] = ["manual", "plan"];
+
 /// The first set of `own`, `repo` and `machine`, setting by setting.
 pub(crate) fn applied(own: &Scoped, repo: &Scoped, machine: &Scoped) -> Scoped {
     let first = |pick: fn(&Scoped) -> &Option<String>| {
@@ -94,13 +98,22 @@ pub(crate) fn from_repo(root: &Path) -> Result<Scoped, String> {
     if !real.starts_with(&real_root) {
         return Err(format!("{REPO_FILE} leads outside the project"));
     }
-    let size = std::fs::metadata(&real)
-        .map_err(|err| err.to_string())?
-        .len();
-    if size > LARGEST {
+    if !std::fs::metadata(&real).is_ok_and(|meta| meta.is_file()) {
+        return Err(format!("{REPO_FILE} is not a file"));
+    }
+    // Capped on the read, not on what the size said a moment before.
+    let mut text = String::new();
+    std::io::Read::read_to_string(
+        &mut std::io::Read::take(
+            std::fs::File::open(&real).map_err(|err| err.to_string())?,
+            LARGEST + 1,
+        ),
+        &mut text,
+    )
+    .map_err(|err| err.to_string())?;
+    if text.len() as u64 > LARGEST {
         return Err(format!("{REPO_FILE} is bigger than {} KB", LARGEST / 1024));
     }
-    let text = std::fs::read_to_string(&real).map_err(|err| err.to_string())?;
     let file: RepoFile =
         serde_json::from_str(&text).map_err(|err| format!("{REPO_FILE} is not valid: {err}"))?;
     let scoped = Scoped {
@@ -108,6 +121,17 @@ pub(crate) fn from_repo(root: &Path) -> Result<Scoped, String> {
         permission_mode: file.permission_mode,
         branch_pattern: file.worktree.and_then(|worktree| worktree.branch_pattern),
     };
+    // A mode that asks less than Supervised is the person's to choose,
+    // never a repository's.
+    if let Some(mode) = scoped
+        .permission_mode
+        .as_deref()
+        .filter(|mode| !REPO_MODES.contains(mode))
+    {
+        return Err(format!(
+            "{REPO_FILE} cannot start chats in {mode}: only you choose a mode that asks less"
+        ));
+    }
     match refused(&scoped) {
         Some(why) => Err(format!("{REPO_FILE}: {why}")),
         None => Ok(scoped),
@@ -196,47 +220,65 @@ pub async fn project_settings_read(
     crate::off_main::blocking(move || read(&Store::open_default()?, project_id.as_deref())).await
 }
 
-/// `project.settings_write` — a project's own settings, replaced; for the
-/// machine, its model and permission mode (its branch name is chosen where it
-/// always was, in Settings → Worktrees).
+/// The scope's settings with `field` set to `value`, or cleared when none.
+pub(crate) fn with_field(
+    mut scoped: Scoped,
+    field: &str,
+    value: Option<String>,
+) -> Result<Scoped, String> {
+    let value = value
+        .map(|one| one.trim().to_owned())
+        .filter(|one| !one.is_empty());
+    match field {
+        "model" => scoped.model = value,
+        "permissionMode" => scoped.permission_mode = value,
+        "branchPattern" => scoped.branch_pattern = value,
+        _ => return Err(format!("{field:?} is not a setting a project chooses")),
+    }
+    match refused(&scoped) {
+        Some(why) => Err(why),
+        None => Ok(scoped),
+    }
+}
+
+/// One write at a time: two settings changed at once both stay.
+static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// `project.settings_write` — one setting of a project, or of the machine,
+/// changed and the others left as they are now. The machine's branch name is
+/// chosen where it always was, in Settings → Worktrees.
 #[tauri::command]
 #[specta::specta]
 pub async fn project_settings_write(
     project_id: Option<String>,
-    settings: Scoped,
+    field: String,
+    value: Option<String>,
 ) -> Result<ProjectSettings, RpcError> {
     crate::off_main::blocking(move || {
-        let trimmed = |value: Option<String>| {
-            value
-                .map(|one| one.trim().to_owned())
-                .filter(|one| !one.is_empty())
-        };
-        let settings = Scoped {
-            model: trimmed(settings.model),
-            permission_mode: trimmed(settings.permission_mode),
-            branch_pattern: trimmed(settings.branch_pattern),
-        };
-        if let Some(why) = refused(&settings) {
-            return Err(RpcError::new(ErrorCode::Invalid, why));
-        }
+        let invalid = |why: String| RpcError::new(ErrorCode::Invalid, why);
+        let _one = WRITING.lock().unwrap_or_else(|held| held.into_inner());
         let store = Store::open_default()?;
         match project_id.as_deref() {
             None => {
-                store.set_preference(
-                    preference::CHAT_MODEL,
-                    settings.model.as_deref().unwrap_or(""),
-                )?;
+                if field == "branchPattern" {
+                    return Err(invalid(
+                        "the branch name for every project is chosen in Settings → Worktrees"
+                            .to_owned(),
+                    ));
+                }
+                let set = with_field(machine(&store), &field, value).map_err(invalid)?;
+                store.set_preference(preference::CHAT_MODEL, set.model.as_deref().unwrap_or(""))?;
                 store.set_preference(
                     preference::CHAT_PERMISSION,
-                    settings.permission_mode.as_deref().unwrap_or(""),
+                    set.permission_mode.as_deref().unwrap_or(""),
                 )?;
             }
             Some(id) => {
                 let mut all = owned(&store);
-                if settings == Scoped::default() {
-                    all.remove(id);
-                } else {
-                    all.insert(id.to_owned(), settings);
+                let set = with_field(all.remove(id).unwrap_or_default(), &field, value)
+                    .map_err(invalid)?;
+                if set != Scoped::default() {
+                    all.insert(id.to_owned(), set);
                 }
                 let json = serde_json::to_string(&all)
                     .map_err(|err| RpcError::internal(err.to_string()))?;

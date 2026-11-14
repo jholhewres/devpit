@@ -55,13 +55,10 @@ pub(crate) fn fresh_session_id() -> String {
 /// Next to the state rather than in a temp file: a turn that outlives the app
 /// still has a file to read, and a path that changes every run would be a new
 /// file on disk for every card moved.
-pub(crate) fn hook_settings() -> Option<String> {
-    hook_settings_for(None)
-}
-
-/// [`hook_settings`] for a session of `profile_id`: a file of the profile's
-/// own when it has an advisor model, devpit's shared one otherwise. The
-/// profile's own settings file is never touched.
+///
+/// For a session of `profile_id`: a file of the profile's own when it has an
+/// advisor model, devpit's shared one otherwise. The profile's own settings
+/// file is never touched.
 pub(crate) fn hook_settings_for(profile_id: Option<&str>) -> Option<String> {
     let root = Store::root().ok()?;
     let endpoint = devpit_agentcli::endpoint_file(&root);

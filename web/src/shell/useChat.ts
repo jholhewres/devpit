@@ -240,8 +240,9 @@ export function useChat(conversationId: string): Chat {
         const applied = said.data?.applied
         if (applied?.model) setModel(applied.model)
         const mode = MODES.find((one) => one.id === applied?.permissionMode)?.id ?? null
-        startsIn.current = mode
-        if (mode) setPermission(mode)
+        // An orchestrator keeps the mode it listens in between turns.
+        startsIn.current = project.orchestrator ? null : mode
+        if (startsIn.current) setPermission(startsIn.current)
       }
       const installed = pickable(found.data ?? [], belongs)
       setProfiles(installed)

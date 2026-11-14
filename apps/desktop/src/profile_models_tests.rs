@@ -85,6 +85,15 @@ fn only_model_names_are_kept_and_an_empty_advisor_is_none() {
 }
 
 #[test]
+fn the_default_model_is_never_switched_off() {
+    assert!(checked(ProfileModels {
+        models_off: vec![DEFAULT_MODEL.to_owned()],
+        advisor_model: None,
+    })
+    .is_err());
+}
+
+#[test]
 fn a_profile_with_an_advisor_gets_a_hooks_file_of_its_own() {
     let root = Path::new("/home/me/.devpit");
     assert_eq!(hooks_file(root, None), root.join("hooks.json"));

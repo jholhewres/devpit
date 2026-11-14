@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ProviderChecks } from './ProviderChecks'
-import { useCheckEvery } from './providerChecks'
+import { useCheckEvery } from './checkEvery'
 
 let minutes = 5
 const write = vi.fn(async (next: number) => ({ minutes: (minutes = next) }))

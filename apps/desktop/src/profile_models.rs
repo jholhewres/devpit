@@ -35,6 +35,9 @@ pub(crate) fn of(store: &Store, profile_id: &str) -> ProfileModels {
     kept(store).remove(profile_id).unwrap_or_default()
 }
 
+/// The model a session runs without one chosen, which stays on.
+pub(crate) const DEFAULT_MODEL: &str = "default";
+
 /// What `write` accepts: model names only, as a profile's own models are;
 /// an empty advisor model is none.
 pub(crate) fn checked(models: ProfileModels) -> Result<ProfileModels, String> {
@@ -45,6 +48,9 @@ pub(crate) fn checked(models: ProfileModels) -> Result<ProfileModels, String> {
             .filter(|one| !one.is_empty()),
         models_off: models.models_off,
     };
+    if models.models_off.iter().any(|one| one == DEFAULT_MODEL) {
+        return Err("the default model stays on: it is what a session runs without one".to_owned());
+    }
     match models
         .models_off
         .iter()

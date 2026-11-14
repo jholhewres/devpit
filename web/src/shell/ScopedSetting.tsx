@@ -55,10 +55,11 @@ export function ScopedSetting({ field }: { field: Field }): React.JSX.Element {
   }, [scope])
 
   const project = scope !== ''
-  const mine: Scoped = shown ? (project ? shown.own : { model: shown.machine.model, permissionMode: shown.machine.permissionMode }) : {}
+  const mine: Scoped = shown ? (project ? shown.own : shown.machine) : {}
   const value = mine[field] ?? ''
+  /* One setting at a time: another page's change to another one stays. */
   const save = (next: string): void => {
-    void ask(() => commands.projectSettingsWrite(scope || null, { ...mine, [field]: next.trim() || null })).then((answer) => {
+    void ask(() => commands.projectSettingsWrite(scope || null, field, next.trim() || null)).then((answer) => {
       setError(answer.error)
       if (answer.data) setShown(answer.data)
     })
