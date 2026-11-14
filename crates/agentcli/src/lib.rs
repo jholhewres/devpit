@@ -29,7 +29,9 @@ pub use catalogue::{
     Rejected,
 };
 pub use headless::{run_turn, run_turn_cancellable, Outcome, Turn};
-pub use hook_settings::{plugin_hooks_json, settings_json, ALLOWED_TOOLS, HOOKED};
+pub use hook_settings::{
+    plugin_hooks_json, settings_json, settings_json_advised, ALLOWED_TOOLS, HOOKED,
+};
 pub use hooks::{auth_file, endpoint_file, read as read_hook, Event, Happening, HOOK_HEADER};
 pub use schema::validates;
 pub use sources::seed_sources;

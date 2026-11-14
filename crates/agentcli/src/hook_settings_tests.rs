@@ -225,3 +225,25 @@ fn on_windows_a_hook_is_devpit_itself() {
         assert!(!command.contains("curl"), "{event}: {command}");
     }
 }
+
+#[test]
+fn an_advisor_model_is_added_to_the_same_settings_and_nothing_else_changes() {
+    let (endpoint, auth) = (Path::new("/tmp/endpoint"), Path::new("/tmp/hook-auth"));
+    let plain = settings_json(endpoint, auth);
+    assert_eq!(
+        crate::hook_settings::settings_json_advised(endpoint, auth, None),
+        plain
+    );
+    let advised = crate::hook_settings::settings_json_advised(endpoint, auth, Some("opus"));
+    let parsed: serde_json::Value = serde_json::from_str(&advised).expect("valid json");
+    assert_eq!(parsed["advisorModel"], "opus");
+    let mut without = parsed.clone();
+    without
+        .as_object_mut()
+        .expect("object")
+        .remove("advisorModel");
+    assert_eq!(
+        without,
+        serde_json::from_str::<serde_json::Value>(&plain).expect("json")
+    );
+}

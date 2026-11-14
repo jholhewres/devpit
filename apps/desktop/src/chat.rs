@@ -185,10 +185,11 @@ pub async fn chat_send(
     let steered = control.clone();
     crate::card_chat::turn_heard(&app, &conversation_id, Doing::Working);
     let noticed = (project_id.clone(), profile_id.clone(), from);
+    let advised = profile_id.clone();
     let checkout_at = PathBuf::from(&cwd);
     let said = tauri::async_runtime::spawn_blocking(move || {
         let prompt = crate::session_notice::with_notice(&noticed, &prompt, now() * 1000.0);
-        let hooks = crate::steps::hook_settings();
+        let hooks = crate::steps::hook_settings_for(Some(&advised));
         let checkout = std::path::Path::new(&cwd);
         let mut before = crate::turn_changes::Before::default();
         let turn = Say {

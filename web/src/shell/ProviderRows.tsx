@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AgentChoice, Profile } from '../gen/bindings'
 import { AgentRow } from './AgentRow'
 import { EnvironmentCopy } from './EnvironmentCopy'
+import { ProviderChecks } from './ProviderChecks'
+import { ScopedSetting } from './ScopedSetting'
 import { FieldSelect } from './FieldSelect'
 import { catalogue, choosable, defaultLost, elsewhere, here, type Entry } from './catalogue'
 import { ask, commands } from './live'
@@ -263,6 +265,8 @@ export function ProviderRows(): React.JSX.Element {
           </p>
         )}
         <EnvironmentCopy />
+        <ProviderChecks />
+        <ScopedSetting field="model" />
 
         {here(entries).map((entry) => (
           <AgentRow

@@ -362,7 +362,7 @@ fn resumed(
     let mcp = crate::agent_reach::chat_mcp(&profile.driver);
     let reach = crate::orchestrator::reaches(project_id);
     let address = crate::orchestrator::address_of(project_id);
-    let hooks = crate::steps::hook_settings();
+    let hooks = crate::steps::hook_settings_for(Some(&head.profile));
     let cwd = crate::chat_turn::turn_cwd(head.cwd.as_deref(), cwd).ok()?;
     let mode = head.permission.as_deref();
     // Only through a process this conversation already has: starting one

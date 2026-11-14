@@ -101,6 +101,7 @@ vi.mock('./live', () => ({
     chatCancel: (id: string) => (calls.chatCancel(id), null),
     chatForceStop: (id: string) => (calls.chatForceStop(id), true),
     agentProfiles: () => [{ id: 'claude', path: '/bin/claude' }],
+    projectSettingsRead: () => ({ own: {}, repo: {}, machine: {}, applied: projectSettings.applied, repoProblem: null }),
     permissionAskFromNow: () => null,
   },
 }))
@@ -112,6 +113,12 @@ vi.mock('./window', () => ({
 }))
 const shell = { project: { id: 'p', rootPath: '/w', orchestrator: null }, show: vi.fn() }
 vi.mock('./shellStore', () => ({ useShellPick: (pick: (from: typeof shell) => unknown) => pick(shell) }))
+
+/* What a new chat's project says it starts with. */
+const projectSettings: { applied: { model?: string; permissionMode?: string } } = { applied: {} }
+afterEach(() => {
+  projectSettings.applied = {}
+})
 
 const said = (id: string): Frame => ({
   type: 'opened',
@@ -421,3 +428,20 @@ describe('a stop pressed again', () => {
     }
   })
 })
+
+describe('a new chat', () => {
+  it("starts with its project's model and permission mode", async () => {
+    projectSettings.applied = { model: 'opus', permissionMode: 'plan' }
+    const { result } = renderHook(() => useChat('conv_new'))
+    await waitFor(() => expect(result.current.model).toBe('opus'))
+    await waitFor(() => expect(result.current.permission).toBe('plan'))
+  })
+
+  it('starts as before when nothing is set', async () => {
+    const { result } = renderHook(() => useChat('conv_plain'))
+    await waitFor(() => expect(calls.chatHistory).toHaveBeenCalledWith('p', 'conv_plain'))
+    await waitFor(() => expect(result.current.permission).toBe('manual'))
+    expect(result.current.model ?? null).toBeNull()
+  })
+})
+

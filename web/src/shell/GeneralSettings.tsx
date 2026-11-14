@@ -10,6 +10,7 @@ import { OpenApps } from './OpenApps'
 import { PauseSettings } from './PauseSettings'
 import { PrefSwitch } from './PrefSwitch'
 import { RemoteSettings } from './RemoteSettings'
+import { ScopedSetting } from './ScopedSetting'
 import { SessionRelaySettings } from './SessionRelaySettings'
 import type { Flag } from './settingsFlags'
 import type { PrefsPane } from './shape'
@@ -68,6 +69,7 @@ export function GeneralPanes({
         <SessionRelaySettings />
         <ActivityDefault />
         <ChatKeySettings />
+        <ScopedSetting field="permissionMode" />
         <PrefSwitch on={on('confirmStop')} onFlip={flip('confirmStop')} title="Ask before stopping a terminal" said={<>A terminal still running something asks before it is closed. Its &ldquo;Don&rsquo;t ask again&rdquo; turns this off; this turns it back on.</>} />
       </section>
 

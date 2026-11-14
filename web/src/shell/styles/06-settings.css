@@ -409,3 +409,7 @@ button.remote__chip:hover { color: var(--text); background: var(--overlay-strong
 .diag__t td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-2); font-family: var(--mono); }
 .diag__t td:first-child { color: var(--text); }
 .diag__log { margin: 6px 0 0; padding: 10px 12px; max-height: 280px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--overlay); font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
+
+/* Settings → Providers: a profile's models, each offered or switched off. */
+.pmodels { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 420px; }
+.pmodels__one { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12px; color: var(--text-2); }
