@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useGroups } from './paletteGroups'
+import { TALK } from './paletteIcons'
+import { openHit, useHits } from './SessionSearch'
+import { pieces } from './snippet'
 import { PaletteKeys, PaletteList } from './PaletteList'
 import { useReachable } from './paletteReach'
 import { useShell } from './useShell'
@@ -15,7 +18,7 @@ import { committed } from './typing'
  */
 
 export function Palette({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const { show } = useShell()
+  const { show, openChat, projects } = useShell()
   const { panes, agents, sessions, cards, files, indexing, partial } = useReachable()
   const [query, setQuery] = useState('')
   const [at, setAt] = useState(0)
@@ -23,7 +26,21 @@ export function Palette({ onClose }: { onClose: () => void }): React.JSX.Element
 
   useEffect(() => field.current?.focus(), [])
 
-  const groups = useGroups({ panes, agents, sessions, cards, files, query, show })
+  /* What was said in any project's conversations, opened in its own project. */
+  const said = useHits(query, null, query.trim().length > 1).hits
+  const conversations = useMemo(
+    () =>
+      said.map((hit, index) => ({
+        key: `said:${hit.projectId}:${hit.sessionId}:${index}`,
+        name: pieces(hit.snippet).map((piece) => piece.text).join(''),
+        meta: projects.find((one) => one.id === hit.projectId)?.name ?? '',
+        icon: TALK,
+        go: () => void openHit(hit, openChat),
+      })),
+    [said, projects, openChat],
+  )
+
+  const groups = useGroups({ panes, agents, sessions, conversations, cards, files, query, show })
 
   const flat = groups.flatMap(([, rows]) => rows)
 
@@ -62,7 +79,7 @@ export function Palette({ onClose }: { onClose: () => void }): React.JSX.Element
             type="text"
             autoComplete="off"
             spellCheck={false}
-            placeholder="Search tabs, files, cards, agents…"
+            placeholder="Search tabs, files, cards, agents, conversations…"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)

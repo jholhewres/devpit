@@ -18,17 +18,15 @@ import { useShell } from './useShell'
    whole history. */
 const WAIT_MS = 250
 
-export function SessionSearch(): React.JSX.Element | null {
-  const { project, show } = useShell()
-  const [query, setQuery] = useState('')
+/* What a query finds: in one project, or in every project's conversations
+   when none is named. Cleared with the query: a search still on its way when
+   the field was emptied used to leave "Reading transcripts…" behind. */
+export function useHits(query: string, projectId: string | null, on = true): { hits: readonly SessionHit[]; error: string | null; looking: boolean } {
   const [hits, setHits] = useState<readonly SessionHit[]>([])
   const [error, setError] = useState<string | null>(null)
   const [looking, setLooking] = useState(false)
-
   useEffect(() => {
-    /* Cleared with the query: a search still on its way when the field was
-       emptied used to leave "Reading transcripts…" and its error behind. */
-    if (!project || !query.trim()) {
+    if (!on || !query.trim()) {
       setHits([])
       setLooking(false)
       setError(null)
@@ -37,7 +35,7 @@ export function SessionSearch(): React.JSX.Element | null {
     let current = true
     const timer = window.setTimeout(() => {
       setLooking(true)
-      void ask(() => commands.sessionsSearch(project.id, query)).then((answer) => {
+      void ask(() => commands.sessionsSearch(projectId, query)).then((answer) => {
         if (!current) return
         setHits(answer.data ?? [])
         setError(answer.error)
@@ -48,26 +46,41 @@ export function SessionSearch(): React.JSX.Element | null {
       current = false
       window.clearTimeout(timer)
     }
-  }, [project, query])
+  }, [on, projectId, query])
+  return { hits, error, looking }
+}
+
+/* Opens what a hit is in: the conversation devpit holds for it, or the session
+   taken in under a profile of its installation. Answers why not, if it could not. */
+export async function openHit(hit: SessionHit, open: (projectId: string, conversationId: string) => void): Promise<string | null> {
+  if (hit.conversationId) {
+    open(hit.projectId, hit.conversationId)
+    return null
+  }
+  const [installed, known] = await Promise.all([ask(() => commands.cliInstallations()), ask(() => commands.agentProfiles())])
+  const profile = profileFor(
+    { sessionId: hit.sessionId, title: null, installation: hit.installation, lastAt: null },
+    (installed.data ?? []) as readonly Installation[],
+    (known.data ?? []) as readonly Profile[],
+  )
+  if (!profile) return 'No profile runs against the installation that holds this session.'
+  const adopted = await ask(() => commands.chatAdopt(hit.projectId, hit.sessionId, profile.id, null, null))
+  if (!adopted.data) return adopted.error
+  open(hit.projectId, adopted.data)
+  return null
+}
+
+export function SessionSearch(): React.JSX.Element | null {
+  const { project, show } = useShell()
+  const [query, setQuery] = useState('')
+  const found = useHits(query, project?.id ?? null, Boolean(project))
+  const [failed, setFailed] = useState<string | null>(null)
+  const { hits, looking } = found
+  const error = failed ?? found.error
 
   if (!project) return null
 
-  const open = async (hit: SessionHit): Promise<void> => {
-    if (hit.conversationId) return show('chat', { id: hit.conversationId })
-    const [installed, known] = await Promise.all([
-      ask(() => commands.cliInstallations()),
-      ask(() => commands.agentProfiles()),
-    ])
-    const profile = profileFor(
-      { sessionId: hit.sessionId, title: null, installation: hit.installation, lastAt: null },
-      (installed.data ?? []) as readonly Installation[],
-      (known.data ?? []) as readonly Profile[],
-    )
-    if (!profile) return setError('No profile runs against the installation that holds this session.')
-    const adopted = await ask(() => commands.chatAdopt(project.id, hit.sessionId, profile.id, null, null))
-    if (adopted.data) show('chat', { id: adopted.data })
-    else setError(adopted.error)
-  }
+  const open = async (hit: SessionHit): Promise<void> => setFailed(await openHit(hit, (_, id) => show('chat', { id })))
 
   return (
     <div className="ssearch">
@@ -75,7 +88,10 @@ export function SessionSearch(): React.JSX.Element | null {
         className="fb__find"
         placeholder="Search what was said…"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          setQuery(event.target.value)
+          setFailed(null)
+        }}
         aria-label="Search conversations"
       />
       {looking && <div className="sessions__none">Reading transcripts…</div>}

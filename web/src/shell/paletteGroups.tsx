@@ -20,6 +20,7 @@ export function useGroups({
   panes,
   agents,
   sessions,
+  conversations = [],
   cards,
   files,
   query,
@@ -28,6 +29,8 @@ export function useGroups({
   panes: Row[]
   agents: Row[]
   sessions: Row[]
+  /** What was said, in every project: ranked by the search that found it. */
+  conversations?: Row[]
   cards: readonly Card[]
   files: readonly string[]
   query: string
@@ -41,6 +44,7 @@ export function useGroups({
          for, and it is the thing people came to the plus button to do. */
       Agents: ranked(agents, query, (row) => row.name),
       Sessions: ranked(sessions, query, (row) => row.name),
+      Conversations: conversations,
       Cards: ranked(cards, query, (card) => card.title).map((card) => ({
         key: `card:${card.id}`,
         name: card.title,
@@ -59,5 +63,5 @@ export function useGroups({
     /* A group with nothing in it leaves rather than showing a heading over
        nothing. */
     return Object.entries(asRows).filter(([, rows]) => rows.length > 0)
-  }, [panes, agents, sessions, cards, files, query, show])
+  }, [panes, agents, sessions, conversations, cards, files, query, show])
 }
