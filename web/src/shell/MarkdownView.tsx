@@ -9,7 +9,9 @@ import { external, grown, linkTarget, mended, resolved, spans, type Block, type 
 import { Pathed, Tick } from './MdTick'
 import { ask, commands } from './live'
 import { went } from './problems'
+import { PICTURES } from './sentFiles'
 import { useShellPick } from './shellStore'
+import { useStream } from './Streamed'
 import { Zoomable } from './Zoom'
 
 /*
@@ -140,15 +142,13 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
       return <strong>{span.text}</strong>
     case 'em':
       return <em>{span.text}</em>
-    case 'image':
-      /* Resolved against the file's own folder. Nothing loads it yet unless it
-         is a URL — a relative image needs a read through the backend, and this
-         says so rather than drawing a broken frame. */
-      return external(span.src) ? (
-        <Zoomable src={span.src} name={span.alt || 'Image'} className="md__img" />
-      ) : (
-        <span className="md__tick">{resolved(path, span.src)}</span>
-      )
+    case 'image': {
+      /* Resolved against the file's own folder. A picture on this machine is
+         read through the backend; any other path stays its words. */
+      if (external(span.src)) return <Zoomable src={span.src} name={span.alt || 'Image'} className="md__img" />
+      const here = resolved(path, span.src)
+      return localPicture(here) ? <LocalPicture path={here} name={span.alt} /> : <span className="md__tick">{here}</span>
+    }
     case 'link': {
       const target = linkTarget(span.href)
       if (target === 'text') return <span title={span.href}>{span.text}</span>
@@ -160,4 +160,13 @@ function Bit({ span, path }: { span: Span; path: string }): React.JSX.Element {
     default:
       return <Pathed text={span.text} opens={opens} />
   }
+}
+
+const localPicture = (path: string): boolean => path.startsWith('/') && PICTURES.has(path.split('.').at(-1)?.toLowerCase() ?? '')
+
+/* A webview cannot load a path: the file is streamed by devpit's own scheme. */
+function LocalPicture({ path, name }: { path: string; name: string }): React.JSX.Element {
+  const { url, error } = useStream(null, path)
+  if (!url) return <span className="md__tick" title={error ?? undefined}>{path}</span>
+  return <Zoomable src={url} name={name || path.split('/').at(-1)!} path={path} className="md__img" />
 }

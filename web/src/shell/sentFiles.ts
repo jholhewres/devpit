@@ -12,7 +12,7 @@ export interface SentFile {
   readonly image: boolean
 }
 
-const PICTURES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
+export const PICTURES: ReadonlySet<string> = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 
 const files = (line: string | undefined): SentFile[] | null => {
   if (!line?.startsWith('@')) return null
