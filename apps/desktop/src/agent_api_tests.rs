@@ -441,3 +441,18 @@ fn a_session_consults_its_own_projects_agent_and_no_other() {
     assert!(none.contains("no project agent"), "{none}");
     assert!(!app.join(".devpit").exists(), "consulting made a memory");
 }
+
+#[test]
+fn labs_turns_off_every_way_to_the_project_agent_and_nothing_else() {
+    for method in [
+        "project_agent_ask",
+        "project_agent_brief",
+        "project_agent_consult",
+        "project_agent_propose",
+    ] {
+        assert!(asks_the_project_agent(method), "{method}");
+    }
+    for method in ["board", "card", "comment", "health", "status"] {
+        assert!(!asks_the_project_agent(method), "{method}");
+    }
+}

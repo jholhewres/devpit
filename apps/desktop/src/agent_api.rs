@@ -482,14 +482,16 @@ fn respond_in(
             &asked.params,
         );
     }
-    if crate::project_agent::SESSION_METHODS.contains(&asked.method.as_str()) {
-        return crate::project_agent::from_session(app, here, projects, asked);
-    }
-    if crate::project_agent::METHODS.contains(&asked.method.as_str()) {
+    if asks_the_project_agent(&asked.method) {
         let store = devpit_core::Store::open_default().map_err(|err| said(err.into()))?;
         if !crate::maintenance::project_agent_on(&store) {
             return Err(LABS_OFF.to_owned());
         }
+    }
+    if crate::project_agent::SESSION_METHODS.contains(&asked.method.as_str()) {
+        return crate::project_agent::from_session(app, here, projects, asked);
+    }
+    if crate::project_agent::METHODS.contains(&asked.method.as_str()) {
         return crate::project_agent::respond(
             app,
             &asked.method,
@@ -1021,6 +1023,13 @@ pub(crate) fn project_at<'a>(projects: &'a [Project], cwd: &Path) -> Option<&'a 
 
 fn resolved(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Whether a method reaches the project agent, the orchestrator's or a
+/// session's: all of them are off while Labs has it off.
+pub(crate) fn asks_the_project_agent(method: &str) -> bool {
+    crate::project_agent::METHODS.contains(&method)
+        || crate::project_agent::SESSION_METHODS.contains(&method)
 }
 
 /// What the project agent's tools say while Labs has it off.

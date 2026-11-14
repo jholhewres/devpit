@@ -99,7 +99,7 @@ export function MaintenanceSettings(): React.JSX.Element {
         on={shown?.projectAgent ?? true}
         onFlip={() => shown && write({ projectAgent: !shown.projectAgent })}
         title="Project agent"
-        said="Beta. An agent that knows one project: the orchestrator asks it, and it draws lessons when a card is done."
+        said="Beta. An agent that knows one project: the orchestrator and the project's sessions ask it, and it draws lessons when a card is done."
       />
       <PrefSwitch
         on={shown?.canvas ?? true}
