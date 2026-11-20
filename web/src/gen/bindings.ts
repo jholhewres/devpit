@@ -619,6 +619,17 @@ export const commands = {
 	sessionChanges: (cwd: string, cardId: string | null) => typedError<SessionChanges, RpcError>(__TAURI_INVOKE("session_changes", { cwd, cardId })),
 	/**  `orchestrator.draft_drop` — the person drops a draft without sending it. */
 	orchestratorDraftDrop: (profileId: string, name: string) => __TAURI_INVOKE<void>("orchestrator_draft_drop", { profileId, name }),
+	/**  `forwarded.list` — what other orchestrators forwarded to this one. */
+	forwardedList: (projectId: string) => typedError<ForwardedRequests, RpcError>(__TAURI_INVOKE("forwarded_list", { projectId })),
+	/**  `forwarded.drop` — the person lets go of one request without sending it. */
+	forwardedDrop: (projectId: string, from: string, id: string) => typedError<null, RpcError>(__TAURI_INVOKE("forwarded_drop", { projectId, from, id })),
+	/**
+	 *  `forwarded.send` — the person sends a request on, with the words they
+	 *  left in it: a turn in the destination's conversation, found again now,
+	 *  under a notice that the words are another orchestrator's and approve
+	 *  nothing. The request leaves when the turn starts.
+	 */
+	forwardedSend: (projectId: string, from: string, id: string, text: string) => typedError<ForwardedSent, RpcError>(__TAURI_INVOKE("forwarded_send", { projectId, from, id, text })),
 	/**  `orchestrator.stops_asked` — the stops waiting for the person's click. */
 	orchestratorStopsAsked: (profileId: string) => __TAURI_INVOKE<StopsAsked>("orchestrator_stops_asked", { profileId }),
 	/**
@@ -3902,6 +3913,31 @@ export type FolderGlance = {
 	files: number,
 	added: number,
 	removed: number,
+};
+
+/**
+ *  A request another orchestrator forwarded, waiting in this orchestrator's
+ *  conversation for the person. Nothing in it has been sent or run.
+ */
+export type ForwardedRequest = {
+	/**  The address of the orchestrator that sent it. */
+	from: string,
+	/**  What the sender calls it: the same request sent again carries it again. */
+	id: string,
+	/**  The conversation it waits in. */
+	conversation: string,
+	text: string,
+};
+
+/**  A list, so tomorrow's field has somewhere to go. */
+export type ForwardedRequests = {
+	requests: ForwardedRequest[],
+};
+
+/**  Where the turn of a forwarded request the person sent on runs. */
+export type ForwardedSent = {
+	/**  The conversation the turn started in, found again at the click. */
+	conversation: string,
 };
 
 /**

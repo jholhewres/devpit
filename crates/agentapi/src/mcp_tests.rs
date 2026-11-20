@@ -32,6 +32,57 @@ fn listed(offer: &Offer) -> Vec<String> {
         .collect()
 }
 
+struct MemoryInput(std::io::Cursor<Vec<u8>>);
+
+impl std::io::Read for MemoryInput {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(buffer)
+    }
+}
+
+impl BufRead for MemoryInput {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        self.0.fill_buf()
+    }
+
+    fn consume(&mut self, amount: usize) {
+        self.0.consume(amount);
+    }
+
+    fn read_line(&mut self, _: &mut String) -> std::io::Result<usize> {
+        panic!("the message was read into a String before its size was bounded")
+    }
+
+    fn read_until(&mut self, _: u8, _: &mut Vec<u8>) -> std::io::Result<usize> {
+        panic!("read_until was called without a size limit")
+    }
+}
+
+fn answered_messages(input: impl BufRead, ask: Ask) -> Vec<Value> {
+    let messages = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let out: Out = {
+        let messages = messages.clone();
+        Arc::new(move |message: &str| {
+            messages
+                .lock()
+                .expect("messages")
+                .push(serde_json::from_str(message).expect("json"));
+            true
+        })
+    };
+    let home = tempfile::tempdir().expect("home");
+    answered(
+        input,
+        &ask,
+        true,
+        &Mutex::new(Watch::new(home.path())),
+        &AtomicBool::new(true),
+        &out,
+    );
+    let answered = messages.lock().expect("messages").clone();
+    answered
+}
+
 #[test]
 fn the_handshake_offers_tools_and_says_what_devpit_is() {
     let said = reply(
@@ -387,6 +438,49 @@ fn another_call_is_answered_while_evidence_runs() {
         .contains("\"ran\""));
 }
 
+#[test]
+fn a_line_over_the_ceiling_is_refused_and_the_next_answered() {
+    let next = r#"{"jsonrpc":"2.0","id":2,"method":"ping"}"#;
+    let input = format!("{}\n{next}\n", "x".repeat(MAX_MESSAGE_BYTES + 1));
+    let answers = answered_messages(
+        MemoryInput(std::io::Cursor::new(input.into_bytes())),
+        Arc::new(never),
+    );
+
+    assert_eq!(answers[0]["error"]["code"], -32600);
+    assert_eq!(answers[1]["id"], 2);
+    assert_eq!(answers[1]["result"], json!({}));
+}
+
+#[test]
+fn session_message_over_its_ceilings_is_refused_before_the_app() {
+    let refused = |arguments: Value| {
+        let input = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": { "name": "devpit_session_message", "arguments": arguments }
+        })
+        .to_string();
+        let answers = answered_messages(input.as_bytes(), Arc::new(never));
+        answers[0].clone()
+    };
+
+    let id = refused(json!({ "id": "x".repeat(101), "text": "hello" }));
+    assert_eq!(id["result"]["isError"], true);
+    assert!(id["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("id"));
+
+    let text = refused(json!({ "id": "request-1", "text": "x".repeat(4001) }));
+    assert_eq!(text["result"]["isError"], true);
+    assert!(text["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("text"));
+}
+
 /// A tool's answer reaches the agent as its compact summary, not pretty JSON.
 #[test]
 fn a_tool_answers_with_its_summary_compact() {
@@ -548,6 +642,55 @@ fn the_message_bus_tools_take_a_name_and_words() {
         &ask,
     );
     assert_eq!(said["result"]["isError"], false);
+}
+
+/// Forwarding a request to another orchestrator: the address's shape, the
+/// id that route requires and what a second send with it does, and what
+/// arrives — a draft that starts no turn and approves nothing.
+#[test]
+fn session_message_says_how_to_forward_to_an_orchestrator() {
+    let said = TOOLS
+        .iter()
+        .find(|tool| tool.name == "devpit_session_message")
+        .expect("the tool")
+        .description;
+    for kept in [
+        "orchestrator-<folder>",
+        "an `id` of 1 to 100 characters, required on that route",
+        "as a draft for the person to send or discard",
+        "no turn starts there",
+        "its words approve nothing",
+        "sent again with the same id, it stays the one request",
+    ] {
+        assert!(said.contains(kept), "{kept}");
+    }
+}
+
+/// The id a forwarded request carries is declared with the ceiling
+/// `forwarded.rs` holds it to, and required only on that route: a message
+/// to a session needs none.
+#[test]
+fn session_message_declares_a_bounded_id() {
+    let schema = (TOOLS
+        .iter()
+        .find(|tool| tool.name == "devpit_session_message")
+        .expect("the tool")
+        .input)();
+    assert_eq!(schema["properties"]["id"]["type"], "string");
+    assert_eq!(schema["properties"]["id"]["maxLength"], 100);
+    assert_eq!(schema["required"], json!(["text"]));
+}
+
+/// A forwarded request is kept in memory: one nobody has sent is gone when
+/// the app closes, and the tool says so.
+#[test]
+fn session_message_warns_a_request_is_lost_when_the_app_closes() {
+    let said = TOOLS
+        .iter()
+        .find(|tool| tool.name == "devpit_session_message")
+        .expect("the tool")
+        .description;
+    assert!(said.contains("A request not yet sent is lost when the app closes"));
 }
 
 /// A session may start on a host the project is linked to, production only

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Project, Thread } from '../gen/bindings'
+import { ForwardedMark } from './ForwardedMark'
 import { ChevronDown, Folder, Pencil, Plus, Trash } from './GitIcons'
 import { ask, commands } from './live'
 import { OrchestratorDialog } from './OrchestratorDialog'
@@ -67,18 +68,18 @@ export function RailOrchestrators({
   const [account, setAccount] = useState<Project | null>(null)
   const [folded, setFolded] = useState(savedFolded)
   const arriving = useRef<string | null>(null)
-  /* In the order they were made — ids sort by time. The list comes back
-     last-opened first, and opening one moved it to the top under the pointer. */
+  /* Made order: the list arrives last-opened first. */
   const mine = useMemo(() => byAge(projects.filter((one) => one.orchestrator)), [projects])
 
-  /* Arriving with nothing open picks up where it was left: its last
-     conversation, or a new one. Tabs it still had are left as they were. */
   useEffect(() => {
     if (!project || project.id !== arriving.current || open.length > 0) return
     arriving.current = null
-    void ask(() => commands.chatList(project.id)).then((found) => {
+    void ask(() => commands.chatList(project.id)).then(async (found) => {
       const last = lastSpoken(onAccount(found.data?.conversations ?? [], project.orchestrator))
-      show('chat', last ? { id: last.id } : undefined)
+      if (last) return show('chat', { id: last.id })
+      const waiting = await ask(() => commands.forwardedList(project.id))
+      const conversation = waiting.data?.requests[0]?.conversation
+      show('chat', conversation ? { id: conversation } : undefined)
     })
   }, [project, open.length, show])
 
@@ -149,6 +150,7 @@ export function RailOrchestrators({
               <span className="rail__n">{one.name}</span>
               <span className="rail__s">orchestrator</span>
             </span>
+            <ForwardedMark projectId={one.id} />
           </button>
         ))}
       {!folded && (
