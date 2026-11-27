@@ -398,6 +398,27 @@ fn the_assistants_methods_refuse_without_assistant_mode() {
     }
 }
 
+/// The agents' tools answer only an orchestrator whose Agents mode is on: a
+/// project's session asking by name is refused.
+#[test]
+fn the_agents_methods_refuse_without_agents_mode() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let projects = vec![project("prj_app", &dir.path().join("app"), &[])];
+    for method in crate::agents_mode::METHODS {
+        assert!(METHODS.contains(&method), "{method}");
+        assert!(!WRITES.contains(&method), "{method}");
+        let asked: Asked = serde_json::from_value(json!({
+            "method": method, "params": {}, "cwd": "",
+        }))
+        .expect("asked");
+        let refused = respond_in(None, &projects, &projects[0], &asked).expect_err(method);
+        assert!(
+            refused.contains("Agents mode is off"),
+            "{method}: {refused}"
+        );
+    }
+}
+
 /// A project's session reaches its own project's agent and no other one; an
 /// orchestrator asks with its own tool, and a project never learned is off,
 /// and consulting it reads nothing.

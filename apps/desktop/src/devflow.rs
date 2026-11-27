@@ -319,7 +319,7 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
         Offered::Setup => ("setup", Vec::new()),
         Offered::Active(stages) => ("active", stages),
     };
-    json!({
+    let mut said = json!({
         "offer": word,
         "stages": stages,
         "watch": root.join(file()).display().to_string(),
@@ -327,7 +327,12 @@ fn offer(store: &Store, project: &Project, root: &Path, state: &State) -> Value 
         "orchestrator": orchestrator,
         "decisions": crate::decisions::key().is_some(),
         "assistant": orchestrator && crate::assistant::on(store, root),
-    })
+    });
+    // Said only while on, so the answer with the mode off is the one it always was.
+    if orchestrator && crate::agents_mode::on(store, root) {
+        said["agents"] = json!(true);
+    }
+    said
 }
 
 /// Why devpit sets no security path: what an attack may reach is the

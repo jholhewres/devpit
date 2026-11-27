@@ -76,6 +76,99 @@ fn expand(
     }
 }
 
+/// The lines devpit imports its briefs with in `CLAUDE.md`, in the order they
+/// go: its own brief first, then each mode's.
+const IMPORTS: [&str; 3] = [
+    "@.devpit/orchestrator.md",
+    crate::assistant::IMPORT,
+    crate::agents_mode::IMPORT,
+];
+
+/// `CLAUDE.md` with a mode's `import` line, or without it; every other line
+/// as the person wrote it. The line goes under devpit's brief and the modes'
+/// imports before it, over the ones after it, and at the end with none.
+pub(crate) fn imported(text: &str, import: &str, on: bool) -> String {
+    let mut lines: Vec<&str> = text
+        .split_inclusive('\n')
+        .filter(|line| line.trim() != import)
+        .collect();
+    if !on {
+        return lines.concat();
+    }
+    let rank = IMPORTS.iter().position(|one| *one == import).unwrap_or(1);
+    let (before, after) = (&IMPORTS[1..rank], &IMPORTS[rank + 1..]);
+    let is = |set: &[&str], line: &str| set.contains(&line.trim());
+    let under = match lines.iter().position(|one| one.trim() == IMPORTS[0]) {
+        Some(mut at) => {
+            while lines.get(at + 1).is_some_and(|next| is(before, next)) {
+                at += 1;
+            }
+            Some(at)
+        }
+        None => lines.iter().rposition(|one| is(before, one)),
+    };
+    let line = format!("{import}\n");
+    if let Some(at) = under {
+        if !lines[at].ends_with('\n') {
+            return format!("{}\n{line}", lines.concat());
+        }
+        lines.insert(at + 1, &line);
+        return lines.concat();
+    }
+    match lines.iter().position(|one| is(after, one)) {
+        Some(at) => {
+            lines.insert(at, &line);
+            lines.concat()
+        }
+        None if text.is_empty() || text.ends_with('\n') => format!("{}{line}", lines.concat()),
+        None => format!("{}\n{line}", lines.concat()),
+    }
+}
+
+/// A mode's brief and its import as the mode says: `words` written to `brief`
+/// in `folder` and imported when on, both taken out when off; then
+/// [`AGENTS`] brought up to date.
+pub(crate) fn mode_brief(
+    folder: &Path,
+    brief: &str,
+    words: &str,
+    import: &str,
+    on: bool,
+) -> std::io::Result<()> {
+    let brief = folder.join(brief);
+    if on {
+        let text = format!(
+            "<!-- written by devpit {} -->\n{words}",
+            env!("CARGO_PKG_VERSION")
+        );
+        std::fs::create_dir_all(brief.parent().unwrap_or(folder))?;
+        crate::assistant::inside(folder, &brief)?;
+        if std::fs::read_to_string(&brief).ok() != Some(text.clone()) {
+            std::fs::write(&brief, text)?;
+        }
+    } else if brief.symlink_metadata().is_ok() {
+        // A link is removed, not what it points at, and never through a linked folder.
+        let parent = brief.parent().unwrap_or(folder).canonicalize()?;
+        if !parent.starts_with(folder.canonicalize()?) {
+            return Err(std::io::Error::other(format!(
+                "{} is not a file of the orchestrator's folder: left as it is",
+                brief.display()
+            )));
+        }
+        std::fs::remove_file(&brief)?;
+    }
+    let claude = folder.join(SOURCE);
+    if claude.symlink_metadata().is_ok() {
+        crate::assistant::inside(folder, &claude)?;
+    }
+    let before = std::fs::read_to_string(&claude).unwrap_or_default();
+    let after = imported(&before, import, on);
+    if after != before {
+        std::fs::write(&claude, after)?;
+    }
+    write_agents(folder)
+}
+
 /// `AGENTS.md` written from `CLAUDE.md` when it differs, and only as a file of
 /// `folder`: nothing when there is no `CLAUDE.md` to write it from.
 pub(crate) fn write_agents(folder: &Path) -> std::io::Result<()> {

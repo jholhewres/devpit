@@ -9,6 +9,7 @@ import { ChatCardChip } from './ChatCardChip'
 import { useDetails, useDetailsMenu } from './chatDetails'
 import type { Exported } from './chatMarkdown'
 import { ContextMeter } from './ContextMeter'
+import { AgentsToggle } from './AgentsToggle'
 import { AssistantToggle } from './AssistantToggle'
 import { CopySession } from './CopySession'
 import { Menu, MenuItem } from './Menu'
@@ -92,6 +93,7 @@ export const ChatHead = memo(function ChatHead({
         {session && <CopySession id={session} />}
         {orchestrator && <SessionsChip profileId={orchestrator} />}
         {orchestrator && projectId && <AssistantToggle projectId={projectId} />}
+        {orchestrator && projectId && <AgentsToggle projectId={projectId} />}
         {projectId && <RemoteToggle projectId={projectId} conversationId={tabId} sending={sending} supervised={supervised} />}
       </PaneCorner>
     </div>

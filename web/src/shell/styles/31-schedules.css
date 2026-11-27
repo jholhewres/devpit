@@ -1,7 +1,7 @@
 /* ── Schedules ───────────────────────────────────────────────────────
    An orchestrator's reminders and routines, one row each, and the
-   Assistant mode toggle in its chat's corner. */
-.asst[data-on='true'] { color: var(--orchestrate); }
+   Assistant and Agents mode toggles in its chat's corner. */
+.asst[data-on='true'], .agts[data-on='true'] { color: var(--orchestrate); }
 
 .sched__new { display: flex; gap: 8px; margin: 14px 0 10px; }
 .sched__form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--raised); }

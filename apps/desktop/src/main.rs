@@ -15,6 +15,7 @@ mod agent_reminders;
 #[cfg(test)]
 #[path = "agent_rules_tests.rs"]
 mod agent_rules_tests;
+mod agents_mode;
 mod arranging;
 mod artifacts;
 mod asking;
