@@ -490,6 +490,7 @@ fn an_orchestrator_is_offered_the_plan_wherever_it_stands() {
         orchestrator: Some(true),
         decisions: None,
         assistant: None,
+        agents: None,
     };
     let named = |offer: &Offer, seat: &Seat| -> Vec<&'static str> {
         relayed(&STAGED, &offer.tools(&STAGED), seat)
@@ -503,6 +504,7 @@ fn an_orchestrator_is_offered_the_plan_wherever_it_stands() {
         orchestrator: Some(false),
         decisions: None,
         assistant: None,
+        agents: None,
     };
     assert!(named(&Offer::Off, &session).is_empty());
     let planning = Offer::Active(vec!["plan".to_owned()]);

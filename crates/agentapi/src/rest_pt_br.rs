@@ -1,8 +1,8 @@
-//! The pt-BR words of what `mcp_pt_br.rs` does not hold: the Assistant mode's
-//! tools, the `full` and `comments` arguments that `lean` adds to a tool's
-//! schema, and the five tools a client on another machine reads. By name, so
-//! the English base stays where it was written; only the words are
-//! Portuguese.
+//! The pt-BR words of what `mcp_pt_br.rs` does not hold: the Assistant and
+//! Agents modes' tools, the `full` and `comments` arguments that `lean` adds
+//! to a tool's schema, and the five tools a client on another machine reads.
+//! By name, so the English base stays where it was written; only the words
+//! are Portuguese.
 
 use crate::mcp::Said;
 
@@ -36,6 +36,17 @@ pub(crate) fn assistant(name: &str) -> Option<&'static Said> {
         "devpit_telegram_send" => &Said {
             description: "Somente no modo Assistente: enviar uma mensagem à pessoa no Telegram, quando ela pediu para ser avisada lá ou está fora. Vai tanto dela quanto a privacidade do chat deixa sair. A resposta dela volta a este chat como a vez dela; uma pergunta de uma das suas sessões ela responde com os botões da própria sessão, não por você.",
             params: &[("text", "A mensagem, de no máximo 4000 caracteres.")],
+        },
+        _ => return None,
+    })
+}
+
+/// What the Agents mode's tools say in pt-BR, by the name they are listed under.
+pub(crate) fn agents(name: &str) -> Option<&'static Said> {
+    Some(match name {
+        "devpit_agents" => &Said {
+            description: "Somente no modo Agentes: os seus agentes, a quem você entrega o trabalho, cada um com o identificador, o nome e o papel. Você planeja e delega; eles fazem o trabalho. Só a pessoa cria ou muda um agente.",
+            params: &[],
         },
         _ => return None,
     })

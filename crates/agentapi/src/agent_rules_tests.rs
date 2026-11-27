@@ -13,7 +13,7 @@ struct Rule {
     pt: &'static str,
 }
 
-const RULES: [Rule; 6] = [
+const RULES: [Rule; 8] = [
     Rule {
         rule: "a card is not moved into a column that runs a step",
         tool: "devpit_move_card",
@@ -50,6 +50,18 @@ const RULES: [Rule; 6] = [
         en: "Assistant mode only",
         pt: "Somente no modo Assistente",
     },
+    Rule {
+        rule: "the Agents tools exist only in the Agents mode",
+        tool: "devpit_agents",
+        en: "Agents mode only",
+        pt: "Somente no modo Agentes",
+    },
+    Rule {
+        rule: "only the person creates or changes an agent",
+        tool: "devpit_agents",
+        en: "Only the person creates or changes an agent",
+        pt: "Só a pessoa cria ou muda um agente",
+    },
 ];
 
 fn described(language: &str, tool: &str) -> String {
@@ -57,6 +69,7 @@ fn described(language: &str, tool: &str) -> String {
         orchestrator: Some(true),
         decisions: Some(true),
         assistant: Some(true),
+        agents: Some(true),
     };
     crate::mcp::tools_said(&Offer::Off, &seat, language)
         .into_iter()
@@ -128,6 +141,7 @@ fn listed(language: &str) -> Vec<serde_json::Value> {
         orchestrator: Some(true),
         decisions: Some(true),
         assistant: Some(true),
+        agents: Some(true),
     };
     crate::mcp::tools_said(&Offer::Off, &seat, language)
 }

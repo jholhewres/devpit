@@ -78,6 +78,7 @@ pub(crate) fn described(language: &str, tool: &Tool, mut input: Value) -> (&'sta
             crate::mcp_pt_br::said(tool.name)
                 .or_else(|| crate::devflow_pt_br::said(tool.name))
                 .or_else(|| crate::rest_pt_br::assistant(tool.name))
+                .or_else(|| crate::rest_pt_br::agents(tool.name))
         })
         .flatten();
     let Some(said) = said else {
@@ -596,6 +597,7 @@ pub(crate) fn tools_said(offer: &Offer, seat: &Seat, language: &str) -> Vec<Valu
         .chain(offered)
         .chain(relayed)
         .chain(crate::assistant::offered(seat))
+        .chain(crate::agents::offered(seat))
         .chain(crate::consult::offered(seat))
         .filter_map(|tool| crate::listing::listed(tool, seat, language))
         .collect()
@@ -714,6 +716,7 @@ fn call(
         .chain(&SETUP_TOOLS)
         .chain(STAGED.iter().map(|(_, tool)| tool))
         .chain(&crate::assistant::TOOLS)
+        .chain(&crate::agents::TOOLS)
         .chain(&crate::consult::TOOLS)
         .chain(&crate::consult::ORCHESTRATOR);
     let Some(tool) = every.find(|tool| tool.name == name) else {
