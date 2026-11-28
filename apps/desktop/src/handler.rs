@@ -7,11 +7,11 @@
 //! is what is typed.
 
 use crate::{
-    account, account_quota, adopting, agent_choice, agent_door, agent_profiles, arranging,
-    artifacts, asking, asking_kept, asking_picks, asking_waiting, assistant, assistant_watch,
-    attaching_chat, blocks, board, branches, briefing, browser, browser_cookies, browser_driving,
-    browser_menu, card_chat, card_elsewhere, card_ties, card_work, cards, chat, chat_aside,
-    chat_queue, chat_relay, chat_remote, chat_window, checkpoint, checkpoint_findings,
+    account, account_quota, adopting, agent_choice, agent_door, agent_profiles, agents_mode,
+    arranging, artifacts, asking, asking_kept, asking_picks, asking_waiting, assistant,
+    assistant_watch, attaching_chat, blocks, board, branches, briefing, browser, browser_cookies,
+    browser_driving, browser_menu, card_chat, card_elsewhere, card_ties, card_work, cards, chat,
+    chat_aside, chat_queue, chat_relay, chat_remote, chat_window, checkpoint, checkpoint_findings,
     checkpoint_preview, checkpoint_tested, claude_accounts, claude_plugin, cloning, columns,
     commands, decisions, delegations, desk, devflow_asks, devflow_binary, devflow_card,
     devflow_codex, devflow_jev, devflow_mcp, devflow_plan, devflow_plugin, devflow_profile,
@@ -201,6 +201,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Syn
         host_panes::tab_host,
         assistant::assistant_mode,
         assistant::assistant_mode_set,
+        agents_mode::agents_mode,
+        agents_mode::agents_mode_set,
         assistant_watch::assistant_heartbeat,
         assistant_watch::assistant_heartbeat_set,
         briefing::assistant_briefing,

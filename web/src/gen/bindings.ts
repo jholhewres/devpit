@@ -761,6 +761,14 @@ export const commands = {
 	 *  the assistant's tools; its brief is read when the chat next starts.
 	 */
 	assistantModeSet: (projectId: string, on: boolean) => typedError<AssistantMode, RpcError>(__TAURI_INVOKE("assistant_mode_set", { projectId, on })),
+	/**  `agents.mode` — whether this orchestrator's Agents mode is on. */
+	agentsMode: (projectId: string) => typedError<AgentsMode, RpcError>(__TAURI_INVOKE("agents_mode", { projectId })),
+	/**
+	 *  `agents.mode_set` — Agents mode on or off, as the person clicked it. The
+	 *  MCP servers are told to look again, so the running chat gains or loses the
+	 *  agents' tools; its brief is read when the chat next starts.
+	 */
+	agentsModeSet: (projectId: string, on: boolean) => typedError<AgentsMode, RpcError>(__TAURI_INVOKE("agents_mode_set", { projectId, on })),
 	/**  `assistant.heartbeat` — the heartbeat's settings. */
 	assistantHeartbeat: () => typedError<Heartbeat, RpcError>(__TAURI_INVOKE("assistant_heartbeat")),
 	/**  `assistant.heartbeat_set` — the heartbeat's settings, as the person chose. */
@@ -2336,6 +2344,11 @@ export type Agents = {
 	rejected: RejectedAgent[],
 	/**  Where they live, so the screen can say where to put another one. */
 	directory: string,
+};
+
+/**  Agents mode for one orchestrator. */
+export type AgentsMode = {
+	on: boolean,
 };
 
 /**  What a person answered. */

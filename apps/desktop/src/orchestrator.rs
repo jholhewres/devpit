@@ -297,7 +297,7 @@ pub(crate) fn seed(folder: &Path, locale: SessionLocale) -> std::io::Result<()> 
 }
 
 /// devpit's half of an orchestrator's folder, written in `locale`: its brief
-/// of this build, and the assistant's beside it when its mode is on. The
+/// of this build, and each mode's beside it when that mode is on. The
 /// birth of each of the orchestrator's own sessions writes it in that
 /// session's language; the window, in front, in its own. Never under a
 /// session already running, whose files stay the language it was born in.
@@ -306,9 +306,15 @@ pub(crate) fn written_in(
     folder: &Path,
     locale: SessionLocale,
 ) -> std::io::Result<()> {
-    seed(folder, locale).and_then(|()| {
-        crate::assistant::brief_in(folder, crate::assistant::on(store, folder), locale)
-    })
+    seed(folder, locale)
+        .and_then(|()| {
+            crate::assistant::brief_in(folder, crate::assistant::on(store, folder), locale)
+        })
+        // A mode nobody ever set leaves the folder as it always was.
+        .and_then(|()| match crate::agents_mode::set(store, folder) {
+            Some(on) => crate::agents_mode::brief_in(folder, on, locale),
+            None => Ok(()),
+        })
 }
 
 /// The birth of a conversation of the orchestrator `project_id`, when the

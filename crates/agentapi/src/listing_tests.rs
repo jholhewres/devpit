@@ -34,6 +34,7 @@ const PROJECT: Seat = Seat {
     orchestrator: Some(false),
     decisions: Some(false),
     assistant: None,
+    agents: None,
 };
 
 #[test]
@@ -43,6 +44,7 @@ fn every_tool_named_here_is_one_devpit_has() {
         .chain(&SETUP_TOOLS)
         .chain(STAGED.iter().map(|(_, tool)| tool))
         .chain(&crate::assistant::TOOLS)
+        .chain(&crate::agents::TOOLS)
         .chain(&crate::consult::TOOLS)
         .chain(&crate::consult::ORCHESTRATOR)
         .map(|tool| tool.name)
@@ -118,6 +120,7 @@ fn an_orchestrator_is_offered_its_own_tools_and_another_projects_board() {
         orchestrator: Some(true),
         decisions: Some(true),
         assistant: None,
+        agents: None,
     };
     // The app answers `off` for an orchestrator: its folder is notes.
     let listed = tools(&Offer::Off, &seat);
@@ -201,6 +204,7 @@ fn the_project_agent_is_offered_to_the_orchestrator_alone() {
         orchestrator: Some(true),
         decisions: Some(false),
         assistant: None,
+        agents: None,
     };
     for name in ["devpit_project_agent_ask", "devpit_project_agent_brief"] {
         let tool = TOOLS
@@ -221,6 +225,7 @@ fn the_assistants_tools_come_with_assistant_mode_alone() {
         orchestrator: Some(true),
         decisions: Some(false),
         assistant,
+        agents: None,
     };
     let before = names(&tools(&Offer::Off, &orchestrator(None))).join(",");
     let off = names(&tools(&Offer::Off, &orchestrator(Some(false)))).join(",");
@@ -256,6 +261,79 @@ fn turning_assistant_mode_on_or_off_changes_the_list() {
     assert_eq!(watch.seat.assistant, Some(true));
 }
 
+/// Agents mode adds its group to the orchestrator's list, and only it: with
+/// the mode off the list is the one an app too old to say gets, byte for byte.
+#[test]
+fn the_agents_tools_come_with_agents_mode_alone() {
+    let orchestrator = |agents| Seat {
+        orchestrator: Some(true),
+        decisions: Some(false),
+        assistant: None,
+        agents,
+    };
+    let said = |seat: &Seat| serde_json::to_string(&tools(&Offer::Off, seat)).expect("json");
+    let before = said(&orchestrator(None));
+    assert_eq!(
+        said(&orchestrator(Some(false))),
+        before,
+        "the list without the mode changed"
+    );
+    let count = tools(&Offer::Off, &orchestrator(None)).len();
+    let on = tools(&Offer::Off, &orchestrator(Some(true)));
+    let on = names(&on);
+    for tool in &crate::agents::TOOLS {
+        assert!(on.contains(&tool.name), "{} was not listed", tool.name);
+        assert!(!before.contains(tool.name), "{} listed off", tool.name);
+    }
+    assert_eq!(on.len(), count + crate::agents::TOOLS.len());
+}
+
+/// An app too old to say whether Agents mode is on never sees its group,
+/// whatever else it says and whatever Devflow offers.
+#[test]
+fn an_app_too_old_to_say_never_sees_the_agents_group() {
+    let old = Seat::of(&json!({
+        "offer": "active", "orchestrator": true, "decisions": true, "assistant": true,
+    }));
+    assert_eq!(old.agents, None);
+    for seat in [Seat::default(), old] {
+        for offer in [
+            Offer::Off,
+            Offer::Setup,
+            Offer::Active(vec!["plan".into(), "review".into()]),
+        ] {
+            let listed = tools(&offer, &seat);
+            for tool in &crate::agents::TOOLS {
+                assert!(
+                    !names(&listed).contains(&tool.name),
+                    "{} offered to {seat:?}",
+                    tool.name
+                );
+            }
+        }
+    }
+}
+
+/// The person turning Agents mode on or off changes the list the server
+/// offers, and the client is told so.
+#[test]
+fn turning_agents_mode_on_or_off_changes_the_list() {
+    let root = tempfile::tempdir().expect("tmp");
+    let mut watch = Watch::new(root.path());
+    let looked = watch.due().expect("due");
+    let off = json!({ "offer": "off", "orchestrator": true, "assistant": false });
+    assert!(watch.settle(looked.clone(), Ok(off.clone())).is_some());
+    let on = json!({ "offer": "off", "orchestrator": true, "assistant": false, "agents": true });
+    assert!(watch.settle(looked.clone(), Ok(on.clone())).is_some());
+    assert_eq!(watch.seat.agents, Some(true));
+    assert!(watch.settle(looked.clone(), Ok(on)).is_none());
+    assert!(
+        watch.settle(looked, Ok(off)).is_some(),
+        "off is a change too"
+    );
+    assert_eq!(watch.seat.agents, None);
+}
+
 /// A project's own session is offered its project agent, to ask and to
 /// propose, without `project`: its own is the only one it reaches. The
 /// orchestrator keeps its own pair, and an app too old to say offers neither.
@@ -269,6 +347,7 @@ fn a_projects_session_is_offered_its_own_project_agent_and_no_one_else_is() {
         orchestrator: Some(true),
         decisions: Some(false),
         assistant: None,
+        agents: None,
     };
     let session = tools(&Offer::Off, &PROJECT);
     for name in SESSION_TOOLS {
@@ -301,6 +380,7 @@ fn a_session_may_message_and_only_an_orchestrator_hears_of_idle() {
         orchestrator: Some(true),
         decisions: Some(false),
         assistant: None,
+        agents: None,
     };
     let listed = tools(&Offer::Off, &orchestrator);
     let orchestrating = names(&listed);

@@ -60,7 +60,7 @@ impl Asked {
 }
 
 /// The methods this build answers, for an agent asking what it can do.
-pub(crate) const METHODS: [&str; 61] = [
+pub(crate) const METHODS: [&str; 62] = [
     "context",
     "board",
     "card",
@@ -120,6 +120,7 @@ pub(crate) const METHODS: [&str; 61] = [
     "heartbeat_status",
     "briefing",
     "telegram_send",
+    "agents",
     "session_message",
     "session_notify_idle",
 ];
@@ -623,6 +624,9 @@ fn respond_in(
             projects,
             &asked.params,
         );
+    }
+    if crate::agents_mode::METHODS.contains(&asked.method.as_str()) {
+        return crate::agents_mode::respond(&asked.method, here);
     }
     if asked.method.starts_with("artifact") {
         return crate::artifacts::respond(

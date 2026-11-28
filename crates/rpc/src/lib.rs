@@ -10,6 +10,7 @@
 pub mod account;
 pub mod accounts;
 pub mod agents;
+pub mod agents_mode;
 pub mod blocks;
 pub mod board;
 pub mod card;
@@ -70,6 +71,7 @@ pub use accounts::{
     AccountQuota, AccountQuotas, Accounts, ClaudeAccount, ProjectAccount, QuotaState,
 };
 pub use agents::{Agent, Agents, RejectedAgent};
+pub use agents_mode::AgentsMode;
 pub use blocks::{BlockChanged, CommandBlock, FolderGlance, PaneBlocks};
 pub use board::{Board, CardChanged, Column, ColumnDeleted, Run, RunState, Step, StepKind};
 pub use card::{

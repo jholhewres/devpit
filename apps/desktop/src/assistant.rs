@@ -28,8 +28,6 @@ fn words(locale: SessionLocale) -> &'static str {
 }
 /// The line that imports it.
 pub(crate) const IMPORT: &str = "@.devpit/assistant.md";
-/// The line it goes under.
-const BESIDE: &str = "@.devpit/orchestrator.md";
 /// Its key among the orchestrator's settings.
 const KEY: &str = "assistant";
 
@@ -42,26 +40,9 @@ pub(crate) fn on(store: &Store, folder: &Path) -> bool {
 
 /// `CLAUDE.md` with the import under devpit's brief, or without it; every
 /// other line as the person wrote it.
+#[cfg(test)]
 pub(crate) fn imported(text: &str, on: bool) -> String {
-    let mut lines: Vec<&str> = text
-        .split_inclusive('\n')
-        .filter(|line| line.trim() != IMPORT)
-        .collect();
-    if !on {
-        return lines.concat();
-    }
-    let line = format!("{IMPORT}\n");
-    match lines.iter().position(|one| one.trim() == BESIDE) {
-        Some(at) => {
-            if !lines[at].ends_with('\n') {
-                return format!("{}\n{line}", lines.concat());
-            }
-            lines.insert(at + 1, &line);
-            lines.concat()
-        }
-        None if text.is_empty() || text.ends_with('\n') => format!("{}{line}", lines.concat()),
-        None => format!("{}\n{line}", lines.concat()),
-    }
+    crate::orchestrator_brief::imported(text, IMPORT, on)
 }
 
 /// Refuses to write `path` unless it is a file of `folder` itself: the
@@ -82,32 +63,7 @@ pub(crate) fn inside(folder: &Path, path: &Path) -> std::io::Result<()> {
 /// taken out when off, in the language of the session the folder is being
 /// written for.
 pub(crate) fn brief_in(folder: &Path, on: bool, locale: SessionLocale) -> std::io::Result<()> {
-    let brief = folder.join(BRIEF.0);
-    if on {
-        let text = format!(
-            "<!-- written by devpit {} -->\n{}",
-            env!("CARGO_PKG_VERSION"),
-            words(locale)
-        );
-        std::fs::create_dir_all(brief.parent().unwrap_or(folder))?;
-        inside(folder, &brief)?;
-        if std::fs::read_to_string(&brief).ok() != Some(text.clone()) {
-            std::fs::write(&brief, text)?;
-        }
-    } else if brief.symlink_metadata().is_ok() {
-        // A link is removed, not what it points at.
-        std::fs::remove_file(&brief)?;
-    }
-    let claude = folder.join("CLAUDE.md");
-    if claude.symlink_metadata().is_ok() {
-        inside(folder, &claude)?;
-    }
-    let before = std::fs::read_to_string(&claude).unwrap_or_default();
-    let after = imported(&before, on);
-    if after != before {
-        std::fs::write(&claude, after)?;
-    }
-    crate::orchestrator_brief::write_agents(folder)
+    crate::orchestrator_brief::mode_brief(folder, BRIEF.0, words(locale), IMPORT, on)
 }
 
 /// The methods only an orchestrator in Assistant mode is answered, for the

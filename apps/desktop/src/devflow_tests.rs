@@ -254,6 +254,30 @@ fn the_offer_says_who_asks_and_an_orchestrator_is_offered_no_flow() {
     assert_eq!(orchestrating["orchestrator"], true);
 }
 
+/// Agents mode is said to the server only while it is on: off, the answer
+/// is the one it always was.
+#[test]
+fn the_offer_says_agents_mode_only_while_it_is_on() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = Store::open(&dir.path().join("state.db")).expect("store");
+    let mut here = project("prj_offer_agents", dir.path());
+    here.orchestrator = Some("claude".to_owned());
+    let said = |store: &Store| {
+        let state = looked(None, store, &here, dir.path());
+        offer(store, &here, dir.path(), &state)
+    };
+    let off = said(&store);
+    assert!(off.get("agents").is_none(), "{off}");
+    store
+        .set_orchestrator_setting(dir.path(), "agents", json!(true))
+        .expect("on");
+    assert_eq!(said(&store)["agents"], true);
+    store
+        .set_orchestrator_setting(dir.path(), "agents", json!(false))
+        .expect("off");
+    assert_eq!(said(&store), off);
+}
+
 #[test]
 fn every_devflow_method_is_answered_by_the_agent_api() {
     for method in METHODS {

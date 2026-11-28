@@ -13,6 +13,7 @@
 
 #[cfg(test)]
 mod agent_rules_tests;
+mod agents;
 pub mod apps;
 mod assistant;
 pub mod cli;
